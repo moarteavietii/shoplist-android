@@ -63,6 +63,7 @@ android {
         release {
             optimization {
                 enable = true
+                // Gradual R8 adoption: start with known-safe libraries, expand later.
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
             buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
