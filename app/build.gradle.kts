@@ -13,11 +13,11 @@ val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     providers.fileContents(localPropertiesFile).asText
         .map { text ->
             val properties = Properties().apply { text.reader().use { load(it) } }
-            properties.getProperty("shoplist.devBaseUrl") ?: "http://10.0.2.2:3000"
+            properties.getProperty("shoplist.devBaseUrl") ?: "http://192.168.0.141:3000"
         }
         .get()
 } else {
-    "http://10.0.2.2:3000"
+    "http://192.168.0.141:3000"
 }
 
 android {
