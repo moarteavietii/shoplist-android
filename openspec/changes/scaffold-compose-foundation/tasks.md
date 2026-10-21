@@ -1,7 +1,7 @@
 ## 1. Build setup and dependencies
 
 - [ ] 1.1 Add all new dependencies and plugins to `gradle/libs.versions.toml` (Compose BOM, activity-compose, Hilt + KSP, Retrofit, OkHttp, kotlinx-serialization + plugin, security-crypto, CameraX + ML Kit) and reference them from `app/build.gradle.kts` via aliases only
-- [ ] 1.2 Add `buildConfigField` entries for base URLs (debug: `http://192.168.0.141:3000`, release: `https://shoppinglist.pascariu.eu`) and enable `buildConfig`
+- [ ] 1.2 Add `buildConfigField` entries for base URLs (debug: `devBaseUrl` from gitignored `local.properties` with `http://10.0.2.2:3000` fallback, release: `https://shoppinglist.pascariu.eu`) and enable `buildConfig`
 - [ ] 1.3 Add debug-source-set `network_security_config.xml` allowing cleartext only for the dev host; keep release HTTPS-only
 - [ ] 1.4 Verify the build compiles with `./gradlew assembleDebug`
 
