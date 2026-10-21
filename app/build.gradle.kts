@@ -41,13 +41,13 @@ require(releaseBaseUrl.startsWith("https://")) {
 }
 
 android {
-    namespace = "com.example.shoplist_android"
+    namespace = "eu.pascariu.shoppinglist"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.shoplist_android"
+        applicationId = "eu.pascariu.shoppinglist"
         minSdk = 35
         targetSdk = 37
         versionCode = 1

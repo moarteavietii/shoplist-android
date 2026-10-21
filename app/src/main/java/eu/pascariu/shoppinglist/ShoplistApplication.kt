@@ -1,4 +1,4 @@
-package com.example.shoplist_android
+package eu.pascariu.shoppinglist
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
