@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import com.example.shoplist_android.ui.theme.LocalShoplistColors
 import com.example.shoplist_android.ui.theme.LocalShoplistTypography
 import com.example.shoplist_android.ui.theme.ShoplistTheme
@@ -23,7 +24,7 @@ class MainActivity : ComponentActivity() {
                     val colors = LocalShoplistColors.current
                     val typography = LocalShoplistTypography.current
                     Text(
-                        text = "Shoplist",
+                        text = stringResource(R.string.app_name),
                         style = typography.title,
                         color = colors.content,
                     )
