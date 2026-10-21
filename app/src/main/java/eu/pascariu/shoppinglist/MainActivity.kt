@@ -1,4 +1,4 @@
-package com.example.shoplist_android
+package eu.pascariu.shoppinglist
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,9 +9,9 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.example.shoplist_android.ui.theme.LocalShoplistColors
-import com.example.shoplist_android.ui.theme.LocalShoplistTypography
-import com.example.shoplist_android.ui.theme.ShoplistTheme
+import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
+import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
+import eu.pascariu.shoppinglist.ui.theme.ShoplistTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

@@ -1,4 +1,4 @@
-package com.example.shoplist_android.ui.theme
+package eu.pascariu.shoppinglist.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Immutable
