@@ -8,16 +8,27 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+val defaultDevBaseUrl = "http://10.0.2.2:3000"
 val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
 val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     providers.fileContents(localPropertiesFile).asText
         .map { text ->
             val properties = Properties().apply { text.reader().use { load(it) } }
-            properties.getProperty("shoplist.devBaseUrl") ?: "http://10.0.2.2:3000"
+            properties.getProperty("shoplist.devBaseUrl") ?: run {
+                logger.warn(
+                    "local.properties found but 'shoplist.devBaseUrl' is not set; " +
+                        "falling back to $defaultDevBaseUrl"
+                )
+                defaultDevBaseUrl
+            }
         }
         .get()
 } else {
-    "http://10.0.2.2:3000"
+    logger.warn(
+        "local.properties not found; debug builds will use $defaultDevBaseUrl. " +
+            "Set 'shoplist.devBaseUrl' in local.properties to override."
+    )
+    defaultDevBaseUrl
 }
 
 android {
