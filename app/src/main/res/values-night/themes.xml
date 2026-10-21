@@ -1,5 +1,3 @@
 <resources>
-    <style name="Theme.Shoplistandroid" parent="android:Theme.Material.NoActionBar">
-        <item name="android:statusBarColor">@android:color/transparent</item>
-    </style>
+    <style name="Theme.Shoplistandroid" parent="android:Theme.Material.NoActionBar" />
 </resources>
