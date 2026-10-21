@@ -1,4 +1,10 @@
 import java.util.Properties
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 
 plugins {
     alias(libs.plugins.android.application)
@@ -50,15 +56,21 @@ require(devHost.isNotEmpty()) {
 }
 
 val debugResDir = layout.buildDirectory.dir("generated/dev-network-security-config/res")
-val generateDevNetworkSecurityConfig = tasks.register("generateDevNetworkSecurityConfig") {
-    val host = devHost
-    val outputFile = debugResDir.get().file("xml/network_security_config.xml")
-    inputs.property("devHost", host)
-    outputs.file(outputFile)
-    doLast {
-        val target = outputFile.asFile
+
+abstract class GenerateDevNetworkSecurityConfig : DefaultTask() {
+    @get:Input
+    abstract val devHost: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputResDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val host = devHost.get()
+        val target = outputResDir.get().file("xml/network_security_config.xml").asFile
         target.parentFile.mkdirs()
-        val xml = """
+        target.writeText(
+            """
             <?xml version="1.0" encoding="utf-8"?>
             <network-security-config>
                 <domain-config cleartextTrafficPermitted="true">
@@ -66,9 +78,15 @@ val generateDevNetworkSecurityConfig = tasks.register("generateDevNetworkSecurit
                     <domain includeSubdomains="false">10.0.2.2</domain>
                 </domain-config>
             </network-security-config>
-        """.trimIndent()
-        target.writeText(xml)
+            """.trimIndent()
+        )
     }
+}
+
+val resolvedDevHost = devHost
+val generateDevNetworkSecurityConfig = tasks.register<GenerateDevNetworkSecurityConfig>("generateDevNetworkSecurityConfig") {
+    devHost.set(resolvedDevHost)
+    outputResDir.set(debugResDir)
 }
 
 android {
@@ -104,14 +122,20 @@ android {
         buildConfig = true
         compose = true
     }
-    sourceSets {
-        getByName("debug") {
-            res.srcDir(debugResDir.get())
-        }
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        if (variant.buildType == "debug") {
+            variant.sources.res?.addGeneratedSourceDirectory(
+                generateDevNetworkSecurityConfig,
+                GenerateDevNetworkSecurityConfig::outputResDir
+            )
+        }
     }
 }
 
