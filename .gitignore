@@ -1,6 +1,7 @@
 *.iml
 .gradle
 .coda/
+.codereviews/
 .idea/
 /local.properties
 /.idea/caches
