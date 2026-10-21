@@ -20,6 +20,15 @@ val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     "http://10.0.2.2:3000"
 }
 
+require(devBaseUrl.none { it == '"' || it == '\\' || it.isWhitespace() }) {
+    "shoplist.devBaseUrl must not contain quotes, backslashes, or whitespace"
+}
+
+val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
+require(releaseBaseUrl.startsWith("https://")) {
+    "release BASE_URL must use HTTPS"
+}
+
 android {
     namespace = "com.example.shoplist_android"
     compileSdk {
@@ -45,7 +54,7 @@ android {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
-            buildConfigField("String", "BASE_URL", "\"https://shoppinglist.pascariu.eu\"")
+            buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
         }
     }
     buildFeatures {
