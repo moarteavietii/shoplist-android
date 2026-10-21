@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.serialization)
@@ -5,6 +7,14 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+val devBaseUrl: String = localProperties.getProperty("devBaseUrl")
+    ?: "http://10.0.2.2:3000"
 
 android {
     namespace = "com.example.shoplist_android"
@@ -24,7 +34,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://192.168.0.141:3000\"")
+            buildConfigField("String", "BASE_URL", "\"$devBaseUrl\"")
         }
         release {
             optimization {
