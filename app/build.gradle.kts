@@ -8,13 +8,17 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
+val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
+val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
+    providers.fileContents(localPropertiesFile).asText
+        .map { text ->
+            val properties = Properties().apply { text.reader().use { load(it) } }
+            properties.getProperty("shoplist.devBaseUrl") ?: "http://10.0.2.2:3000"
+        }
+        .get()
+} else {
+    "http://10.0.2.2:3000"
 }
-
-val devBaseUrl: String = localProperties.getProperty("devBaseUrl")
-    ?: "http://10.0.2.2:3000"
 
 android {
     namespace = "com.example.shoplist_android"
