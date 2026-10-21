@@ -40,6 +40,37 @@ require(releaseBaseUrl.startsWith("https://")) {
     "release BASE_URL must use HTTPS"
 }
 
+val devHost = devBaseUrl
+    .removePrefix("http://")
+    .removePrefix("https://")
+    .substringBefore('/')
+    .substringBefore(':')
+require(devHost.isNotEmpty()) {
+    "shoplist.devBaseUrl must include a host (got '$devBaseUrl')"
+}
+
+val debugResDir = layout.buildDirectory.dir("generated/dev-network-security-config/res")
+val generateDevNetworkSecurityConfig = tasks.register("generateDevNetworkSecurityConfig") {
+    val host = devHost
+    val outputFile = debugResDir.get().file("xml/network_security_config.xml")
+    inputs.property("devHost", host)
+    outputs.file(outputFile)
+    doLast {
+        val target = outputFile.asFile
+        target.parentFile.mkdirs()
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <network-security-config>
+                <domain-config cleartextTrafficPermitted="true">
+                    <domain includeSubdomains="false">$host</domain>
+                    <domain includeSubdomains="false">10.0.2.2</domain>
+                </domain-config>
+            </network-security-config>
+        """.trimIndent()
+        target.writeText(xml)
+    }
+}
+
 android {
     namespace = "eu.pascariu.shoppinglist"
     compileSdk {
@@ -71,6 +102,11 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
+    }
+    sourceSets {
+        getByName("debug") {
+            res.srcDir(debugResDir.get())
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
