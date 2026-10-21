@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-val defaultDevBaseUrl = "http://10.0.2.2:3000"
+val defaultDevBaseUrl = "http://192.168.0.141:3000"
 val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
 val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     providers.fileContents(localPropertiesFile).asText
