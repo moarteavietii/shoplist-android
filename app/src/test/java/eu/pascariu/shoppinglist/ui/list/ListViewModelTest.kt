@@ -67,7 +67,7 @@ class ListViewModelTest {
         itemsRepository = ItemsRepository(retrofit.create(ItemsApi::class.java))
         shopsRepository = ShopsRepository(retrofit.create(ShopsApi::class.java))
         undoHistoryStore = UndoHistoryStore(
-            dataStore = PreferenceDataStoreFactory.create(scope = CoroutineScope(testDispatcher)) {
+            dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
                 dataStoreFile
             },
             json = json,
