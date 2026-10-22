@@ -41,6 +41,7 @@ class ListViewModel @Inject constructor(
 
     private val inFlightChecks = MutableStateFlow(0)
     private val undoMutex = Mutex()
+    private var isCreateInFlight = false
 
     init {
         viewModelScope.launch {
@@ -177,6 +178,8 @@ class ListViewModel @Inject constructor(
     fun onAddItemSave() {
         val modal = localState.value.addItemModal ?: return
         if (!modal.canSave) return
+        if (isCreateInFlight) return
+        isCreateInFlight = true
         viewModelScope.launch {
             try {
                 itemsRepository.create(
@@ -189,6 +192,7 @@ class ListViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
+                isCreateInFlight = false
                 return@launch
             }
             localState.update {
