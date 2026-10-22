@@ -83,6 +83,7 @@ fun QrScanEffect(
                     },
                 ))
                 cameraProvider.unbindAll()
+                if (isDisposed) return@addListener
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
