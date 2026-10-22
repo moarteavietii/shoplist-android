@@ -61,7 +61,9 @@ class EncryptedDeviceIdStore @Inject constructor(
 
     @Synchronized
     override fun getOrCreate(): String {
-        prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
+        prefs.getString(KEY_DEVICE_ID, null)?.let { stored ->
+            if (isValidDeviceId(stored)) return stored
+        }
         val deviceId = UUID.randomUUID().toString()
         prefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
         return deviceId
@@ -74,3 +76,9 @@ class EncryptedDeviceIdStore @Inject constructor(
         const val MASTER_KEY_ALIAS = "_androidx_security_master_key_"
     }
 }
+
+internal fun isValidDeviceId(deviceId: String): Boolean =
+    deviceId.length <= MAX_DEVICE_ID_LENGTH && DEVICE_ID_PATTERN.matches(deviceId)
+
+private val DEVICE_ID_PATTERN = Regex("[A-Za-z0-9_-]+")
+private const val MAX_DEVICE_ID_LENGTH = 64
