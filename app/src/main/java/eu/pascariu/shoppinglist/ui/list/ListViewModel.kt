@@ -14,7 +14,9 @@ import eu.pascariu.shoppinglist.data.undo.UndoEntry
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
+import eu.pascariu.shoppinglist.ui.drawer.DrawerShop
 import javax.inject.Inject
+import retrofit2.HttpException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -222,6 +224,103 @@ class ListViewModel @Inject constructor(
         localState.update { it.copy(errorMessage = null) }
     }
 
+    fun onViewSelected(shopId: Long) {
+        localState.update { it.copy(activeViewId = shopId, drawerOpen = false) }
+    }
+
+    fun onDrawerToggled() {
+        localState.update { it.copy(drawerOpen = !it.drawerOpen) }
+    }
+
+    fun onDrawerDismissed() {
+        localState.update { it.copy(drawerOpen = false) }
+    }
+
+    fun onShopEditTapped(shopId: Long) {
+        val shop = shopsRepository.shops.value.firstOrNull { it.id == shopId } ?: return
+        localState.update {
+            it.copy(
+                shopModal = ShopModalUiState(
+                    mode = ShopModalMode.EDIT,
+                    shopId = shop.id,
+                    shopName = shop.name,
+                    name = shop.name,
+                ),
+            )
+        }
+    }
+
+    fun onAddShopTapped() {
+        localState.update {
+            it.copy(shopModal = ShopModalUiState(mode = ShopModalMode.CREATE))
+        }
+    }
+
+    fun onShopNameChanged(name: String) {
+        localState.update { state ->
+            state.copy(shopModal = state.shopModal?.copy(name = name))
+        }
+    }
+
+    fun onShopDiscard() {
+        localState.update { it.copy(shopModal = null) }
+    }
+
+    fun onShopSave() {
+        val modal = localState.value.shopModal ?: return
+        if (!modal.canSave || modal.saving) return
+        localState.update { it.copy(shopModal = it.shopModal?.copy(saving = true, error = null)) }
+        viewModelScope.launch {
+            try {
+                val trimmed = modal.trimmedName
+                if (modal.mode == ShopModalMode.CREATE) {
+                    shopsRepository.create(trimmed)
+                } else {
+                    shopsRepository.rename(modal.shopId ?: return@launch, trimmed)
+                }
+                localState.update { it.copy(shopModal = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                localState.update {
+                    it.copy(shopModal = it.shopModal?.copy(saving = false, error = shopErrorMessage(e)))
+                }
+            }
+        }
+    }
+
+    fun onShopDeleteTapped() {
+        localState.update { it.copy(shopModal = it.shopModal?.copy(deleteConfirmOpen = true)) }
+    }
+
+    fun onShopDeleteCancelled() {
+        localState.update { it.copy(shopModal = it.shopModal?.copy(deleteConfirmOpen = false)) }
+    }
+
+    fun onShopDeleteConfirmed() {
+        val modal = localState.value.shopModal ?: return
+        val shopId = modal.shopId ?: return
+        localState.update { it.copy(shopModal = it.shopModal?.copy(saving = true, deleteConfirmOpen = false)) }
+        viewModelScope.launch {
+            try {
+                shopsRepository.delete(shopId)
+                localState.update { it.copy(shopModal = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                localState.update {
+                    it.copy(shopModal = it.shopModal?.copy(saving = false, error = shopErrorMessage(e)))
+                }
+            }
+        }
+    }
+
+    private fun shopErrorMessage(e: Exception): String =
+        when {
+            e is HttpException && e.code() == 409 -> "A shop with this name already exists"
+            else -> "Could not save shop"
+        }
+
     private fun openAddItemModal(prefilledTitle: String) {
         val shops = orderViewsGlobalFirst(shopsRepository.shops.value)
         localState.update { state ->
@@ -242,7 +341,13 @@ class ListViewModel @Inject constructor(
         local: LocalUiState,
     ): ListUiState {
         val globalShop = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }
-        val activeViewId = globalShop?.id
+        val globalShopId = globalShop?.id
+        val activeShop = shops.firstOrNull { it.id == local.activeViewId }
+        val activeViewId = when {
+            activeShop != null -> activeShop.id
+            globalShopId != null -> globalShopId
+            else -> null
+        }
         val viewItems = if (activeViewId == null) {
             items
         } else {
@@ -251,17 +356,79 @@ class ListViewModel @Inject constructor(
         val sorted = sortManual(items = viewItems, viewId = activeViewId)
         val query = local.searchQuery.trim()
         val filtered = if (query.isEmpty()) sorted else sorted.filter { fuzzyMatch(query, it.name) }
+        val activeName = when {
+            activeShop != null -> activeShop.name
+            globalShop != null -> globalShop.name
+            else -> GLOBAL_VIEW_NAME
+        }
+        val hasUnchecked = deriveHasUncheckedItems(items, shops)
+        val drawerShops = buildDrawerShops(
+            shops = shops,
+            globalShopId = globalShopId,
+            activeViewId = activeViewId,
+            hasUncheckedItems = hasUnchecked,
+        )
         return ListUiState(
             items = sorted,
-            watermarkName = globalShop?.name ?: GLOBAL_VIEW_NAME,
+            watermarkName = activeName,
+            activeViewId = activeViewId,
+            hasUncheckedItems = hasUnchecked,
+            drawerShops = drawerShops,
+            drawerOpen = local.drawerOpen,
             searchQuery = local.searchQuery,
             filteredItems = filtered,
             showAddAffordance = query.isNotEmpty() && filtered.isEmpty(),
             showUndoBar = undoEntries.isNotEmpty(),
             addItemModal = local.addItemModal,
+            shopModal = local.shopModal,
             postSaveSignal = local.postSaveSignal,
             errorMessage = local.errorMessage,
         )
+    }
+
+    private fun buildDrawerShops(
+        shops: List<Shop>,
+        globalShopId: Long?,
+        activeViewId: Long?,
+        hasUncheckedItems: Map<Long, Boolean>,
+    ): List<DrawerShop> {
+        val global = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }
+        val others = shops
+            .filter { it.name != GLOBAL_VIEW_NAME }
+            .sortedBy { it.name.lowercase() }
+        val globalRow = DrawerShop(
+            id = global?.id ?: GLOBAL_PLACEHOLDER_ID,
+            name = GLOBAL_VIEW_NAME,
+            isGlobal = true,
+            isActive = activeViewId == null || activeViewId == global?.id,
+            hasUncheckedItems = globalShopId != null && hasUncheckedItems[globalShopId] == true,
+        )
+        val otherRows = others.map { shop ->
+            DrawerShop(
+                id = shop.id,
+                name = shop.name,
+                isGlobal = false,
+                isActive = shop.id == activeViewId,
+                hasUncheckedItems = hasUncheckedItems[shop.id] == true,
+            )
+        }
+        return listOf(globalRow) + otherRows
+    }
+
+    private fun deriveHasUncheckedItems(items: List<Item>, shops: List<Shop>): Map<Long, Boolean> {
+        val globalShopId = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }?.id
+        val uncheckedByShop = mutableMapOf<Long, Boolean>()
+        for (item in items) {
+            if (item.isChecked) continue
+            if (item.visibleIn.isEmpty()) {
+                if (globalShopId != null) uncheckedByShop[globalShopId] = true
+            } else {
+                for (shopId in item.visibleIn) {
+                    uncheckedByShop[shopId] = true
+                }
+            }
+        }
+        return shops.associate { shop -> shop.id to (uncheckedByShop[shop.id] == true) }
     }
 
     private fun sortManual(items: List<Item>, viewId: Long?): List<Item> {
@@ -285,12 +452,16 @@ class ListViewModel @Inject constructor(
 
     private data class LocalUiState(
         val searchQuery: String = "",
+        val activeViewId: Long? = null,
+        val drawerOpen: Boolean = false,
         val postSaveSignal: PostSaveSignal? = null,
         val addItemModal: AddItemUiState? = null,
+        val shopModal: ShopModalUiState? = null,
         val errorMessage: String? = null,
     )
 
     private companion object {
         const val GLOBAL_VIEW_NAME = "Global"
+        const val GLOBAL_PLACEHOLDER_ID = -1L
     }
 }

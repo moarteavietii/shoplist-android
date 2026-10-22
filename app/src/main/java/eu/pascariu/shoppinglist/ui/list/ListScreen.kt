@@ -23,9 +23,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +51,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
+import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -66,6 +72,10 @@ fun ListScreen(
     if (state.addItemModal != null) {
         lastAddItemModal = state.addItemModal
     }
+    var lastShopModal by remember { mutableStateOf<ShopModalUiState?>(null) }
+    if (state.shopModal != null) {
+        lastShopModal = state.shopModal
+    }
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -82,6 +92,10 @@ fun ListScreen(
 
     BackHandler(enabled = state.addItemModal != null) {
         viewModel.onAddItemDiscard()
+    }
+
+    BackHandler(enabled = state.shopModal != null) {
+        viewModel.onShopDiscard()
     }
 
     Box(
@@ -112,12 +126,26 @@ fun ListScreen(
                     state = listState,
                     reverseLayout = true,
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .leftEdgeSwipeToOpen(
+                            isEnabled = !state.drawerOpen,
+                            onOpen = viewModel::onDrawerToggled,
+                        ),
                 ) {
                     items(state.filteredItems, key = { it.id }) { item ->
                         ItemRow(item = item, onCheckToggled = viewModel::onCheckToggled)
                     }
                 }
+
+                Icon(
+                    imageVector = Icons.Filled.Menu,
+                    contentDescription = if (state.drawerOpen) "Close views" else "Open views",
+                    tint = if (state.drawerOpen) colors.ledOn else colors.contentMuted,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) { viewModel.onDrawerToggled() },
+                )
             }
 
             AnimatedVisibility(
@@ -176,6 +204,16 @@ fun ListScreen(
             )
         }
 
+        ViewDrawer(
+            visible = state.drawerOpen,
+            shops = state.drawerShops,
+            onShopSelected = viewModel::onViewSelected,
+            onShopEdit = viewModel::onShopEditTapped,
+            onAddShop = viewModel::onAddShopTapped,
+            onDismiss = viewModel::onDrawerDismissed,
+            modifier = Modifier.matchParentSize(),
+        )
+
         if (state.addItemModal != null) {
             Box(
                 modifier = Modifier
@@ -203,6 +241,26 @@ fun ListScreen(
                     onDiscard = viewModel::onAddItemDiscard,
                     modifier = Modifier.background(colors.surface, shapes.large),
                 )
+            }
+        }
+
+        if (state.shopModal != null || lastShopModal != null) {
+            AnimatedVisibility(
+                visible = state.shopModal != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                lastShopModal?.let { modal ->
+                    ShopModal(
+                        modal = modal,
+                        onNameChanged = viewModel::onShopNameChanged,
+                        onSave = viewModel::onShopSave,
+                        onDiscard = viewModel::onShopDiscard,
+                        onDeleteTapped = viewModel::onShopDeleteTapped,
+                        onDeleteConfirmed = viewModel::onShopDeleteConfirmed,
+                        onDeleteCancelled = viewModel::onShopDeleteCancelled,
+                    )
+                }
             }
         }
     }

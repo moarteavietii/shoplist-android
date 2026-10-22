@@ -589,6 +589,101 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `active view defaults to Global`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        val state = viewModel.uiState.value
+        assertEquals(1L, state.activeViewId)
+        assertEquals("Global", state.watermarkName)
+    }
+
+    @Test
+    fun `selecting a view filters and sorts by that view`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", visibleIn = "[1]"),
+            itemJson(11, "Bread", orderKey = "a1", visibleIn = "[1,2]"),
+            itemJson(12, "Chips", orderKey = "a0", visibleIn = "[2]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+
+        val state = viewModel.uiState.value
+        assertEquals(2L, state.activeViewId)
+        assertEquals("Auchan", state.watermarkName)
+        assertEquals(listOf("Bread", "Chips"), state.items.map { it.name })
+    }
+
+    @Test
+    fun `fallback to Global when active shop is deleted`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+
+        shopsRepository.applyDeleted(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 1L }
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `hasUncheckedItems covers shops and Global participation`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1,2]"),
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[2]"),
+            itemJson(12, "Chips", isChecked = false, visibleIn = "[]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val indicators = viewModel.uiState.value.hasUncheckedItems
+        assertEquals(true, indicators[1L])
+        assertEquals(true, indicators[2L])
+    }
+
+    @Test
+    fun `fully checked shop has no indicator`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[2]"),
+            itemJson(12, "Chips", isChecked = true, visibleIn = "[]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val indicators = viewModel.uiState.value.hasUncheckedItems
+        assertEquals(false, indicators[1L])
+        assertEquals(false, indicators[2L])
+    }
+
+    @Test
+    fun `empty visibleIn counts toward Global only`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(12, "Chips", isChecked = false, visibleIn = "[]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val indicators = viewModel.uiState.value.hasUncheckedItems
+        assertEquals(true, indicators[1L])
+        assertEquals(false, indicators[2L])
+    }
+
+    @Test
     fun `remote item deleted event drops row while undo bar visible`() = runTest(testDispatcher) {
         loadFixtures()
         server.enqueue(
@@ -604,5 +699,174 @@ class ListViewModelTest {
 
         assertEquals(listOf(10L), viewModel.uiState.value.items.map { it.id })
         assertTrue(viewModel.uiState.value.showUndoBar)
+    }
+
+    @Test
+    fun `add shop opens create modal with empty name`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onAddShopTapped()
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertEquals(ShopModalMode.CREATE, modal?.mode)
+        assertEquals("", modal?.name)
+        assertFalse(modal?.canSave ?: true)
+    }
+
+    @Test
+    fun `edit shop opens modal pre-filled and save disabled while unchanged`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertEquals(ShopModalMode.EDIT, modal?.mode)
+        assertEquals(2L, modal?.shopId)
+        assertEquals("Auchan", modal?.name)
+        assertTrue(modal?.isUnchanged == true)
+        assertFalse(modal?.canSave ?: true)
+        assertEquals("Close", modal?.secondaryLabel)
+    }
+
+    @Test
+    fun `shop name change enables save and trims on save`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onShopEditTapped(2L)
+
+        viewModel.onShopNameChanged("  Auchan Nord  ")
+        awaitUntil { viewModel.uiState.value.shopModal?.name == "  Auchan Nord  " }
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.isUnchanged ?: true)
+        assertTrue(modal?.canSave ?: false)
+        assertEquals("Discard", modal?.secondaryLabel)
+        assertEquals("  Auchan Nord  ", modal?.name)
+    }
+
+    @Test
+    fun `whitespace-only name cannot be saved`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onAddShopTapped()
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopNameChanged("   ")
+        awaitUntil { viewModel.uiState.value.shopModal?.name == "   " }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.canSave ?: true)
+    }
+
+    @Test
+    fun `saving create mode creates shop and closes modal`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(shopJson(3, "Lidl")),
+        )
+
+        viewModel.onAddShopTapped()
+        viewModel.onShopNameChanged("Lidl")
+        viewModel.onShopSave()
+        awaitUntil { viewModel.uiState.value.shopModal == null }
+
+        awaitUntil { shopsRepository.shops.value.any { it.id == 3L } }
+        assertEquals(listOf("Global", "Auchan", "Lidl"), shopsRepository.shops.value.map { it.name })
+        val drawer = viewModel.uiState.value.drawerShops
+        assertEquals(listOf("Global", "Auchan", "Lidl"), drawer.map { it.name })
+    }
+
+    @Test
+    fun `saving rename updates shop everywhere`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(shopJson(2, "Auchan Express")),
+        )
+
+        viewModel.onShopEditTapped(2L)
+        viewModel.onShopNameChanged("Auchan Express")
+        viewModel.onShopSave()
+        awaitUntil { viewModel.uiState.value.shopModal == null }
+
+        awaitUntil { viewModel.uiState.value.drawerShops.any { it.name == "Auchan Express" } }
+        assertEquals(listOf("Global", "Auchan Express"), viewModel.uiState.value.drawerShops.map { it.name })
+    }
+
+    @Test
+    fun `failed create keeps modal open and surfaces error`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(409)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"error": "duplicate"}"""),
+        )
+
+        viewModel.onAddShopTapped()
+        viewModel.onShopNameChanged("Auchan")
+        viewModel.onShopSave()
+        awaitUntil { viewModel.uiState.value.shopModal?.error != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.saving ?: true)
+        assertNotNull(modal?.error)
+    }
+
+    @Test
+    fun `discard closes shop modal`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onAddShopTapped()
+        viewModel.onShopDiscard()
+
+        assertNull(viewModel.uiState.value.shopModal)
+    }
+
+    @Test
+    fun `delete confirmation flow deletes shop and closes dialogs`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"status": "ok"}"""),
+        )
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopDeleteTapped()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == true }
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertTrue(modal?.deleteConfirmOpen == true)
+
+        viewModel.onShopDeleteConfirmed()
+        awaitUntil { viewModel.uiState.value.shopModal == null }
+        awaitUntil { shopsRepository.shops.value.none { it.id == 2L } }
+
+        assertNull(viewModel.uiState.value.shopModal)
+        assertTrue(viewModel.uiState.value.drawerShops.none { it.id == 2L })
+    }
+
+    @Test
+    fun `cancelling delete returns to edit modal`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopDeleteTapped()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == true }
+        viewModel.onShopDeleteCancelled()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == false }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.deleteConfirmOpen ?: true)
     }
 }
