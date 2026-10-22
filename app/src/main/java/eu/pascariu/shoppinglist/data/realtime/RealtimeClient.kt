@@ -20,6 +20,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -28,7 +29,7 @@ import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
 
 class RealtimeClient(
-    private val okHttpClient: OkHttpClient,
+    okHttpClient: OkHttpClient,
     private val json: Json,
     baseUrl: String,
     listId: Long,
@@ -37,6 +38,10 @@ class RealtimeClient(
 ) : RealtimeClientContract {
 
     enum class Stream { ITEMS, SHOPS }
+
+    private val okHttpClient = okHttpClient.newBuilder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .build()
 
     private val itemsUrl = "${baseUrl.trimEnd('/')}/api/lists/$listId/subscribe"
     private val shopsUrl = "${baseUrl.trimEnd('/')}/api/shops/subscribe"

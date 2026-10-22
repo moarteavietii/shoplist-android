@@ -204,4 +204,41 @@ class RealtimeClientTest {
         withTimeout(5_000) { secondConnect.await() }
         job.cancel()
     }
+
+    @Test
+    fun `stream survives heartbeat gaps longer than the client read timeout`() = runBlocking {
+        server = MockWebServer()
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                return MockResponse()
+                    .setHeader("Content-Type", "text/event-stream")
+                    .setBody("event: connected\ndata: {}\n\n" + ": ping\n\n".repeat(1_000))
+                    .throttleBody(1_000, 400, TimeUnit.MILLISECONDS)
+            }
+        }
+        server.start()
+        client = RealtimeClient(
+            okHttpClient = OkHttpClient.Builder()
+                .readTimeout(300, TimeUnit.MILLISECONDS)
+                .build(),
+            json = json,
+            baseUrl = server.url("/").toString(),
+            listId = 1L,
+            initialBackoff = 10.milliseconds,
+            maxBackoff = 50.milliseconds,
+        )
+
+        var itemsConnects = 0
+        val job = launch {
+            client.connectSignals.collect { stream ->
+                if (stream == RealtimeClient.Stream.ITEMS) itemsConnects++
+            }
+        }
+        delay(200)
+        client.start()
+        delay(2_500)
+
+        assertEquals(1, itemsConnects)
+        job.cancel()
+    }
 }

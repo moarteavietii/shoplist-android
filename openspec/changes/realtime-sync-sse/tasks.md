@@ -29,4 +29,4 @@
 ## 6. Verification
 
 - [x] 6.1 Run `./gradlew test` and `./gradlew lint` and fix any issues
-- [ ] 6.2 Manual device check: with the dev backend up (`adb reverse tcp:3005 tcp:3005`), create/rename/delete an item from the web client and confirm the app's cache updates; background the app and confirm streams close (no `: ping` traffic), foreground and confirm reconnect + refetch
+- [x] 6.2 Manual device check: with the dev backend up (`adb reverse tcp:3005 tcp:3005`), create/rename/delete an item from the web client and confirm the app's cache updates; background the app and confirm streams close (no `: ping` traffic), foreground and confirm reconnect + refetch
