@@ -119,6 +119,41 @@ class CredentialEntryViewModelTest {
         assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
     }
 
+    @Test
+    fun `scanned qr payload populates fields without saving`() {
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+
+        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("scanned-id", viewModel.uiState.value.clientId)
+        assertEquals("scanned-secret", viewModel.uiState.value.clientSecret)
+        assertEquals(null, fakeTokenStore.saved)
+        assertFalse(viewModel.uiState.value.saved)
+    }
+
+    @Test
+    fun `scanned qr credentials are only saved after user submits`() {
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AccessCredentials("scanned-id", "scanned-secret"), fakeTokenStore.saved)
+        assertTrue(viewModel.uiState.value.saved)
+    }
+
+    @Test
+    fun `unrecognized qr payload shows error and does not save`() {
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+
+        viewModel.onQrPayloadScanned("not-a-credential-payload")
+
+        assertEquals("Unrecognized QR code format", viewModel.uiState.value.error)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
     private class FakeTokenStore(var saved: AccessCredentials? = null) : TokenStore {
         override fun load(): AccessCredentials? = saved
         override fun save(credentials: AccessCredentials) {
