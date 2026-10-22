@@ -32,11 +32,15 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideApiBaseUrl(): String = BuildConfig.BASE_URL
+
+    @Provides
+    @Singleton
     fun provideOkHttpClient(authEventBus: AuthEventBus, authInterceptor: AuthInterceptor): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(authInterceptor)
+            .addNetworkInterceptor(authInterceptor)
             .addInterceptor(AuthResponseInterceptor(authEventBus))
             .build()
 

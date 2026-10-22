@@ -1,6 +1,7 @@
 package eu.pascariu.shoppinglist.data.auth
 
 import javax.inject.Inject
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.Response
 
@@ -12,19 +13,29 @@ class NoOpAuthInterceptor @Inject constructor() : AuthInterceptor {
 
 class CloudflareAccessInterceptor @Inject constructor(
     private val tokenStore: TokenStore,
+    private val apiBaseUrl: String,
 ) : AuthInterceptor {
 
+    private val apiOrigin: okhttp3.HttpUrl = apiBaseUrl.toHttpUrl()
+
     override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
         val credentials = tokenStore.load()
-        val request = if (credentials == null) {
-            chain.request()
-        } else {
-            chain.request().newBuilder()
-                .header(HEADER_CLIENT_ID, credentials.clientId)
-                .header(HEADER_CLIENT_SECRET, credentials.clientSecret)
+        val isApiRequest = request.url.host == apiOrigin.host &&
+            request.url.port == apiOrigin.port &&
+            request.url.isHttps == apiOrigin.isHttps
+        if (credentials == null || !isApiRequest) {
+            val stripped = request.newBuilder()
+                .removeHeader(HEADER_CLIENT_ID)
+                .removeHeader(HEADER_CLIENT_SECRET)
                 .build()
+            return chain.proceed(stripped)
         }
-        return chain.proceed(request)
+        val authorized = request.newBuilder()
+            .header(HEADER_CLIENT_ID, credentials.clientId)
+            .header(HEADER_CLIENT_SECRET, credentials.clientSecret)
+            .build()
+        return chain.proceed(authorized)
     }
 
     companion object {
