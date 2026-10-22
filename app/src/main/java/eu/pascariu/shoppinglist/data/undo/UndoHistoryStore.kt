@@ -30,6 +30,7 @@ class UndoHistoryStore @Inject constructor(
     val entries: StateFlow<List<UndoEntry>> = history.asStateFlow()
 
     private val mutationMutex = Mutex()
+    @Volatile
     private var restoreJob: Job? = null
 
     init {
@@ -70,10 +71,10 @@ class UndoHistoryStore @Inject constructor(
     }
 
     private suspend fun persist(updated: List<UndoEntry>) {
-        history.value = updated
         dataStore.edit { prefs ->
             prefs[KEY_HISTORY] = json.encodeToString(ListSerializer(UndoEntry.serializer()), updated)
         }
+        history.value = updated
     }
 
     private suspend fun restore() {
