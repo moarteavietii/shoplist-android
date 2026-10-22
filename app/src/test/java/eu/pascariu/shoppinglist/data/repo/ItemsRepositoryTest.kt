@@ -187,6 +187,76 @@ class ItemsRepositoryTest {
         assertTrue(thrown.exceptionOrNull() is HttpException)
         assertEquals(sampleItems(), repository.items.first())
     }
+
+    @Test
+    fun `applyCreated appends an item that is not cached`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        val created = sampleItems().first()
+
+        repository.applyCreated(created)
+
+        assertEquals(listOf(created), repository.items.first())
+    }
+
+    @Test
+    fun `applyCreated for an already-cached id leaves the cache unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+
+        repository.applyCreated(sampleItems().first())
+
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
+    fun `applyUpdated replaces a cached entry whose payload differs`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        val updated = sampleItems().first().copy(isChecked = true)
+
+        repository.applyUpdated(updated)
+
+        assertEquals(listOf(updated), repository.items.first())
+    }
+
+    @Test
+    fun `applyUpdated for an absent id leaves the cache unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+
+        repository.applyUpdated(sampleItems().first().copy(id = 99, isChecked = true))
+
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
+    fun `applyUpdated with an identical payload leaves the cache unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+
+        repository.applyUpdated(sampleItems().first())
+
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
+    fun `applyDeleted removes a cached id and ignores an absent one`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+
+        repository.applyDeleted(itemId = 999L)
+        assertEquals(sampleItems(), repository.items.first())
+
+        repository.applyDeleted(itemId = 42L)
+        assertTrue(repository.items.first().isEmpty())
+    }
 }
 
 private fun sampleItems(): List<Item> = listOf(

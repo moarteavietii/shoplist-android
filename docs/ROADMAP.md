@@ -18,7 +18,7 @@ Replace the XML/AppCompat scaffold with the real foundation:
 - `X-Device-Id` interceptor on mutations only
 - Kotlin port of fractional indexing (`generateKeyBetween`) with unit tests
 
-## 3. Realtime sync (SSE)
+## 3. Realtime sync (SSE) ✅ (done — `realtime-sync-sse`, archived 2026-10-22)
 
 - OkHttp EventSource for items + shops streams, with `CF-Access-*` headers on connect
 - Reconnect → full refetch contract (no replay on the server)

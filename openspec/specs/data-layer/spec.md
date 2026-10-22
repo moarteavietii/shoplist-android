@@ -22,7 +22,7 @@ The app SHALL define serializable data models for `Item`, `Shop`, `OrderMap`, `V
 - **THEN** the app can surface the error message from the body
 
 ### Requirement: Items repository fetches and caches list items
-The app SHALL expose an items repository that fetches all items for a list via `GET /api/lists/:listId/items`, stores them in an in-memory cache, and serves subsequent reads from that cache until it is replaced or mutated. No local database is used.
+The app SHALL expose an items repository that fetches all items for a list via `GET /api/lists/:listId/items`, stores them in an in-memory cache, and serves subsequent reads from that cache until it is replaced or mutated. No local database is used. The repository SHALL expose the cached items as an observable stream that emits the full item list after every cache change, so consumers react to both local and remote (SSE-driven) mutations.
 
 #### Scenario: First fetch populates the cache
 - **WHEN** the items repository fetches items for a list for the first time
@@ -36,8 +36,12 @@ The app SHALL expose an items repository that fetches all items for a list via `
 - **WHEN** the backend responds 404 to the items fetch
 - **THEN** the repository surfaces an error to the caller and the cache is left unchanged
 
+#### Scenario: Cache changes are observable
+- **WHEN** the cached items change through any path (fetch, local mutation, or SSE merge)
+- **THEN** the observable items stream emits the updated full item list
+
 ### Requirement: Items repository supports create, update, and delete
-The items repository SHALL expose create (`POST /api/lists/:listId/items`), partial update (`PATCH /api/items/:itemId`), and delete (`DELETE /api/items/:itemId`) operations, and SHALL update its in-memory cache from the server's returned item state on create and update.
+The items repository SHALL expose create (`POST /api/lists/:listId/items`), partial update (`PATCH /api/items/:itemId`), and delete (`DELETE /api/items/:itemId`) operations, and SHALL update its in-memory cache from the server's returned item state on create and update. On a non-2xx response to any mutation, the repository SHALL surface an error to the caller and leave the cache unchanged. The repository SHALL also expose cache merge methods for realtime events: an idempotent created-append, a diff-checked updated-replace, and a deleted-filter. An update whose server-returned item is absent from the cache SHALL be inserted rather than dropped.
 
 #### Scenario: Create item updates the cache
 - **WHEN** an item is created through the repository
@@ -47,12 +51,38 @@ The items repository SHALL expose create (`POST /api/lists/:listId/items`), part
 - **WHEN** an item is updated through the repository
 - **THEN** the server's returned updated item replaces the cached entry for that id
 
+#### Scenario: Update of an item absent from the cache inserts it
+- **WHEN** an item is updated through the repository and the server-returned item's id is not cached (but its list is)
+- **THEN** the server-returned item is inserted into the cache
+
 #### Scenario: Delete item removes the cached entry
 - **WHEN** an item is deleted through the repository and the server responds 204
 - **THEN** the item is removed from the in-memory cache
 
+#### Scenario: Failed mutation surfaces an error and leaves the cache unchanged
+- **WHEN** the backend responds with a non-2xx status to a create, update, or delete
+- **THEN** the repository surfaces an error to the caller and the cache is left unchanged
+
+#### Scenario: Created event appends idempotently
+- **WHEN** a created event arrives for an item id that is already cached
+- **THEN** the cache is unchanged (no duplicate entry)
+
+#### Scenario: Created event appends a new item
+- **WHEN** a created event arrives for an item id that is not cached
+- **THEN** the item is appended to the cache
+
+#### Scenario: Updated event replaces only when the item exists and differs
+- **WHEN** an updated event arrives for an id that is cached and the payload differs from the cached entry
+- **THEN** the cached entry is replaced with the event's item
+- **WHEN** an updated event arrives for an id that is not cached, or whose payload is identical to the cached entry
+- **THEN** the cache is unchanged
+
+#### Scenario: Deleted event filters by id
+- **WHEN** a deleted event arrives for a cached item id
+- **THEN** the item is removed from the cache; an id that is not cached leaves the cache unchanged
+
 ### Requirement: Shops repository fetches and caches shops
-The app SHALL expose a shops repository that fetches all shops via `GET /api/shops`, stores them in an in-memory cache, and keeps the cache ordered Global-first then A→Z by name after every mutation.
+The app SHALL expose a shops repository that fetches all shops via `GET /api/shops`, stores them in an in-memory cache, and keeps the cache ordered Global-first then A→Z by name after every mutation. The repository SHALL expose the cached shops as an observable stream that emits after every cache change, and SHALL expose idempotent created-append, replace, and deleted-filter merge methods for realtime shop events, re-sorting after every merge.
 
 #### Scenario: Shops are fetched and ordered
 - **WHEN** the shops repository fetches shops
@@ -61,6 +91,16 @@ The app SHALL expose a shops repository that fetches all shops via `GET /api/sho
 #### Scenario: Shop create, rename, and delete update the cache
 - **WHEN** a shop is created, renamed, or deleted through the shops repository
 - **THEN** the in-memory cache is updated accordingly and re-sorted Global-first then A→Z
+
+#### Scenario: Failed shop mutation surfaces an error and leaves the cache unchanged
+- **WHEN** the backend responds with a non-2xx status to a shop create, rename, or delete
+- **THEN** the repository surfaces an error to the caller and the cache is left unchanged
+
+#### Scenario: Shop events merge idempotently and re-sort
+- **WHEN** a created event arrives for an already-cached shop id, or an updated event arrives for a shop whose payload is unchanged
+- **THEN** the cache is unchanged
+- **WHEN** a created, updated, or deleted event changes the cached shops
+- **THEN** the cache is updated and re-sorted Global-first then A→Z
 
 ### Requirement: Mutations carry the device id header
 The app SHALL attach an `X-Device-Id` header with a stable per-install value (UUID, at most 64 characters, limited to `[A-Za-z0-9_-]`) to every mutation request (POST, PATCH, DELETE). GET requests and SSE connections SHALL NOT include the header.

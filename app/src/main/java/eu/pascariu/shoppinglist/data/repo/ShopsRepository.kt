@@ -42,6 +42,23 @@ class ShopsRepository @Inject constructor(
         cache.update { current -> current.filterNot { it.id == shopId } }
     }
 
+    fun applyCreated(shop: Shop) {
+        cache.update { current ->
+            if (current.any { it.id == shop.id }) current else sort(current + shop)
+        }
+    }
+
+    fun applyUpdated(shop: Shop) {
+        cache.update { current ->
+            val existing = current.firstOrNull { it.id == shop.id } ?: return@update current
+            if (existing == shop) current else sort(current.map { if (it.id == shop.id) shop else it })
+        }
+    }
+
+    fun applyDeleted(shopId: Long) {
+        cache.update { current -> current.filterNot { it.id == shopId } }
+    }
+
     private fun sort(shops: List<Shop>): List<Shop> =
         shops.sortedWith(
             compareByDescending<Shop> { it.name == GLOBAL_SHOP_NAME }
