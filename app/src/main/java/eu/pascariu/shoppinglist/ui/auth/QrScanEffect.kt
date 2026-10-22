@@ -56,6 +56,8 @@ fun QrScanEffect(
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val barcodeScanner = remember { BarcodeScanning.getClient() }
     var lastPayload by remember { mutableStateOf<String?>(null) }
+    var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var isDisposed by remember { mutableStateOf(false) }
 
     AndroidView(
         modifier = modifier.fillMaxSize(),
@@ -80,12 +82,14 @@ fun QrScanEffect(
                     },
                 ))
                 cameraProvider.unbindAll()
+                if (isDisposed) return@addListener
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     analysis,
                 )
+                boundCameraProvider = cameraProvider
             }, ContextCompat.getMainExecutor(viewContext))
             previewView
         },
@@ -93,6 +97,9 @@ fun QrScanEffect(
 
     DisposableEffect(Unit) {
         onDispose {
+            isDisposed = true
+            boundCameraProvider?.unbindAll()
+            boundCameraProvider = null
             analysisExecutor.shutdown()
             barcodeScanner.close()
         }
