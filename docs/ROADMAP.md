@@ -25,7 +25,7 @@ Replace the XML/AppCompat scaffold with the real foundation:
 - Cache merge rules: idempotent `item:created`, diff-checked `item:updated`, filter `item:deleted`, re-sorted shops
 - **Lifecycle-aware connections:** stop SSE (and any in-flight polling) when the app is backgrounded, resume + resync on foreground — power consumption is a hard requirement
 
-## 4. List screen MVP
+## 4. List screen MVP ✅ (done — `list-screen-mvp`, archived 2026-10-22)
 
 - Items list, check-off with optimistic update + rollback, instant undo (50 entries / 30-min TTL, device-local)
 - Quick add from empty search
