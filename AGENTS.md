@@ -27,6 +27,15 @@ Notes:
 
 - If an agent genuinely needs a command outside this list, surface it to the user instead of improvising — do not widen the allow list without confirmation.
 
+## Dev Backend Connectivity (device gotcha)
+
+The user's physical test device silently drops **per-app** LAN traffic: connections from an app's UID to private LAN addresses time out, while shell (`adb shell curl`) and Chrome on the same device succeed. No VPN, Secure Wi-Fi, Auto Blocker, proxy, or LTE explanation was found (2026-10-22); root cause suspected in a deep OEM/Knox layer. Do not re-diagnose from scratch — the workaround below is the accepted setup.
+
+- **Workaround in place:** `devBaseUrl=http://127.0.0.1:3005` in gitignored `local.properties` + `adb reverse tcp:3005 tcp:3005` (USB tunnel from the device's loopback to the workstation's port 3005).
+- **After every device reconnect**, re-run `adb reverse tcp:3005 tcp:3005` — the rule dies with the cable. Symptom if forgotten: app shows "backend unreachable" while everything else works.
+- The backend itself runs in Colima (Docker VM) and is exposed on the workstation's port 3005 via an SSH tunnel; if `/health` fails from the workstation, check Colima first.
+- If the per-app LAN block is ever resolved, revert `devBaseUrl` to the workstation's LAN URL and drop the `adb reverse` step.
+
 ## Workflow: OpenSpec
 
 This repo uses the `spec-driven` OpenSpec schema. Use the provided commands rather than running the CLI directly:

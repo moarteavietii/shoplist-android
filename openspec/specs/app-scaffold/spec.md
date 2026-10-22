@@ -39,7 +39,7 @@ The app SHALL perform REST calls through Retrofit over OkHttp with kotlinx.seria
 - **THEN** the call fails with an error the UI can surface, without crashing the app
 
 ### Requirement: Base URL is selected per build type
-The app SHALL use `https://shoppinglist.pascariu.eu` as the base URL in release builds. In debug builds the base URL SHALL come from the `devBaseUrl` property in the gitignored `local.properties`, falling back to `http://192.168.0.141:3000` (the workstation's LAN address) when unset, and debug builds SHALL permit cleartext HTTP for the configured dev host and the workstation fallback only.
+The app SHALL use `https://shoppinglist.pascariu.eu` as the base URL in release builds. In debug builds the base URL SHALL come from the `devBaseUrl` property in the gitignored `local.properties`, falling back to `http://192.168.0.141:3005` (the workstation's LAN address) when unset, and debug builds SHALL permit cleartext HTTP for the configured dev host and the workstation fallback only.
 
 #### Scenario: Release build targets production
 - **WHEN** a release build performs any REST call
@@ -51,7 +51,7 @@ The app SHALL use `https://shoppinglist.pascariu.eu` as the base URL in release 
 
 #### Scenario: Debug build falls back to the workstation
 - **WHEN** a debug build performs any REST call and `local.properties` does not define `devBaseUrl`
-- **THEN** the request targets `http://192.168.0.141:3000`
+- **THEN** the request targets `http://192.168.0.141:3005`
 
 #### Scenario: Cleartext is restricted to the dev hosts
 - **WHEN** a debug build attempts cleartext HTTP to any host other than the configured dev host or the workstation fallback
