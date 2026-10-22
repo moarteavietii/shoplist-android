@@ -24,7 +24,7 @@ The app SHALL expose an items repository that fetches all items for a list via `
 - **THEN** the observable items stream emits the updated full item list
 
 ### Requirement: Items repository supports create, update, and delete
-The items repository SHALL expose create (`POST /api/lists/:listId/items`), partial update (`PATCH /api/items/:itemId`), and delete (`DELETE /api/items/:itemId`) operations, and SHALL update its in-memory cache from the server's returned item state on create and update. The repository SHALL also expose cache merge methods for realtime events: an idempotent created-append, a diff-checked updated-replace, and a deleted-filter.
+The items repository SHALL expose create (`POST /api/lists/:listId/items`), partial update (`PATCH /api/items/:itemId`), and delete (`DELETE /api/items/:itemId`) operations, and SHALL update its in-memory cache from the server's returned item state on create and update. On a non-2xx response to any mutation, the repository SHALL surface an error to the caller and leave the cache unchanged. The repository SHALL also expose cache merge methods for realtime events: an idempotent created-append, a diff-checked updated-replace, and a deleted-filter. An update whose server-returned item is absent from the cache SHALL be inserted rather than dropped.
 
 #### Scenario: Create item updates the cache
 - **WHEN** an item is created through the repository
@@ -34,9 +34,17 @@ The items repository SHALL expose create (`POST /api/lists/:listId/items`), part
 - **WHEN** an item is updated through the repository
 - **THEN** the server's returned updated item replaces the cached entry for that id
 
+#### Scenario: Update of an item absent from the cache inserts it
+- **WHEN** an item is updated through the repository and the server-returned item's id is not cached (but its list is)
+- **THEN** the server-returned item is inserted into the cache
+
 #### Scenario: Delete item removes the cached entry
 - **WHEN** an item is deleted through the repository and the server responds 204
 - **THEN** the item is removed from the in-memory cache
+
+#### Scenario: Failed mutation surfaces an error and leaves the cache unchanged
+- **WHEN** the backend responds with a non-2xx status to a create, update, or delete
+- **THEN** the repository surfaces an error to the caller and the cache is left unchanged
 
 #### Scenario: Created event appends idempotently
 - **WHEN** a created event arrives for an item id that is already cached
@@ -66,6 +74,10 @@ The app SHALL expose a shops repository that fetches all shops via `GET /api/sho
 #### Scenario: Shop create, rename, and delete update the cache
 - **WHEN** a shop is created, renamed, or deleted through the shops repository
 - **THEN** the in-memory cache is updated accordingly and re-sorted Global-first then A→Z
+
+#### Scenario: Failed shop mutation surfaces an error and leaves the cache unchanged
+- **WHEN** the backend responds with a non-2xx status to a shop create, rename, or delete
+- **THEN** the repository surfaces an error to the caller and the cache is left unchanged
 
 #### Scenario: Shop events merge idempotently and re-sort
 - **WHEN** a created event arrives for an already-cached shop id, or an updated event arrives for a shop whose payload is unchanged

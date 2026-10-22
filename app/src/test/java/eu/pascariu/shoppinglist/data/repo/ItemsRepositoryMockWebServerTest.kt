@@ -1,0 +1,189 @@
+package eu.pascariu.shoppinglist.data.repo
+
+import eu.pascariu.shoppinglist.data.api.ItemsApi
+import eu.pascariu.shoppinglist.data.model.CreateItemRequest
+import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+
+class ItemsRepositoryMockWebServerTest {
+
+    private lateinit var server: MockWebServer
+    private lateinit var repository: ItemsRepository
+
+    @Before
+    fun setUp() {
+        server = MockWebServer()
+        server.start()
+        val json = Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
+        val api = Retrofit.Builder()
+            .baseUrl(server.url("/"))
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+            .create(ItemsApi::class.java)
+        repository = ItemsRepository(api)
+    }
+
+    @After
+    fun tearDown() {
+        server.shutdown()
+    }
+
+    private fun enqueueItemJson(
+        id: Long = 10,
+        listId: Long = 1,
+        name: String = "Milk",
+        isChecked: Boolean = false,
+    ): String =
+        """
+        {
+          "id": $id,
+          "listId": $listId,
+          "name": "$name",
+          "isChecked": $isChecked,
+          "orderMap": {"a0": "a1"},
+          "quantity": 2,
+          "isTemporary": false,
+          "checkCount": 0,
+          "expiresAt": null,
+          "createdAt": "2026-10-22T09:00:00Z",
+          "visibleIn": [1]
+        }
+        """.trimIndent()
+
+    private fun enqueueItemListJson(vararg itemJsons: String): MockResponse =
+        MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("[${itemJsons.joinToString(",")}]")
+
+    private fun enqueueItemResponse(itemJson: String, code: Int = 200): MockResponse =
+        MockResponse()
+            .setResponseCode(code)
+            .setHeader("Content-Type", "application/json")
+            .setBody(itemJson)
+
+    @Test
+    fun `listItems deserializes real JSON and populates cache`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10), enqueueItemJson(id = 11, name = "Bread")))
+
+        repository.refetch(listId = 1)
+
+        val recorded = server.takeRequest()
+        assertEquals("GET", recorded.method)
+        assertEquals("/api/lists/1/items", recorded.path)
+        assertEquals(listOf(10L, 11L), repository.items.first().map { it.id })
+        assertEquals(listOf("Milk", "Bread"), repository.items.first().map { it.name })
+        assertEquals(listOf(false, false), repository.items.first().map { it.isTemporary })
+    }
+
+    @Test
+    fun `create posts JSON body to list-scoped path and caches server item`() = runTest {
+        server.enqueue(enqueueItemListJson())
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 12, name = "Eggs")))
+
+        val request = CreateItemRequest(name = "Eggs", quantity = 2)
+        val created = repository.create(listId = 1, request)
+
+        val recorded = server.takeRequest()
+        assertEquals("POST", recorded.method)
+        assertEquals("/api/lists/1/items", recorded.path)
+        assertTrue(recorded.body.readUtf8().contains("\"name\":\"Eggs\""))
+        assertTrue(recorded.getHeader("Content-Type")!!.startsWith("application/json"))
+        assertEquals(12L, created.id)
+        assertEquals(listOf(12L), repository.items.first().map { it.id })
+    }
+
+    @Test
+    fun `update patches JSON body to item path and replaces cached entry`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10, isChecked = true)))
+
+        val request = UpdateItemRequest(isChecked = true)
+        val updated = repository.update(itemId = 10, request)
+
+        val recorded = server.takeRequest()
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        assertTrue(recorded.body.readUtf8().contains("\"isChecked\":true"))
+        assertTrue(updated.isChecked)
+        assertTrue(repository.items.first().single().isChecked)
+    }
+
+    @Test
+    fun `delete sends DELETE to item path and removes from cache`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        repository.delete(itemId = 10)
+
+        val recorded = server.takeRequest()
+        assertEquals("DELETE", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        assertTrue(repository.items.first().isEmpty())
+    }
+
+    @Test
+    fun `500 on create surfaces HttpException and leaves cache unchanged`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(500)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"error\":\"boom\"}")
+        )
+
+        val thrown = runCatching { repository.create(listId = 1, CreateItemRequest(name = "Milk")) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(500, (thrown.exceptionOrNull() as HttpException).code())
+        assertEquals(listOf(10L), repository.items.first().map { it.id })
+    }
+
+    @Test
+    fun `404 on delete surfaces HttpException and leaves cache unchanged`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.enqueue(MockResponse().setResponseCode(404))
+
+        val thrown = runCatching { repository.delete(itemId = 10) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(404, (thrown.exceptionOrNull() as HttpException).code())
+        assertEquals(listOf(10L), repository.items.first().map { it.id })
+    }
+
+    @Test
+    fun `404 on fetch surfaces HttpException and leaves cache unchanged`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.enqueue(MockResponse().setResponseCode(404))
+
+        val thrown = runCatching { repository.refetch(listId = 1) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(listOf(10L), repository.items.first().map { it.id })
+    }
+}
