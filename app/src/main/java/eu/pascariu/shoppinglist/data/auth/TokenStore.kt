@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.IOException
+import java.security.GeneralSecurityException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.Serializable
@@ -23,20 +25,37 @@ interface TokenStore {
 
 @Singleton
 class EncryptedTokenStore @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
 ) : TokenStore {
 
-    private val prefs: SharedPreferences by lazy {
+    private val prefs: SharedPreferences by lazy { createPrefs(retryOnCorruption = true) }
+
+    private fun createPrefs(retryOnCorruption: Boolean): SharedPreferences {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
-        EncryptedSharedPreferences.create(
-            context,
-            PREFS_FILE,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+        return try {
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_FILE,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        } catch (error: GeneralSecurityException) {
+            recoverFromCorruptedPrefs(retryOnCorruption, error)
+        } catch (error: IOException) {
+            recoverFromCorruptedPrefs(retryOnCorruption, error)
+        }
+    }
+
+    private fun recoverFromCorruptedPrefs(
+        retryOnCorruption: Boolean,
+        error: Exception,
+    ): SharedPreferences {
+        if (!retryOnCorruption) throw error
+        context.deleteSharedPreferences(PREFS_FILE)
+        return createPrefs(retryOnCorruption = false)
     }
 
     override fun load(): AccessCredentials? {
