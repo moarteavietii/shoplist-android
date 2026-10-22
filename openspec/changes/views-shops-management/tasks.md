@@ -28,4 +28,4 @@
 ## 5. Verification
 
 - [x] 5.1 Run `./gradlew test` and `./gradlew lint`; fix findings
-- [ ] 5.2 Build `./gradlew assembleDebug` and smoke-test on device: drawer open/close (icon, edge swipe, swipes, backdrop), view switching with filter + watermark, add/rename/delete shop flows
+- [x] 5.2 Build `./gradlew assembleDebug` and smoke-test on device: drawer open/close (icon, edge swipe, swipes, backdrop), view switching with filter + watermark, add/rename/delete shop flows
