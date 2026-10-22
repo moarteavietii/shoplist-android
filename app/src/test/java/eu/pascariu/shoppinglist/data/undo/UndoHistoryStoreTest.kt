@@ -37,7 +37,7 @@ class UndoHistoryStoreTest {
     fun setUp() {
         dataStoreFile = File(tmpFolder.root, "undo_history_test.preferences_pb")
         storeScope = CoroutineScope(testDispatcher + Job())
-        dataStore = PreferenceDataStoreFactory.create(scope = CoroutineScope(testDispatcher)) {
+        dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
             dataStoreFile
         }
     }
