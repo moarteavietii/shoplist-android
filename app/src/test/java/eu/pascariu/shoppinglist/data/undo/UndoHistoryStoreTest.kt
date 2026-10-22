@@ -143,10 +143,20 @@ class UndoHistoryStoreTest {
         store.record(entry)
         advanceUntilIdle()
 
-        val secondStore = createStore()
+        storeScope.cancel()
+        val secondScope = CoroutineScope(testDispatcher + Job())
+        val secondDataStore = PreferenceDataStoreFactory.create(scope = secondScope) {
+            dataStoreFile
+        }
+        val secondStore = UndoHistoryStore(
+            dataStore = secondDataStore,
+            json = json,
+            storeScope = secondScope,
+        )
         advanceUntilIdle()
 
         assertEquals(listOf(entry), secondStore.entries.value)
+        secondScope.cancel()
     }
 
     @Test
