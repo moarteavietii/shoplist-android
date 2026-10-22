@@ -6,11 +6,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
+import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoConfig
 import eu.pascariu.shoppinglist.data.undo.UndoEntry
+import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStackControl
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
@@ -35,6 +37,7 @@ class ListViewModel @Inject constructor(
     private val itemsRepository: ItemsRepository,
     private val shopsRepository: ShopsRepository,
     private val undoHistoryStore: UndoHistoryStore,
+    private val listPreferences: ListPreferencesDataSource,
 ) : ViewModel() {
 
     private val localState = MutableStateFlow(LocalUiState())
@@ -58,6 +61,15 @@ class ListViewModel @Inject constructor(
             }.collect { newState ->
                 _uiState.value = newState
             }
+        }
+        viewModelScope.launch {
+            listPreferences.isReady.first { it }
+            restoreActiveView()
+        }
+        viewModelScope.launch {
+            listPreferences.isReady.first { it }
+            val expanded = listPreferences.widgetStackExpanded.value
+            localState.update { it.copy(isWidgetStackExpanded = expanded) }
         }
     }
 
@@ -226,6 +238,36 @@ class ListViewModel @Inject constructor(
 
     fun onViewSelected(shopId: Long) {
         localState.update { it.copy(activeViewId = shopId, drawerOpen = false) }
+        viewModelScope.launch {
+            listPreferences.setActiveShopId(shopId)
+        }
+    }
+
+    private suspend fun restoreActiveView() {
+        val persistedId = listPreferences.activeShopId.value ?: return
+        shopsRepository.shops.first { it.isNotEmpty() }
+        val shopExists = shopsRepository.shops.value.any { it.id == persistedId }
+        if (shopExists) {
+            localState.update { it.copy(activeViewId = persistedId) }
+        }
+    }
+
+    fun onWidgetStackExpandedChanged(expanded: Boolean) {
+        localState.update { it.copy(isWidgetStackExpanded = expanded) }
+        viewModelScope.launch {
+            listPreferences.setWidgetStackExpanded(expanded)
+        }
+    }
+
+    fun onWidgetStackControlTapped(control: WidgetStackControl) {
+        when (control) {
+            WidgetStackControl.VIEW_SWITCHER -> onDrawerToggled()
+            WidgetStackControl.SETTINGS,
+            WidgetStackControl.SORT_MODE,
+            WidgetStackControl.CHECKED_ITEMS_TOGGLE,
+            WidgetStackControl.SEARCH,
+            -> Unit
+        }
     }
 
     fun onDrawerToggled() {
@@ -372,6 +414,7 @@ class ListViewModel @Inject constructor(
             items = sorted,
             watermarkName = activeName,
             activeViewId = activeViewId,
+            isWidgetStackExpanded = local.isWidgetStackExpanded,
             hasUncheckedItems = hasUnchecked,
             drawerShops = drawerShops,
             drawerOpen = local.drawerOpen,
@@ -454,6 +497,7 @@ class ListViewModel @Inject constructor(
         val searchQuery: String = "",
         val activeViewId: Long? = null,
         val drawerOpen: Boolean = false,
+        val isWidgetStackExpanded: Boolean = false,
         val postSaveSignal: PostSaveSignal? = null,
         val addItemModal: AddItemUiState? = null,
         val shopModal: ShopModalUiState? = null,

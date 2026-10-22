@@ -56,6 +56,7 @@ import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
+import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStack
 
 @Composable
 fun ListScreen(
@@ -137,14 +138,12 @@ fun ListScreen(
                     }
                 }
 
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = if (state.drawerOpen) "Close views" else "Open views",
-                    tint = if (state.drawerOpen) colors.ledOn else colors.contentMuted,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .minimumInteractiveComponentSize()
-                        .clickable(role = Role.Button) { viewModel.onDrawerToggled() },
+                WidgetStack(
+                    isDrawerOpen = state.drawerOpen,
+                    isExpanded = state.isWidgetStackExpanded,
+                    onControlTapped = viewModel::onWidgetStackControlTapped,
+                    onExpandedChanged = viewModel::onWidgetStackExpandedChanged,
+                    modifier = Modifier.align(Alignment.TopEnd),
                 )
             }
 

@@ -23,9 +23,13 @@ import eu.pascariu.shoppinglist.data.device.DeviceIdStore
 import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
+import eu.pascariu.shoppinglist.di.IoDispatcher
+import eu.pascariu.shoppinglist.di.ListPreferencesDataStore
+import eu.pascariu.shoppinglist.di.UndoHistoryDataStore
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -98,11 +102,29 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @UndoHistoryDataStore
     fun provideUndoHistoryDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
         File(context.filesDir, "datastore/undo_history.preferences_pb")
     }
+
+    @Provides
+    @Singleton
+    @ListPreferencesDataStore
+    fun provideListPreferencesDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        File(context.filesDir, "datastore/list_preferences.preferences_pb")
+    }
+
+    @Provides
+    @Singleton
+    fun provideListPreferencesDataSource(
+        @ListPreferencesDataStore dataStore: DataStore<Preferences>,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ): eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource =
+        eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource(dataStore, ioDispatcher)
 
     @Provides
     @Singleton

@@ -8,6 +8,7 @@ data class ListUiState(
     val items: List<Item> = emptyList(),
     val watermarkName: String = "Global",
     val activeViewId: Long? = null,
+    val isWidgetStackExpanded: Boolean = false,
     val hasUncheckedItems: Map<Long, Boolean> = emptyMap(),
     val drawerShops: List<DrawerShop> = emptyList(),
     val drawerOpen: Boolean = false,

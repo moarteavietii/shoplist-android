@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
@@ -50,6 +51,7 @@ class ListViewModelTest {
     private lateinit var itemsRepository: ItemsRepository
     private lateinit var shopsRepository: ShopsRepository
     private lateinit var undoHistoryStore: UndoHistoryStore
+    private lateinit var listPreferences: ListPreferencesDataSource
     private lateinit var viewModel: ListViewModel
 
     private val json = Json
@@ -77,7 +79,13 @@ class ListViewModelTest {
             pruneInterval = java.time.Duration.ofHours(1),
             clock = System::currentTimeMillis,
         )
-        viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore)
+        listPreferences = ListPreferencesDataSource(
+            dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
+                java.io.File(tmpFolder.root, "list_prefs_viewmodel_test.preferences_pb")
+            },
+            ioDispatcher = testDispatcher,
+        )
+        viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
     }
 
     @After
@@ -868,5 +876,105 @@ class ListViewModelTest {
         val modal = viewModel.uiState.value.shopModal
         assertNotNull(modal)
         assertFalse(modal?.deleteConfirmOpen ?: true)
+    }
+
+    private fun newViewModel(): ListViewModel {
+        val instance = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
+        viewModel = instance
+        return instance
+    }
+
+    @Test
+    fun `valid persisted shop id is restored once shops load`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(2L)
+        advanceUntilIdle()
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+
+        newViewModel().refresh()
+        advanceUntilIdle()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+
+        assertEquals(2L, viewModel.uiState.value.activeViewId)
+        assertEquals("Auchan", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `invalid persisted shop id falls back to Global`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(999L)
+        advanceUntilIdle()
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+
+        newViewModel().refresh()
+        advanceUntilIdle()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `nothing persisted defaults to Global`() = runTest(testDispatcher) {
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+
+        newViewModel().refresh()
+        advanceUntilIdle()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `persisted id is not applied before shops load`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(2L)
+        advanceUntilIdle()
+
+        newViewModel()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `view selection writes the persisted id immediately`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onViewSelected(2L)
+        advanceUntilIdle()
+
+        assertEquals(2L, listPreferences.activeShopId.value)
+    }
+
+    @Test
+    fun `widget stack expand state persists and is restored on a new view model`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onWidgetStackExpandedChanged(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isWidgetStackExpanded)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(restarted.uiState.value.isWidgetStackExpanded)
+    }
+
+    @Test
+    fun `widget stack collapse persists`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onWidgetStackExpandedChanged(true)
+        advanceUntilIdle()
+        viewModel.onWidgetStackExpandedChanged(false)
+        advanceUntilIdle()
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertFalse(restarted.uiState.value.isWidgetStackExpanded)
     }
 }
