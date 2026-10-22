@@ -167,6 +167,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)

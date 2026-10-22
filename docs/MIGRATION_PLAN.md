@@ -100,12 +100,12 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `sse-subscriptions` | Roadmap 3 — realtime sync | **done** — `realtime-sync-sse` (archived 2026-10-22); Android spec: `realtime-sync` |
 | `frontend-realtime-sync` | Roadmap 3 — realtime sync | **done** — `realtime-sync-sse` (archived 2026-10-22); Android specs: `realtime-sync`, `data-layer` (merge methods) |
 | `frontend-data-fetching` | Roadmap 2 + 3 — repositories + SSE merge | **done** — repositories in `data-layer-repositories`; SSE merge in `realtime-sync-sse` (both archived 2026-10-22); Android specs: `data-layer`, `realtime-sync` |
-| `frontend-list-styling` | Roadmap 4 — list screen MVP (design language) | not started |
-| `frontend-bottom-anchored-list` | Roadmap 4 — list screen MVP | not started |
-| `frontend-modal-design-language` | Roadmap 4+ — modals | not started |
-| `frontend-check-history-undo` | Roadmap 4 — list screen MVP | not started |
-| `frontend-undo-snackbar` | Roadmap 4 — list screen MVP | not started |
-| `frontend-add-item-from-search` | Roadmap 4 — list screen MVP | not started |
+| `frontend-list-styling` | Roadmap 4 — list screen MVP (design language) | **done** — `list-screen-mvp` (archived 2026-10-22); Android specs: `list-screen` |
+| `frontend-bottom-anchored-list` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `list-screen` |
+| `frontend-modal-design-language` | Roadmap 4+ — modals | partially — add-item overlay in `list-screen-mvp` (archived 2026-10-22); edit/delete modals remain (roadmap 6) |
+| `frontend-check-history-undo` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android specs: `check-undo`, `data-layer` (history store) |
+| `frontend-undo-snackbar` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `check-undo` |
+| `frontend-add-item-from-search` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `quick-add` |
 | `frontend-view-drawer` | Roadmap 5 — views + widget stack | not started |
 | `frontend-shops-management` | Roadmap 5 — views + widget stack | not started |
 | `shops-data-model` | Roadmap 2 — data layer | **done** — `data-layer-repositories` (archived 2026-10-22); Android spec: `data-layer` |

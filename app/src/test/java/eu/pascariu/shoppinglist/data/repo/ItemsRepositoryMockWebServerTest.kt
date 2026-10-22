@@ -3,7 +3,9 @@ package eu.pascariu.shoppinglist.data.repo
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -49,6 +51,7 @@ class ItemsRepositoryMockWebServerTest {
         listId: Long = 1,
         name: String = "Milk",
         isChecked: Boolean = false,
+        checkCount: Int = 0,
     ): String =
         """
         {
@@ -59,7 +62,7 @@ class ItemsRepositoryMockWebServerTest {
           "orderMap": {"a0": "a1"},
           "quantity": 2,
           "isTemporary": false,
-          "checkCount": 0,
+          "checkCount": $checkCount,
           "expiresAt": null,
           "createdAt": "2026-10-22T09:00:00Z",
           "visibleIn": [1]
@@ -185,5 +188,101 @@ class ItemsRepositoryMockWebServerTest {
 
         assertTrue(thrown.exceptionOrNull() is HttpException)
         assertEquals(listOf(10L), repository.items.first().map { it.id })
+    }
+
+    @Test
+    fun `setChecked optimistically flips cache before PATCH settles`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = false)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10, isChecked = true)))
+
+        val deferred = async { repository.setChecked(itemId = 10, isChecked = true) }
+
+        runCurrent()
+        assertTrue(repository.items.first().single().isChecked)
+
+        deferred.join()
+        assertEquals(10L, deferred.await().id)
+    }
+
+    @Test
+    fun `setChecked sends PATCH with isChecked and swaps in server item`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = false)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10, isChecked = true, checkCount = 1)))
+
+        val updated = repository.setChecked(itemId = 10, isChecked = true)
+
+        val recorded = server.takeRequest()
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"isChecked\":true"))
+        assertTrue(!body.contains("isUndo"))
+        assertTrue(updated.isChecked)
+        assertEquals(1, repository.items.first().single().checkCount)
+    }
+
+    @Test
+    fun `setChecked with isUndo sends undo flag in PATCH body`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = true)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10, isChecked = false)))
+
+        repository.setChecked(itemId = 10, isChecked = false, isUndo = true)
+
+        val recorded = server.takeRequest()
+        assertTrue(recorded.body.readUtf8().contains("\"isUndo\":true"))
+    }
+
+    @Test
+    fun `manual uncheck does not send undo flag`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = true)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10, isChecked = false)))
+
+        repository.setChecked(itemId = 10, isChecked = false)
+
+        val recorded = server.takeRequest()
+        assertTrue(!recorded.body.readUtf8().contains("isUndo"))
+    }
+
+    @Test
+    fun `failed setChecked rolls cache back and rethrows`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = false)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val thrown = runCatching { repository.setChecked(itemId = 10, isChecked = true) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(false, repository.items.first().single().isChecked)
+    }
+
+    @Test
+    fun `failed setChecked rollback only reverts isChecked keeping remote fields`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = false)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.setChecked(itemId = 10, isChecked = true) } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString(enqueueItemJson(id = 10, name = "Organic Milk", isChecked = true)),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertEquals(false, rolledBack.isChecked)
+        assertEquals("Organic Milk", rolledBack.name)
     }
 }
