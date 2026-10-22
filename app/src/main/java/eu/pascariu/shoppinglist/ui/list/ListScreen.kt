@@ -1,11 +1,13 @@
 package eu.pascariu.shoppinglist.ui.list
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -73,6 +76,10 @@ fun ListScreen(
             keyboard?.show()
             viewModel.consumePostSaveSignal()
         }
+    }
+
+    BackHandler(enabled = state.addItemModal != null) {
+        viewModel.onAddItemDiscard()
     }
 
     Box(
@@ -146,23 +153,35 @@ fun ListScreen(
                 onImeAction = viewModel::onAddAffordanceTapped,
                 focusRequester = searchFocusRequester,
             )
+        }
 
-            AnimatedVisibility(
-                visible = state.addItemModal != null,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-            ) {
-                lastAddItemModal?.let { modal ->
-                    AddItemModal(
-                        modal = modal,
-                        onTitleChanged = viewModel::onAddItemTitleChanged,
-                        onViewToggled = viewModel::onAddItemViewToggled,
-                        onToggleAll = viewModel::onAddItemToggleAllTapped,
-                        onSave = viewModel::onAddItemSave,
-                        onDiscard = viewModel::onAddItemDiscard,
-                        modifier = Modifier.background(colors.surface, shapes.large),
-                    )
-                }
+        if (state.addItemModal != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .pointerInput(Unit) { detectTapGestures { viewModel.onAddItemDiscard() } }
+                    .background(colors.background.copy(alpha = 0.6f)),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = state.addItemModal != null,
+            enter = fadeIn() + slideInVertically { it },
+            exit = fadeOut() + slideOutVertically { it },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
+        ) {
+            lastAddItemModal?.let { modal ->
+                AddItemModal(
+                    modal = modal,
+                    onTitleChanged = viewModel::onAddItemTitleChanged,
+                    onViewToggled = viewModel::onAddItemViewToggled,
+                    onToggleAll = viewModel::onAddItemToggleAllTapped,
+                    onSave = viewModel::onAddItemSave,
+                    onDiscard = viewModel::onAddItemDiscard,
+                    modifier = Modifier.background(colors.surface, shapes.large),
+                )
             }
         }
     }
