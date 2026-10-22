@@ -50,4 +50,23 @@ class FuzzyMatchTest {
         assertTrue(fuzzyMatch("oo", "Noodles"))
         assertFalse(fuzzyMatch("oo", "Milk"))
     }
+
+    @Test
+    fun `decomposed accents match precomposed names`() {
+        val decomposed = "cafe" + "\u0301"
+        assertTrue(fuzzyMatch(decomposed, "Café"))
+        assertTrue(fuzzyMatch("Café", "cafe" + "\u0301"))
+    }
+
+    @Test
+    fun `romanian diacritics match across normalization forms`() {
+        val decomposed = "ma" + "\u0302" + "s" + "\u0326" + "a"
+        assertTrue(fuzzyMatch(decomposed, "Mâșa"))
+        assertTrue(fuzzyMatch("mâșa", decomposed))
+    }
+
+    @Test
+    fun `diacritic does not match base letter`() {
+        assertFalse(fuzzyMatch("masa", "Mâșa"))
+    }
 }
