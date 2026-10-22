@@ -15,6 +15,7 @@ import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +60,8 @@ class ListViewModel @Inject constructor(
             try {
                 itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
                 shopsRepository.refetch()
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
             }
         }
@@ -82,6 +85,8 @@ class ListViewModel @Inject constructor(
                         at = System.currentTimeMillis(),
                     ),
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
             } finally {
                 inFlightChecks.update { it - 1 }
@@ -119,6 +124,8 @@ class ListViewModel @Inject constructor(
                                 } finally {
                                     inFlightChecks.update { it - 1 }
                                 }
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (_: Exception) {
                                 undoHistoryStore.restoreTop(entry)
                             }
@@ -177,6 +184,8 @@ class ListViewModel @Inject constructor(
                         visibleIn = modal.selectedViewIds.toList(),
                     ),
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 return@launch
             }
