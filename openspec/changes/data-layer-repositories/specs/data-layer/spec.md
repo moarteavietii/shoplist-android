@@ -84,9 +84,9 @@ The app SHALL generate fractional ordering keys locally so a moved or inserted i
 - **THEN** the generated key sorts strictly after `a` and strictly before `b` in byte-wise string comparison
 
 #### Scenario: Append key sorts after the last item
-- **GIVEN** a view whose highest existing order key is `z9`
+- **GIVEN** a view whose highest existing order key is `a0z`
 - **WHEN** the app generates an append key for that view
-- **THEN** the generated key sorts strictly after `z9`
+- **THEN** the generated key sorts strictly after `a0z`
 
 #### Scenario: Initial key when the view is empty
 - **GIVEN** a view with no items
