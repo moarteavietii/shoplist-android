@@ -11,7 +11,7 @@ Replace the XML/AppCompat scaffold with the real foundation:
 - Cloudflare Access auth: service-token headers on every request, encrypted storage, QR/manual token entry screen, 401/403 → re-entry flow (ported from the `helloworldcosmin` testbed). **Dev bypass:** the local dev backend sits outside Cloudflare Access, so auth must be skippable per build (e.g. no-op interceptor in debug builds) — design the auth layer so this is a build-time switch, not scattered conditionals
 - Base URL: production `https://shoppinglist.pascariu.eu`; dev builds point at the workstation over LAN (`http://192.168.0.141:3000`, IP believed to be DHCP-reserved — verify; fallback alternative: Bonjour hostname `http://<macname>.local:3000`), health-check call
 
-## 2. Data layer
+## 2. Data layer ✅ (done — `data-layer-repositories`, archived 2026-10-22)
 
 - DTOs mirroring `packages/shared` in the web repo (items, shops, events)
 - ItemsRepository + ShopsRepository with in-memory cache (no Room yet)

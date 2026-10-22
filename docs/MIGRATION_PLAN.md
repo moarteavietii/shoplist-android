@@ -95,8 +95,8 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | Web spec | Android home | Status |
 |---|---|---|
 | `frontend-scaffold` | Roadmap 1 — scaffold migration | **done** — `scaffold-compose-foundation` (archived 2026-10-22); Android specs: `app-scaffold`, `cloudflare-auth` |
-| `rest-api` (client side) | Roadmap 2 — data layer | not started |
-| `shared-types-package` | Roadmap 2 — DTOs | not started |
+| `rest-api` (client side) | Roadmap 2 — data layer | **done** — `data-layer-repositories` (archived 2026-10-22); Android spec: `data-layer` |
+| `shared-types-package` | Roadmap 2 — DTOs | **done** — `data-layer-repositories` (archived 2026-10-22); Android spec: `data-layer` |
 | `sse-subscriptions` | Roadmap 3 — realtime sync | not started |
 | `frontend-realtime-sync` | Roadmap 3 — realtime sync | not started |
 | `frontend-data-fetching` | Roadmap 2 + 3 — repositories + SSE merge | not started |
@@ -108,7 +108,7 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `frontend-add-item-from-search` | Roadmap 4 — list screen MVP | not started |
 | `frontend-view-drawer` | Roadmap 5 — views + widget stack | not started |
 | `frontend-shops-management` | Roadmap 5 — views + widget stack | not started |
-| `shops-data-model` | Roadmap 2 — data layer | not started |
+| `shops-data-model` | Roadmap 2 — data layer | **done** — `data-layer-repositories` (archived 2026-10-22); Android spec: `data-layer` |
 | `frontend-widget-stack` | Roadmap 5 — views + widget stack | not started |
 | `frontend-sort-mode-toggle` | Roadmap 5 — views + widget stack | not started |
 | `frontend-sort-by-frequency` | Roadmap 5 — views + widget stack | not started |
