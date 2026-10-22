@@ -408,6 +408,51 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `double tap on save creates only one item`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        server.enqueue(
+            MockResponse().setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 12, name = "Eggs")),
+        )
+
+        viewModel.onAddItemSave()
+        viewModel.onAddItemSave()
+        awaitUntil { viewModel.uiState.value.addItemModal == null }
+        advanceUntilIdle()
+
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `save can be retried after a failed create`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(
+            MockResponse().setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 12, name = "Eggs")),
+        )
+
+        viewModel.onAddItemSave()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.addItemModal)
+
+        viewModel.onAddItemSave()
+        awaitUntil { server.requestCount == 4 }
+        awaitUntil { viewModel.uiState.value.addItemModal == null }
+    }
+
+    @Test
     fun `save with blank title does not create item`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onAddAffordanceTapped()
