@@ -4,6 +4,7 @@ import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.CreateShopRequest
 import eu.pascariu.shoppinglist.data.model.RenameShopRequest
 import eu.pascariu.shoppinglist.data.model.Shop
+import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,14 +60,5 @@ class ShopsRepository @Inject constructor(
         cache.update { current -> current.filterNot { it.id == shopId } }
     }
 
-    private fun sort(shops: List<Shop>): List<Shop> =
-        shops.sortedWith(
-            compareByDescending<Shop> { it.name == GLOBAL_SHOP_NAME }
-                .thenBy { it.name.lowercase() }
-                .thenBy { it.name },
-        )
-
-    private companion object {
-        const val GLOBAL_SHOP_NAME = "Global"
-    }
+    private fun sort(shops: List<Shop>): List<Shop> = orderViewsGlobalFirst(shops)
 }
