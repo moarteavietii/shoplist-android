@@ -37,18 +37,22 @@ The app SHALL perform REST calls through Retrofit over OkHttp with kotlinx.seria
 - **THEN** the call fails with an error the UI can surface, without crashing the app
 
 ### Requirement: Base URL is selected per build type
-The app SHALL use `https://shoppinglist.pascariu.eu` as the base URL in release builds and `http://192.168.0.141:3000` in debug builds, and debug builds SHALL permit cleartext HTTP for the dev host only.
+The app SHALL use `https://shoppinglist.pascariu.eu` as the base URL in release builds. In debug builds the base URL SHALL come from the `devBaseUrl` property in the gitignored `local.properties`, falling back to `http://10.0.2.2:3000` when unset, and debug builds SHALL permit cleartext HTTP for the configured dev host and the emulator fallback only.
 
 #### Scenario: Release build targets production
 - **WHEN** a release build performs any REST call
 - **THEN** the request targets `https://shoppinglist.pascariu.eu`
 
-#### Scenario: Debug build targets the LAN dev host
-- **WHEN** a debug build performs any REST call
-- **THEN** the request targets `http://192.168.0.141:3000`
+#### Scenario: Debug build targets the configured dev host
+- **WHEN** a debug build performs any REST call and `local.properties` defines `devBaseUrl`
+- **THEN** the request targets that `devBaseUrl` value
 
-#### Scenario: Cleartext is restricted to the dev host
-- **WHEN** a debug build attempts cleartext HTTP to any host other than the dev host
+#### Scenario: Debug build falls back to the emulator host
+- **WHEN** a debug build performs any REST call and `local.properties` does not define `devBaseUrl`
+- **THEN** the request targets `http://10.0.2.2:3000`
+
+#### Scenario: Cleartext is restricted to the dev hosts
+- **WHEN** a debug build attempts cleartext HTTP to any host other than the configured dev host or the emulator fallback
 - **THEN** the platform blocks the request
 
 ### Requirement: No static title header

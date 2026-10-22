@@ -1,14 +1,14 @@
 ## 1. Build setup and dependencies
 
-- [ ] 1.1 Add all new dependencies and plugins to `gradle/libs.versions.toml` (Compose BOM, activity-compose, Hilt + KSP, Retrofit, OkHttp, kotlinx-serialization + plugin, security-crypto, CameraX + ML Kit) and reference them from `app/build.gradle.kts` via aliases only
-- [ ] 1.2 Add `buildConfigField` entries for base URLs (debug: `http://192.168.0.141:3000`, release: `https://shoppinglist.pascariu.eu`) and enable `buildConfig`
-- [ ] 1.3 Add debug-source-set `network_security_config.xml` allowing cleartext only for the dev host; keep release HTTPS-only
+- [x] 1.1 Add all new dependencies and plugins to `gradle/libs.versions.toml` (Compose BOM, activity-compose, Hilt + KSP, Retrofit, OkHttp, kotlinx-serialization + plugin, security-crypto, CameraX + ML Kit) and reference them from `app/build.gradle.kts` via aliases only
+- [x] 1.2 Add `buildConfigField` entries for base URLs (debug: `shoplist.devBaseUrl` from gitignored `local.properties` with `http://10.0.2.2:3000` fallback, release: `https://shoppinglist.pascariu.eu`) and enable `buildConfig`
+- [x] 1.3 Add debug-source-set `network_security_config.xml` allowing cleartext only for the dev host; keep release HTTPS-only
 - [ ] 1.4 Verify the build compiles with `./gradlew assembleDebug`
 
 ## 2. Compose shell and design language
 
-- [ ] 2.1 Replace the AppCompat activity with a Compose-hosting activity; remove XML layouts/themes and AppCompat dependencies that Compose replaces; update `AndroidManifest.xml`
-- [ ] 2.2 Add Hilt: annotated application class, KSP setup, manifest update
+- [x] 2.1 Replace the AppCompat activity with a Compose-hosting activity; remove XML layouts/themes and AppCompat dependencies that Compose replaces; update `AndroidManifest.xml`
+- [x] 2.2 Add Hilt: annotated application class, KSP setup, manifest update
 - [ ] 2.3 Create the design-language token foundation (`ShoplistColors`, `ShoplistTypography`, `ShoplistShapes`, `ShoplistTheme` with CompositionLocals) expressing the chromeless / borderless / LED-dot aesthetic
 - [ ] 2.4 Verify the app launches with the Compose shell and no title/header bar
 

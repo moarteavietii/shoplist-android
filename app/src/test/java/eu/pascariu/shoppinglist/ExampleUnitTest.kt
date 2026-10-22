@@ -1,4 +1,4 @@
-package com.example.shoplist_android
+package eu.pascariu.shoppinglist
 
 import org.junit.Test
 

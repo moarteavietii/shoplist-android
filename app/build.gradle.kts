@@ -1,4 +1,10 @@
 import java.util.Properties
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,28 +14,95 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
+val defaultDevBaseUrl = "http://192.168.0.141:3000"
+val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
+val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
+    providers.fileContents(localPropertiesFile).asText
+        .map { text ->
+            val properties = Properties().apply { text.reader().use { load(it) } }
+            properties.getProperty("shoplist.devBaseUrl") ?: run {
+                logger.warn(
+                    "local.properties found but 'shoplist.devBaseUrl' is not set; " +
+                        "falling back to $defaultDevBaseUrl"
+                )
+                defaultDevBaseUrl
+            }
+        }
+        .get()
+} else {
+    logger.warn(
+        "local.properties not found; debug builds will use $defaultDevBaseUrl. " +
+            "Set 'shoplist.devBaseUrl' in local.properties to override."
+    )
+    defaultDevBaseUrl
 }
 
-val devBaseUrl: String = localProperties.getProperty("devBaseUrl")
-    ?: "http://10.0.2.2:3000"
+require(devBaseUrl.none { it == '"' || it == '\\' || it.isWhitespace() }) {
+    "shoplist.devBaseUrl must not contain quotes, backslashes, or whitespace"
+}
+
+val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
+require(releaseBaseUrl.startsWith("https://")) {
+    "release BASE_URL must use HTTPS"
+}
+
+val devHost = devBaseUrl
+    .removePrefix("http://")
+    .removePrefix("https://")
+    .substringBefore('/')
+    .substringBefore(':')
+require(devHost.isNotEmpty()) {
+    "shoplist.devBaseUrl must include a host (got '$devBaseUrl')"
+}
+
+val debugResDir = layout.buildDirectory.dir("generated/dev-network-security-config/res")
+
+abstract class GenerateDevNetworkSecurityConfig : DefaultTask() {
+    @get:Input
+    abstract val devHost: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputResDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val host = devHost.get()
+        val target = outputResDir.get().file("xml/network_security_config.xml").asFile
+        target.parentFile.mkdirs()
+        target.writeText(
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <network-security-config>
+                <domain-config cleartextTrafficPermitted="true">
+                    <domain includeSubdomains="false">$host</domain>
+                    <domain includeSubdomains="false">10.0.2.2</domain>
+                </domain-config>
+            </network-security-config>
+            """.trimIndent()
+        )
+    }
+}
+
+val resolvedDevHost = devHost
+val generateDevNetworkSecurityConfig = tasks.register<GenerateDevNetworkSecurityConfig>("generateDevNetworkSecurityConfig") {
+    devHost.set(resolvedDevHost)
+    outputResDir.set(debugResDir)
+}
 
 android {
-    namespace = "com.example.shoplist_android"
+    namespace = "eu.pascariu.shoppinglist"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.shoplist_android"
+        applicationId = "eu.pascariu.shoppinglist"
         minSdk = 35
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "eu.pascariu.shoppinglist.HiltTestRunner"
     }
 
     buildTypes {
@@ -39,9 +112,10 @@ android {
         release {
             optimization {
                 enable = true
+                // Gradual R8 adoption: start with known-safe libraries, expand later.
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
-            buildConfigField("String", "BASE_URL", "\"https://shoppinglist.pascariu.eu\"")
+            buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
         }
     }
     buildFeatures {
@@ -51,6 +125,17 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        if (variant.buildType == "debug") {
+            variant.sources.res?.addGeneratedSourceDirectory(
+                generateDevNetworkSecurityConfig,
+                GenerateDevNetworkSecurityConfig::outputResDir
+            )
+        }
     }
 }
 
@@ -73,7 +158,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging.interceptor)
+    debugImplementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.security.crypto)
@@ -86,9 +171,12 @@ dependencies {
     implementation(libs.accompanist.permissions)
 
     testImplementation(libs.junit)
-    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.compiler)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
 }
