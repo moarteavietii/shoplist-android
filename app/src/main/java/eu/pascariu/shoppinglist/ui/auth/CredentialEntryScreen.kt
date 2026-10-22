@@ -108,6 +108,7 @@ fun CredentialEntryScreen(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
             textStyle = typography.body.copy(color = colors.content),
         )
         Spacer(Modifier.height(16.dp))
