@@ -238,6 +238,11 @@ class ListViewModelTest {
 
         val checkRequest = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(checkRequest)
+        assertEquals("PATCH", checkRequest!!.method)
+        assertEquals("/api/items/10", checkRequest.path)
+        val checkBody = checkRequest.body.readUtf8()
+        assertTrue(checkBody.contains("\"isChecked\":true"))
+        assertFalse(checkBody.contains("isUndo"))
         val undoRequest = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(undoRequest)
         assertEquals("PATCH", undoRequest!!.method)
