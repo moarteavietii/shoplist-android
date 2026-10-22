@@ -11,6 +11,13 @@ import eu.pascariu.shoppinglist.data.auth.AuthResponseInterceptor
 import eu.pascariu.shoppinglist.data.auth.AuthInterceptor
 import eu.pascariu.shoppinglist.data.auth.EncryptedTokenStore
 import eu.pascariu.shoppinglist.data.auth.TokenStore
+import eu.pascariu.shoppinglist.data.api.ItemsApi
+import eu.pascariu.shoppinglist.data.api.ShopsApi
+import eu.pascariu.shoppinglist.data.device.DeviceIdInterceptor
+import eu.pascariu.shoppinglist.data.device.DeviceIdStore
+import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
+import eu.pascariu.shoppinglist.data.repo.ItemsRepository
+import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
@@ -40,12 +47,14 @@ object NetworkModule {
         authEventBus: AuthEventBus,
         authInterceptor: AuthInterceptor,
         tokenStore: TokenStore,
+        deviceIdInterceptor: DeviceIdInterceptor,
     ): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .addNetworkInterceptor(authInterceptor)
             .addInterceptor(AuthResponseInterceptor(authEventBus, tokenStore))
+            .addInterceptor(deviceIdInterceptor)
             .build()
 
     @Provides
@@ -63,9 +72,29 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideItemsApi(retrofit: Retrofit): ItemsApi = retrofit.create(ItemsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideShopsApi(retrofit: Retrofit): ShopsApi = retrofit.create(ShopsApi::class.java)
+
+    @Provides
+    @Singleton
     fun provideAuthEventBus(impl: AuthEventBusImpl): AuthEventBus = impl
 
     @Provides
     @Singleton
     fun provideTokenStore(impl: EncryptedTokenStore): TokenStore = impl
+
+    @Provides
+    @Singleton
+    fun provideDeviceIdStore(impl: EncryptedDeviceIdStore): DeviceIdStore = impl
+
+    @Provides
+    @Singleton
+    fun provideItemsRepository(impl: ItemsRepository): ItemsRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideShopsRepository(impl: ShopsRepository): ShopsRepository = impl
 }
