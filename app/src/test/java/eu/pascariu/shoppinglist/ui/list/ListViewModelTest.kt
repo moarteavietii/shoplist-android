@@ -136,6 +136,8 @@ class ListViewModelTest {
         server.takeRequest(5, TimeUnit.SECONDS)
     }
 
+    // Deliberate hybrid: real-time deadline + virtual-time advanceUntilIdle() so MockWebServer
+    // responses land while virtual time still burns through ViewModel delays deterministically.
     private fun TestScope.awaitUntil(timeoutMs: Long = 5_000, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (!condition()) {
