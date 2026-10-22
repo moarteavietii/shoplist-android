@@ -42,6 +42,7 @@ class ListViewModel @Inject constructor(
     private val inFlightChecks = MutableStateFlow(0)
     private val undoMutex = Mutex()
     private var isCreateInFlight = false
+    private var nextPostSaveSignalId = 0L
 
     init {
         viewModelScope.launch {
@@ -201,7 +202,7 @@ class ListViewModel @Inject constructor(
             localState.update {
                 it.copy(
                     searchQuery = "",
-                    postSaveSignal = PostSaveSignal(),
+                    postSaveSignal = PostSaveSignal(id = nextPostSaveSignalId++),
                     addItemModal = null,
                     errorMessage = null,
                 )
