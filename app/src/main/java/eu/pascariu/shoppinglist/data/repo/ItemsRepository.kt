@@ -9,6 +9,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 @Singleton
 class ItemsRepository @Inject constructor(
@@ -24,18 +25,18 @@ class ItemsRepository @Inject constructor(
 
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
         val created = itemsApi.createItem(listId, request)
-        cache.value = cache.value + created
+        cache.update { it + created }
         return created
     }
 
     suspend fun update(itemId: Long, request: UpdateItemRequest): Item {
         val updated = itemsApi.updateItem(itemId, request)
-        cache.value = cache.value.map { if (it.id == updated.id) updated else it }
+        cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
         return updated
     }
 
     suspend fun delete(itemId: Long) {
         itemsApi.deleteItem(itemId)
-        cache.value = cache.value.filterNot { it.id == itemId }
+        cache.update { current -> current.filterNot { it.id == itemId } }
     }
 }
