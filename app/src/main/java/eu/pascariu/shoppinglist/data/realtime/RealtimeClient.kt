@@ -48,7 +48,7 @@ class RealtimeClient(
     private val shopEventsFlow = MutableSharedFlow<ShopEvent>(extraBufferCapacity = 64)
     override val shopEvents: SharedFlow<ShopEvent> = shopEventsFlow.asSharedFlow()
 
-    private val connectSignalsFlow = MutableSharedFlow<Stream>(replay = 1, extraBufferCapacity = 8)
+    private val connectSignalsFlow = MutableSharedFlow<Stream>(extraBufferCapacity = 8)
     override val connectSignals: SharedFlow<Stream> = connectSignalsFlow.asSharedFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

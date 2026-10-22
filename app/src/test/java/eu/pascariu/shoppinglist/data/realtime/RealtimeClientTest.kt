@@ -15,6 +15,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 class RealtimeClientTest {
 
@@ -143,6 +144,37 @@ class RealtimeClientTest {
             assertEquals("device-a", event.originDeviceId)
         }
         eventsJob.cancel()
+    }
+
+    @Test
+    fun `connect signal is not replayed to late subscribers`() = runBlocking {
+        server = MockWebServer()
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                return MockResponse()
+                    .setHeader("Content-Type", "text/event-stream")
+                    .setBody("event: connected\ndata: {}\n\n" + ": ping\n\n".repeat(5_000))
+                    .throttleBody(1, 1, TimeUnit.MILLISECONDS)
+            }
+        }
+        server.start()
+        client = RealtimeClient(OkHttpClient(), json, server.url("/").toString(), listId = 1L)
+
+        val firstConnect = CompletableDeferred<Unit>()
+        val firstJob = launch {
+            client.connectSignals.collect { firstConnect.complete(Unit) }
+        }
+        client.start()
+        withTimeout(5_000) { firstConnect.await() }
+        firstJob.cancel()
+
+        var replayed = false
+        val lateJob = launch {
+            client.connectSignals.collect { replayed = true }
+        }
+        delay(300)
+        assertEquals(false, replayed)
+        lateJob.cancel()
     }
 
     @Test
