@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -154,5 +156,42 @@ class UndoHistoryStoreTest {
         advanceUntilIdle()
 
         assertTrue(store.entries.value.isEmpty())
+    }
+
+    @Test
+    fun `concurrent record and removeTop do not lose entries`() = runTest(testDispatcher) {
+        val store = createStore()
+        val now = System.currentTimeMillis()
+        repeat(20) { index ->
+            store.record(UndoEntry(index.toLong() + 1, from = false, to = true, at = now + index))
+        }
+        advanceUntilIdle()
+
+        val writers = List(10) { writer ->
+            launch {
+                repeat(5) { attempt ->
+                    store.record(
+                        UndoEntry(
+                            itemId = 100L + writer * 10 + attempt,
+                            from = false,
+                            to = true,
+                            at = now + 1000 + writer * 10 + attempt,
+                        ),
+                    )
+                }
+            }
+        }
+        val removers = List(10) {
+            launch {
+                repeat(5) {
+                    store.removeTop()
+                }
+            }
+        }
+        writers.joinAll()
+        removers.joinAll()
+        advanceUntilIdle()
+
+        assertEquals(20, store.entries.value.size)
     }
 }
