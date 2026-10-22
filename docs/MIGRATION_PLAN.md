@@ -106,8 +106,8 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `frontend-check-history-undo` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android specs: `check-undo`, `data-layer` (history store) |
 | `frontend-undo-snackbar` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `check-undo` |
 | `frontend-add-item-from-search` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `quick-add` |
-| `frontend-view-drawer` | Roadmap 5 — views + widget stack | not started |
-| `frontend-shops-management` | Roadmap 5 — views + widget stack | not started |
+| `frontend-view-drawer` | Roadmap 5 — views + widget stack | **done** — `views-shops-management` (archived 2026-10-22); Android spec: `view-drawer` |
+| `frontend-shops-management` | Roadmap 5 — views + widget stack | **done** — `views-shops-management` (archived 2026-10-22); Android spec: `shops-management` |
 | `shops-data-model` | Roadmap 2 — data layer | **done** — `data-layer-repositories` (archived 2026-10-22); Android spec: `data-layer` |
 | `frontend-widget-stack` | Roadmap 5 — views + widget stack | not started |
 | `frontend-sort-mode-toggle` | Roadmap 5 — views + widget stack | not started |
