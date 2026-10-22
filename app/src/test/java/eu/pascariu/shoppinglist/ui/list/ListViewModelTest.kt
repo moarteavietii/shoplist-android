@@ -429,6 +429,79 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `failed save surfaces error and keeps modal open`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        viewModel.onAddItemSave()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.errorMessage)
+        assertNotNull(viewModel.uiState.value.addItemModal)
+    }
+
+    @Test
+    fun `successful retry clears save error`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(
+            MockResponse().setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 12, name = "Eggs")),
+        )
+
+        viewModel.onAddItemSave()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.errorMessage)
+
+        viewModel.onAddItemSave()
+        awaitUntil { viewModel.uiState.value.addItemModal == null }
+
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `error can be dismissed`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        viewModel.onAddItemSave()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.errorMessage)
+
+        viewModel.onErrorDismissed()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `failed refresh surfaces error`() = runTest(testDispatcher) {
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        viewModel.refresh()
+        awaitUntil { viewModel.uiState.value.errorMessage != null }
+
+        assertNotNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
     fun `save can be retried after a failed create`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onSearchQueryChanged("Eggs")

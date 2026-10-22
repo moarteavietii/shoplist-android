@@ -145,6 +145,22 @@ fun ListScreen(
                 )
             }
 
+            AnimatedVisibility(
+                visible = state.errorMessage != null,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it },
+            ) {
+                Text(
+                    text = state.errorMessage.orEmpty(),
+                    style = typography.label,
+                    color = colors.danger,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button) { viewModel.onErrorDismissed() }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
+
             SearchField(
                 query = state.searchQuery,
                 onQueryChanged = viewModel::onSearchQueryChanged,

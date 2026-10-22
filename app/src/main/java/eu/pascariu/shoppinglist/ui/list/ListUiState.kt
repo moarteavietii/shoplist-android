@@ -12,6 +12,7 @@ data class ListUiState(
     val showUndoBar: Boolean = false,
     val addItemModal: AddItemUiState? = null,
     val postSaveSignal: PostSaveSignal? = null,
+    val errorMessage: String? = null,
 )
 
 data class PostSaveSignal(val id: Long = System.currentTimeMillis())

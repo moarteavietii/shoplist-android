@@ -63,9 +63,11 @@ class ListViewModel @Inject constructor(
             try {
                 itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
                 shopsRepository.refetch()
+                localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
+                localState.update { it.copy(errorMessage = "Couldn't refresh the list") }
             }
         }
     }
@@ -193,10 +195,16 @@ class ListViewModel @Inject constructor(
                 throw e
             } catch (_: Exception) {
                 isCreateInFlight = false
+                localState.update { it.copy(errorMessage = "Couldn't save the item") }
                 return@launch
             }
             localState.update {
-                it.copy(searchQuery = "", postSaveSignal = PostSaveSignal(), addItemModal = null)
+                it.copy(
+                    searchQuery = "",
+                    postSaveSignal = PostSaveSignal(),
+                    addItemModal = null,
+                    errorMessage = null,
+                )
             }
         }
     }
@@ -207,6 +215,10 @@ class ListViewModel @Inject constructor(
 
     fun consumePostSaveSignal() {
         localState.update { it.copy(postSaveSignal = null) }
+    }
+
+    fun onErrorDismissed() {
+        localState.update { it.copy(errorMessage = null) }
     }
 
     private fun openAddItemModal(prefilledTitle: String) {
@@ -247,6 +259,7 @@ class ListViewModel @Inject constructor(
             showUndoBar = undoEntries.isNotEmpty(),
             addItemModal = local.addItemModal,
             postSaveSignal = local.postSaveSignal,
+            errorMessage = local.errorMessage,
         )
     }
 
@@ -273,6 +286,7 @@ class ListViewModel @Inject constructor(
         val searchQuery: String = "",
         val postSaveSignal: PostSaveSignal? = null,
         val addItemModal: AddItemUiState? = null,
+        val errorMessage: String? = null,
     )
 
     private companion object {
