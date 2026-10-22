@@ -169,7 +169,6 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.mlkit.barcode.scanning)
-    implementation(libs.accompanist.permissions)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
