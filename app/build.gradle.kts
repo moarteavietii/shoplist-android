@@ -14,15 +14,15 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-val defaultDevBaseUrl = "http://192.168.0.141:3000"
+val defaultDevBaseUrl = "http://192.168.0.141:3005"
 val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
 val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     providers.fileContents(localPropertiesFile).asText
         .map { text ->
             val properties = Properties().apply { text.reader().use { load(it) } }
-            properties.getProperty("shoplist.devBaseUrl") ?: run {
+            properties.getProperty("devBaseUrl") ?: run {
                 logger.warn(
-                    "local.properties found but 'shoplist.devBaseUrl' is not set; " +
+                    "local.properties found but 'devBaseUrl' is not set; " +
                         "falling back to $defaultDevBaseUrl"
                 )
                 defaultDevBaseUrl
@@ -32,13 +32,13 @@ val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
 } else {
     logger.warn(
         "local.properties not found; debug builds will use $defaultDevBaseUrl. " +
-            "Set 'shoplist.devBaseUrl' in local.properties to override."
+            "Set 'devBaseUrl' in local.properties to override."
     )
     defaultDevBaseUrl
 }
 
 require(devBaseUrl.none { it == '"' || it == '\\' || it == '<' || it == '>' || it == '&' || it.isWhitespace() }) {
-    "shoplist.devBaseUrl must not contain quotes, backslashes, XML metacharacters, or whitespace"
+    "devBaseUrl must not contain quotes, backslashes, XML metacharacters, or whitespace"
 }
 
 val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
@@ -52,7 +52,7 @@ val devHost = devBaseUrl
     .substringBefore('/')
     .substringBefore(':')
 require(devHost.isNotEmpty()) {
-    "shoplist.devBaseUrl must include a host (got '$devBaseUrl')"
+    "devBaseUrl must include a host (got '$devBaseUrl')"
 }
 
 val debugResDir = layout.buildDirectory.dir("generated/dev-network-security-config/res")
