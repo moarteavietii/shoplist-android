@@ -37,8 +37,8 @@ val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     defaultDevBaseUrl
 }
 
-require(devBaseUrl.none { it == '"' || it == '\\' || it.isWhitespace() }) {
-    "shoplist.devBaseUrl must not contain quotes, backslashes, or whitespace"
+require(devBaseUrl.none { it == '"' || it == '\\' || it == '<' || it == '>' || it == '&' || it.isWhitespace() }) {
+    "shoplist.devBaseUrl must not contain quotes, backslashes, XML metacharacters, or whitespace"
 }
 
 val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
