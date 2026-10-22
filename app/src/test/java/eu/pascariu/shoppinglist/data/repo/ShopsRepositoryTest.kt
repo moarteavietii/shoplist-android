@@ -86,6 +86,32 @@ class ShopsRepositoryTest {
     }
 
     @Test
+    fun `409 on create surfaces error and leaves cache unchanged`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+        api.createError = httpException(409)
+
+        val thrown = runCatching { repository.create("Alpine") }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(listOf("Global", "Bakery"), repository.shops.first().map { it.name })
+    }
+
+    @Test
+    fun `422 on rename surfaces error and leaves cache unchanged`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+        api.renameError = httpException(422)
+
+        val thrown = runCatching { repository.rename(shopId = 1, name = "Zoo") }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(listOf("Global", "Bakery"), repository.shops.first().map { it.name })
+    }
+
+    @Test
     fun `403 on delete surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
         val repository = ShopsRepository(api)
@@ -109,11 +135,16 @@ private fun bakery() = shop(1, "Bakery")
 private fun supermarket() = shop(2, "Supermarket")
 private fun global() = shop(4, "Global")
 
+private fun httpException(code: Int): HttpException =
+    HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))
+
 private class FakeShopsApi(
     var shopsForFetch: List<Shop>,
 ) : ShopsApi {
     var createdShop: Shop? = null
     var renamedShop: Shop? = null
+    var createError: HttpException? = null
+    var renameError: HttpException? = null
     var deleted = false
     var deleteResponse: Response<Unit> = Response.success(Unit)
     var lastCreateRequest: CreateShopRequest? = null
@@ -125,12 +156,14 @@ private class FakeShopsApi(
 
     override suspend fun createShop(body: CreateShopRequest): Shop {
         lastCreateRequest = body
+        createError?.let { throw it }
         return requireNotNull(createdShop)
     }
 
     override suspend fun renameShop(shopId: Long, body: RenameShopRequest): Shop {
         lastRenameShopId = shopId
         lastRenameRequest = body
+        renameError?.let { throw it }
         return requireNotNull(renamedShop)
     }
 

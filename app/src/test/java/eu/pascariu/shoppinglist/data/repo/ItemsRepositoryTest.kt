@@ -150,6 +150,32 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `409 on create surfaces error and leaves cache unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.createError = httpException(409)
+
+        val thrown = runCatching { repository.create(listId = 1, CreateItemRequest(name = "Milk")) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
+    fun `422 on update surfaces error and leaves cache unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.updateError = httpException(422)
+
+        val thrown = runCatching { repository.update(itemId = 42L, UpdateItemRequest(isChecked = true)) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
     fun `404 on delete surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
         val repository = ItemsRepository(api)
@@ -184,6 +210,8 @@ private class FakeItemsApi(
 ) : ItemsApi {
     var listCalls = 0
     var listError: HttpException? = null
+    var createError: HttpException? = null
+    var updateError: HttpException? = null
     var createdItem: Item? = null
     var updatedItem: Item? = null
     var deleted = false
@@ -203,12 +231,14 @@ private class FakeItemsApi(
     override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
         lastCreateListId = listId
         lastCreateRequest = body
+        createError?.let { throw it }
         return requireNotNull(createdItem)
     }
 
     override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item {
         lastUpdateItemId = itemId
         lastUpdateRequest = body
+        updateError?.let { throw it }
         return requireNotNull(updatedItem)
     }
 
