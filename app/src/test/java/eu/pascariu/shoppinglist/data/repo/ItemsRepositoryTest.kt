@@ -59,8 +59,11 @@ class ItemsRepositoryTest {
         val created = sampleItems().first()
 
         api.createdItem = created
-        repository.create(listId = 1, CreateItemRequest(name = "Milk"))
+        val request = CreateItemRequest(name = "Milk")
+        repository.create(listId = 1, request)
 
+        assertEquals(1L, api.lastCreateListId)
+        assertEquals(request, api.lastCreateRequest)
         assertEquals(listOf(created), repository.items.first())
     }
 
@@ -72,8 +75,11 @@ class ItemsRepositoryTest {
         val updated = sampleItems().first().copy(isChecked = true)
 
         api.updatedItem = updated
-        repository.update(updated.id, UpdateItemRequest(isChecked = true))
+        val request = UpdateItemRequest(isChecked = true)
+        repository.update(updated.id, request)
 
+        assertEquals(updated.id, api.lastUpdateItemId)
+        assertEquals(request, api.lastUpdateRequest)
         assertEquals(updated, repository.items.first().single())
     }
 
@@ -127,6 +133,7 @@ class ItemsRepositoryTest {
 
         assertTrue(repository.items.first().isEmpty())
         assertTrue(api.deleted)
+        assertEquals(42L, api.lastDeleteItemId)
     }
 
     @Test
@@ -168,6 +175,11 @@ private class FakeItemsApi(
     var updatedItem: Item? = null
     var deleted = false
     var deleteResponse: Response<Unit> = Response.success(Unit)
+    var lastCreateListId: Long? = null
+    var lastCreateRequest: CreateItemRequest? = null
+    var lastUpdateItemId: Long? = null
+    var lastUpdateRequest: UpdateItemRequest? = null
+    var lastDeleteItemId: Long? = null
 
     override suspend fun listItems(listId: Long): List<Item> {
         listCalls++
@@ -175,14 +187,21 @@ private class FakeItemsApi(
         return itemsForFetch
     }
 
-    override suspend fun createItem(listId: Long, body: CreateItemRequest): Item =
-        requireNotNull(createdItem)
+    override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
+        lastCreateListId = listId
+        lastCreateRequest = body
+        return requireNotNull(createdItem)
+    }
 
-    override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item =
-        requireNotNull(updatedItem)
+    override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item {
+        lastUpdateItemId = itemId
+        lastUpdateRequest = body
+        return requireNotNull(updatedItem)
+    }
 
     override suspend fun deleteItem(itemId: Long): Response<Unit> {
         deleted = true
+        lastDeleteItemId = itemId
         return deleteResponse
     }
 }

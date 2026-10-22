@@ -48,6 +48,7 @@ class ShopsRepositoryTest {
         api.createdShop = shop(3, "Alpine")
         repository.create("Alpine")
 
+        assertEquals(CreateShopRequest(name = "Alpine"), api.lastCreateRequest)
         assertEquals(
             listOf("Global", "Alpine", "Bakery"),
             repository.shops.first().map { it.name },
@@ -63,6 +64,8 @@ class ShopsRepositoryTest {
         api.renamedShop = shop(1, "Zoo")
         repository.rename(shopId = 1, name = "Zoo")
 
+        assertEquals(1L, api.lastRenameShopId)
+        assertEquals(RenameShopRequest(name = "Zoo"), api.lastRenameRequest)
         assertEquals(
             listOf("Global", "Supermarket", "Zoo"),
             repository.shops.first().map { it.name },
@@ -79,6 +82,7 @@ class ShopsRepositoryTest {
 
         assertEquals(listOf("Global"), repository.shops.first().map { it.name })
         assertTrue(api.deleted)
+        assertEquals(1L, api.lastDeleteShopId)
     }
 
     @Test
@@ -112,17 +116,27 @@ private class FakeShopsApi(
     var renamedShop: Shop? = null
     var deleted = false
     var deleteResponse: Response<Unit> = Response.success(Unit)
+    var lastCreateRequest: CreateShopRequest? = null
+    var lastRenameShopId: Long? = null
+    var lastRenameRequest: RenameShopRequest? = null
+    var lastDeleteShopId: Long? = null
 
     override suspend fun listShops(): List<Shop> = shopsForFetch
 
-    override suspend fun createShop(body: CreateShopRequest): Shop =
-        requireNotNull(createdShop)
+    override suspend fun createShop(body: CreateShopRequest): Shop {
+        lastCreateRequest = body
+        return requireNotNull(createdShop)
+    }
 
-    override suspend fun renameShop(shopId: Long, body: RenameShopRequest): Shop =
-        requireNotNull(renamedShop)
+    override suspend fun renameShop(shopId: Long, body: RenameShopRequest): Shop {
+        lastRenameShopId = shopId
+        lastRenameRequest = body
+        return requireNotNull(renamedShop)
+    }
 
     override suspend fun deleteShop(shopId: Long): Response<Unit> {
         deleted = true
+        lastDeleteShopId = shopId
         return deleteResponse
     }
 }
