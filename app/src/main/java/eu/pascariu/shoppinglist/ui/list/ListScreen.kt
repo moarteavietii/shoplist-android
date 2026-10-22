@@ -47,6 +47,10 @@ fun ListScreen(
     val shapes = LocalShoplistShapes.current
     val listState = rememberLazyListState()
 
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+
     LaunchedEffect(state.postSaveSignal) {
         if (state.postSaveSignal != null) {
             listState.scrollToItem(0)
