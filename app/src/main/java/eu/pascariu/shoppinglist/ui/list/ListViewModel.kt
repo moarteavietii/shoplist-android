@@ -15,8 +15,10 @@ import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
 import javax.inject.Inject
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -244,12 +246,14 @@ class ListViewModel @Inject constructor(
     }
 
     private suspend fun waitForInFlightChecks(): Boolean {
-        val deadline = System.currentTimeMillis() + UndoConfig.INFLIGHT_WAIT.toMillis()
-        while (inFlightChecks.value > 0) {
-            if (System.currentTimeMillis() >= deadline) return false
-            delay(UndoConfig.INFLIGHT_WAIT.toMillis().coerceAtMost(deadline - System.currentTimeMillis()).coerceAtLeast(1))
+        return try {
+            withTimeout(UndoConfig.INFLIGHT_WAIT.toMillis()) {
+                inFlightChecks.first { it == 0 }
+            }
+            true
+        } catch (_: TimeoutCancellationException) {
+            false
         }
-        return true
     }
 
     private data class LocalUiState(

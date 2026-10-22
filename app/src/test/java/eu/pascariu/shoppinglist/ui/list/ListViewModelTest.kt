@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
@@ -243,6 +244,30 @@ class ListViewModelTest {
         assertEquals("/api/items/10", undoRequest.path)
         assertTrue(undoRequest.body.readUtf8().contains("\"isUndo\":true"))
         awaitUntil { !viewModel.uiState.value.showUndoBar }
+    }
+
+    @Test
+    fun `undo proceeds immediately when no checks are in flight`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.showUndoBar }
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = false)),
+        )
+        viewModel.onUndoTapped()
+        runCurrent()
+
+        val undoRequest = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull("undo PATCH should fire without waiting out the inflight window", undoRequest)
+        assertEquals("PATCH", undoRequest!!.method)
     }
 
     @Test
