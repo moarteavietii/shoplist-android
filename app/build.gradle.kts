@@ -159,7 +159,6 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.okhttp)
-    debugImplementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.security.crypto)
@@ -169,7 +168,6 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.mlkit.barcode.scanning)
-    implementation(libs.accompanist.permissions)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
