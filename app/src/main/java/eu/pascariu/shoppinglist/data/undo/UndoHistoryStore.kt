@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
@@ -27,32 +29,33 @@ class UndoHistoryStore @Inject constructor(
     private val history = MutableStateFlow<List<UndoEntry>>(emptyList())
     val entries: StateFlow<List<UndoEntry>> = history.asStateFlow()
 
+    private val mutationMutex = Mutex()
     private var restoreJob: Job? = null
 
     init {
         restoreJob = storeScope.launch { restore() }
     }
 
-    suspend fun record(entry: UndoEntry) {
+    suspend fun record(entry: UndoEntry) = mutationMutex.withLock {
         awaitRestore()
         persist(listOf(entry) + pruneExpired(history.value).take(UndoConfig.MAX_ENTRIES - 1))
     }
 
-    suspend fun prune() {
+    suspend fun prune() = mutationMutex.withLock {
         awaitRestore()
         val pruned = pruneExpired(history.value)
         if (pruned != history.value) persist(pruned)
     }
 
-    suspend fun removeTop(): UndoEntry? {
+    suspend fun removeTop(): UndoEntry? = mutationMutex.withLock {
         awaitRestore()
         val current = pruneExpired(history.value)
         val top = current.firstOrNull() ?: return null
         persist(current.drop(1))
-        return top
+        top
     }
 
-    suspend fun restoreTop(entry: UndoEntry) {
+    suspend fun restoreTop(entry: UndoEntry) = mutationMutex.withLock {
         awaitRestore()
         persist(listOf(entry) + pruneExpired(history.value))
     }
