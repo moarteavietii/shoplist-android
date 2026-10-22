@@ -22,7 +22,7 @@ Build a native Android (Kotlin + Compose) client for the existing shoppinglist b
 | Auth | Cloudflare Access service tokens | `CF-Access-Client-Id` / `CF-Access-Client-Secret` headers on every request (including SSE connects). Encrypted storage (EncryptedSharedPreferences + Keystore), QR/manual entry, 401/403 → token re-entry screen. Ported from the `helloworldcosmin` testbed. |
 | Auth dev bypass | Build-time switch | Local dev backend sits outside Cloudflare Access; debug builds use a no-op auth interceptor (Hilt provides per build type). Never scattered conditionals. |
 | minSdk | 35 | Deliberate security choice. Do not lower. |
-| Base URL | Prod: `https://shoppinglist.pascariu.eu` · Dev: `devBaseUrl` in gitignored `local.properties` (fallback `http://10.0.2.2:3000`) | Dev URL is machine-local so the LAN IP never lands in git; original choice was the fixed `http://192.168.0.141:3000` (workstation LAN IP, believed DHCP-reserved; fallback: Bonjour `http://<macname>.local:3000`). Debug builds need a cleartext-HTTP exception for the dev host and emulator fallback only. |
+| Base URL | Prod: `https://shoppinglist.pascariu.eu` · Dev: `devBaseUrl` in gitignored `local.properties` (fallback `http://192.168.0.141:3000`, the workstation LAN IP) | Dev URL is machine-local so the LAN IP never lands in git; the fallback is the workstation LAN IP (believed DHCP-reserved; alternative: Bonjour `http://<macname>.local:3000`) since the user tests on a physical device. Debug builds also permit cleartext to `10.0.2.2` for emulator use. |
 | Background power | No network while backgrounded | SSE + any polling stop when the app is not visible (`repeatOnLifecycle(STARTED)`); on foreground, reconnect + full refetch. Revisit only if notifications are added. |
 | Pull-to-refresh | Dropped | SSE + refetch-on-reconnect (network drops and foregrounding) is the freshness mechanism. Revisit only if realtime proves unreliable. |
 | Local database | None initially | In-memory repository cache; server is truth. Room arrives with offline support (roadmap item 8). |
@@ -94,7 +94,7 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 
 | Web spec | Android home | Status |
 |---|---|---|
-| `frontend-scaffold` | Roadmap 1 — scaffold migration | not started |
+| `frontend-scaffold` | Roadmap 1 — scaffold migration | **done** — `scaffold-compose-foundation` (archived 2026-10-22); Android specs: `app-scaffold`, `cloudflare-auth` |
 | `rest-api` (client side) | Roadmap 2 — data layer | not started |
 | `shared-types-package` | Roadmap 2 — DTOs | not started |
 | `sse-subscriptions` | Roadmap 3 — realtime sync | not started |

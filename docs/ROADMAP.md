@@ -2,7 +2,7 @@
 
 Ordered, high-level plan for the Android app that replaces the shoppinglist web frontend. Each item becomes one or more OpenSpec changes when work starts. This file tracks *what* and *why*; specs under `../openspec/specs` track the *contracts*.
 
-## 1. App scaffold migration
+## 1. App scaffold migration ✅ (done — `scaffold-compose-foundation`, archived 2026-10-22)
 
 Replace the XML/AppCompat scaffold with the real foundation:
 

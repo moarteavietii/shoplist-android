@@ -1,0 +1,46 @@
+package eu.pascariu.shoppinglist.data.auth
+
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import okhttp3.Interceptor
+import okhttp3.Response
+import javax.inject.Inject
+import javax.inject.Singleton
+
+sealed interface AuthEvent {
+    data object CredentialsRejected : AuthEvent
+}
+
+interface AuthEventBus {
+    val events: SharedFlow<AuthEvent>
+    fun emit(event: AuthEvent)
+}
+
+@Singleton
+class AuthEventBusImpl @Inject constructor() : AuthEventBus {
+
+    private val mutableEvents = MutableSharedFlow<AuthEvent>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
+    )
+
+    override val events: SharedFlow<AuthEvent> = mutableEvents
+
+    override fun emit(event: AuthEvent) {
+        mutableEvents.tryEmit(event)
+    }
+}
+
+class AuthResponseInterceptor(
+    private val authEventBus: AuthEventBus,
+) : Interceptor {
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val response = chain.proceed(chain.request())
+        if (response.code == 401 || response.code == 403) {
+            authEventBus.emit(AuthEvent.CredentialsRejected)
+        }
+        return response
+    }
+}

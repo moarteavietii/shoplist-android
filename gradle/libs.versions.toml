@@ -17,6 +17,7 @@ kotlinxSerializationJson = "1.9.0"
 kotlinxCoroutines = "1.10.2"
 turbine = "1.2.1"
 securityCrypto = "1.1.0"
+errorProneAnnotations = "2.36.0"
 camerax = "1.5.1"
 mlkitBarcodeScanning = "17.3.0"
 accompanistPermissions = "0.37.3"
@@ -49,6 +50,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "hilt" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorProneAnnotations" }
 camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
