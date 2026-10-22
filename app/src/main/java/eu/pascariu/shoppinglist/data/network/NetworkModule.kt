@@ -101,8 +101,6 @@ object NetworkModule {
             okHttpClient = okHttpClient,
             json = json,
             baseUrl = baseUrl,
-            listId = DEFAULT_LIST_ID,
+            listId = eu.pascariu.shoppinglist.data.realtime.RealtimeClient.DEFAULT_LIST_ID,
         )
-
-    private const val DEFAULT_LIST_ID = 1L
 }

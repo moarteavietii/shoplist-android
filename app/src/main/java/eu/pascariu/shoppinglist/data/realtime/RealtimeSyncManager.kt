@@ -46,7 +46,7 @@ class RealtimeSyncManager @Inject constructor(
 
     private suspend fun refetchAll() {
         try {
-            itemsRepository.refetch(listId = DEFAULT_LIST_ID)
+            itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -79,6 +79,5 @@ class RealtimeSyncManager @Inject constructor(
 
     private companion object {
         const val TAG = "RealtimeSyncManager"
-        const val DEFAULT_LIST_ID = 1L
     }
 }

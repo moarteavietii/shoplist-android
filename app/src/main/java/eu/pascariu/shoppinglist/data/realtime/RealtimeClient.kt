@@ -139,7 +139,9 @@ class RealtimeClient(
         return connected
     }
 
-    private companion object {
-        const val CONNECTED_EVENT_TYPE = "connected"
+    companion object {
+        const val DEFAULT_LIST_ID = 1L
+
+        private const val CONNECTED_EVENT_TYPE = "connected"
     }
 }
