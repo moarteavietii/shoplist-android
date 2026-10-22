@@ -1,11 +1,13 @@
 package eu.pascariu.shoppinglist.data.realtime
 
+import android.util.Log
 import eu.pascariu.shoppinglist.data.model.ItemEvent
 import eu.pascariu.shoppinglist.data.model.ShopEvent
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -43,8 +45,20 @@ class RealtimeSyncManager @Inject constructor(
     }
 
     private suspend fun refetchAll() {
-        itemsRepository.refetch(listId = DEFAULT_LIST_ID)
-        shopsRepository.refetch()
+        try {
+            itemsRepository.refetch(listId = DEFAULT_LIST_ID)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.w(TAG, "Items refetch after reconnect failed", error)
+        }
+        try {
+            shopsRepository.refetch()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.w(TAG, "Shops refetch after reconnect failed", error)
+        }
     }
 
     private suspend fun mergeItemEvent(event: ItemEvent) {
@@ -64,6 +78,7 @@ class RealtimeSyncManager @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "RealtimeSyncManager"
         const val DEFAULT_LIST_ID = 1L
     }
 }
