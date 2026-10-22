@@ -21,6 +21,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import retrofit2.Response
+import java.io.IOException
 
 class RealtimeSyncManagerTest {
 
@@ -112,6 +113,32 @@ class RealtimeSyncManagerTest {
     }
 
     @Test
+    fun `failed refetch does not crash the sync collectors`() = runTest {
+        val itemsApi = FakeItemsApi(itemsForFetch = listOf(sampleItem())).apply {
+            listError = IOException("network down")
+        }
+        val shopsApi = FakeShopsApi(shopsForFetch = listOf(sampleShop()))
+        val client = FakeRealtimeClient()
+        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(shopsApi))
+
+        manager.start(this)
+        advanceUntilIdle()
+        client.connectSignals.emit(RealtimeClient.Stream.ITEMS)
+        advanceUntilIdle()
+
+        assertEquals(1, itemsApi.listCalls)
+        assertEquals(1, shopsApi.listCalls)
+
+        itemsApi.listError = null
+        client.connectSignals.emit(RealtimeClient.Stream.ITEMS)
+        advanceUntilIdle()
+
+        assertEquals(2, itemsApi.listCalls)
+        assertEquals(2, shopsApi.listCalls)
+        manager.stop()
+    }
+
+    @Test
     fun `stop closes the client and stops processing events`() = runTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
@@ -183,9 +210,11 @@ private class FakeRealtimeClient : RealtimeClientContract {
 
 private class FakeItemsApi(var itemsForFetch: List<Item>) : ItemsApi {
     var listCalls = 0
+    var listError: IOException? = null
 
     override suspend fun listItems(listId: Long): List<Item> {
         listCalls++
+        listError?.let { throw it }
         return itemsForFetch
     }
 
@@ -196,9 +225,11 @@ private class FakeItemsApi(var itemsForFetch: List<Item>) : ItemsApi {
 
 private class FakeShopsApi(var shopsForFetch: List<Shop>) : ShopsApi {
     var listCalls = 0
+    var listError: IOException? = null
 
     override suspend fun listShops(): List<Shop> {
         listCalls++
+        listError?.let { throw it }
         return shopsForFetch
     }
 
