@@ -20,7 +20,7 @@ class ShoplistApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        appScope.launch { deviceIdStore.getOrCreate() }
+        appScope.launch(Dispatchers.IO) { deviceIdStore.getOrCreate() }
         realtimeLifecycle.observe(appScope)
     }
 }
