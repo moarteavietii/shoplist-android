@@ -99,6 +99,7 @@ class CredentialEntryViewModelTest {
         assertTrue(viewModel.uiState.value.saved)
 
         authEventBus.emit(AuthEvent.CredentialsRejected)
+        testDispatcher.scheduler.advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.saved)
     }
@@ -113,6 +114,7 @@ class CredentialEntryViewModelTest {
         assertTrue(viewModel.uiState.value.saved)
 
         authEventBus.emit(AuthEvent.CredentialsRejected)
+        testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
     }
