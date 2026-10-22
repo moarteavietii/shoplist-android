@@ -25,8 +25,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Color
@@ -49,6 +53,8 @@ fun ListScreen(
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
     val listState = rememberLazyListState()
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -57,6 +63,8 @@ fun ListScreen(
     LaunchedEffect(state.postSaveSignal) {
         if (state.postSaveSignal != null) {
             listState.scrollToItem(0)
+            searchFocusRequester.requestFocus()
+            keyboard?.show()
             viewModel.consumePostSaveSignal()
         }
     }
@@ -130,6 +138,7 @@ fun ListScreen(
                 query = state.searchQuery,
                 onQueryChanged = viewModel::onSearchQueryChanged,
                 onImeAction = viewModel::onAddAffordanceTapped,
+                focusRequester = searchFocusRequester,
             )
 
             AnimatedVisibility(
@@ -158,6 +167,7 @@ private fun SearchField(
     query: String,
     onQueryChanged: (String) -> Unit,
     onImeAction: () -> Unit,
+    focusRequester: FocusRequester,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
@@ -186,6 +196,7 @@ private fun SearchField(
         ),
         modifier = Modifier
             .fillMaxWidth()
+            .focusRequester(focusRequester)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
