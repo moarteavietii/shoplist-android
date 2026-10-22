@@ -12,49 +12,55 @@ import org.junit.Test
 
 class CloudflareAccessInterceptorTest {
 
-    private lateinit var mockWebServer: MockWebServer
+    private lateinit var apiServer: MockWebServer
+    private lateinit var otherServer: MockWebServer
     private lateinit var fakeTokenStore: FakeTokenStore
 
     @Before
     fun setUp() {
-        mockWebServer = MockWebServer()
-        mockWebServer.start()
+        apiServer = MockWebServer()
+        apiServer.start()
+        otherServer = MockWebServer()
+        otherServer.start()
         fakeTokenStore = FakeTokenStore()
     }
 
     @After
     fun tearDown() {
-        mockWebServer.shutdown()
+        apiServer.shutdown()
+        otherServer.shutdown()
     }
 
     private fun buildClient(): OkHttpClient =
         OkHttpClient.Builder()
-            .addInterceptor(CloudflareAccessInterceptor(fakeTokenStore))
+            .addNetworkInterceptor(
+                CloudflareAccessInterceptor(fakeTokenStore, apiServer.url("/").toString())
+            )
             .build()
 
     @Test
     fun `injects both headers when credentials are stored`() {
         fakeTokenStore.saved = AccessCredentials(clientId = "id-1", clientSecret = "secret-1")
-        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+        apiServer.enqueue(MockResponse().setResponseCode(200))
 
-        buildClient().newCall(Request.Builder().url(mockWebServer.url("/health")).build())
+        buildClient().newCall(Request.Builder().url(apiServer.url("/health")).build())
             .execute()
             .close()
 
-        val recorded = mockWebServer.takeRequest()
+        val recorded = apiServer.takeRequest()
         assertEquals("id-1", recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
         assertEquals("secret-1", recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
     }
 
     @Test
     fun `injects no headers when credentials are missing`() {
-        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+        apiServer.enqueue(MockResponse().setResponseCode(200))
 
-        buildClient().newCall(Request.Builder().url(mockWebServer.url("/health")).build())
+        buildClient().newCall(Request.Builder().url(apiServer.url("/health")).build())
             .execute()
             .close()
 
-        val recorded = mockWebServer.takeRequest()
+        val recorded = apiServer.takeRequest()
         assertNull(recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
         assertNull(recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
     }
@@ -62,18 +68,50 @@ class CloudflareAccessInterceptorTest {
     @Test
     fun `no-op interceptor injects no headers even with credentials stored`() {
         fakeTokenStore.saved = AccessCredentials(clientId = "id-1", clientSecret = "secret-1")
-        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+        apiServer.enqueue(MockResponse().setResponseCode(200))
         val client = OkHttpClient.Builder()
             .addInterceptor(NoOpAuthInterceptor())
             .build()
 
-        client.newCall(Request.Builder().url(mockWebServer.url("/health")).build())
+        client.newCall(Request.Builder().url(apiServer.url("/health")).build())
             .execute()
             .close()
 
-        val recorded = mockWebServer.takeRequest()
+        val recorded = apiServer.takeRequest()
         assertNull(recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
         assertNull(recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
+    }
+
+    @Test
+    fun `strips credentials for requests to other hosts`() {
+        fakeTokenStore.saved = AccessCredentials(clientId = "id-1", clientSecret = "secret-1")
+        otherServer.enqueue(MockResponse().setResponseCode(200))
+
+        buildClient().newCall(Request.Builder().url(otherServer.url("/elsewhere")).build())
+            .execute()
+            .close()
+
+        val recorded = otherServer.takeRequest()
+        assertNull(recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
+        assertNull(recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
+    }
+
+    @Test
+    fun `does not leak credentials on cross-host redirect`() {
+        fakeTokenStore.saved = AccessCredentials(clientId = "id-1", clientSecret = "secret-1")
+        apiServer.enqueue(
+            MockResponse().setResponseCode(302)
+                .setHeader("Location", otherServer.url("/elsewhere"))
+        )
+        otherServer.enqueue(MockResponse().setResponseCode(200))
+
+        buildClient().newCall(Request.Builder().url(apiServer.url("/health")).build())
+            .execute()
+            .close()
+
+        val redirected = otherServer.takeRequest()
+        assertNull(redirected.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
+        assertNull(redirected.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
     }
 }
 
