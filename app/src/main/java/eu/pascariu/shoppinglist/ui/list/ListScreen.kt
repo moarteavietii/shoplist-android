@@ -27,9 +27,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,6 +125,7 @@ fun ListScreen(
             SearchField(
                 query = state.searchQuery,
                 onQueryChanged = viewModel::onSearchQueryChanged,
+                onImeAction = viewModel::onAddAffordanceTapped,
             )
 
             AnimatedVisibility(
@@ -149,6 +153,7 @@ fun ListScreen(
 private fun SearchField(
     query: String,
     onQueryChanged: (String) -> Unit,
+    onImeAction: () -> Unit,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
@@ -161,6 +166,10 @@ private fun SearchField(
             Text(text = "Search or add", style = typography.body, color = colors.contentMuted)
         },
         singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(
+            onDone = { if (query.isNotBlank()) onImeAction() },
+        ),
         shape = shapes.medium,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = colors.surface,
