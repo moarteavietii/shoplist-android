@@ -2,6 +2,7 @@ package eu.pascariu.shoppinglist.data.device
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -47,6 +48,7 @@ class EncryptedDeviceIdStore @Inject constructor(
         error: Exception,
     ): SharedPreferences {
         if (!retryOnCorruption) throw error
+        Log.w(TAG, "Device identity prefs corrupted; resetting device id", error)
         deleteMasterKey()
         if (!context.deleteSharedPreferences(PREFS_FILE)) throw error
         return createPrefs(retryOnCorruption = false)
@@ -74,6 +76,7 @@ class EncryptedDeviceIdStore @Inject constructor(
         const val KEY_DEVICE_ID = "device_id"
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
         const val MASTER_KEY_ALIAS = "_androidx_security_master_key_"
+        const val TAG = "DeviceIdStore"
     }
 }
 
