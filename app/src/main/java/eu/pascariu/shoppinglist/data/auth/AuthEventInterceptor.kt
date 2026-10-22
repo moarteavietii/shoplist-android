@@ -34,11 +34,13 @@ class AuthEventBusImpl @Inject constructor() : AuthEventBus {
 
 class AuthResponseInterceptor(
     private val authEventBus: AuthEventBus,
+    private val tokenStore: TokenStore,
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val response = chain.proceed(chain.request())
         if (response.code == 401 || response.code == 403) {
+            tokenStore.clear()
             authEventBus.emit(AuthEvent.CredentialsRejected)
         }
         return response
