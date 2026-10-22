@@ -15,7 +15,7 @@ data class ListUiState(
     val errorMessage: String? = null,
 )
 
-data class PostSaveSignal(val id: Long = System.currentTimeMillis())
+data class PostSaveSignal(val id: Long)
 
 data class AddItemUiState(
     val title: String,
