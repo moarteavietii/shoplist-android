@@ -14,7 +14,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
@@ -52,16 +51,11 @@ class RealtimeClient(
     override val connectSignals: SharedFlow<Stream> = connectSignalsFlow.asSharedFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val backgrounded = MutableStateFlow(false)
     private val streamJobs = mutableListOf<Job>()
 
     @Volatile private var running = false
 
     @Volatile private var closed = false
-
-    fun setBackgrounded(value: Boolean) {
-        backgrounded.value = value
-    }
 
     override fun start() {
         if (closed || running) return
@@ -94,10 +88,6 @@ class RealtimeClient(
     ) {
         var backoff = initialBackoff
         while (running && scope.isActive) {
-            if (backgrounded.value) {
-                delay(BACKOFF_POLL)
-                continue
-            }
             val connected = connectOnce(url, eventsFlow, serializer, stream)
             if (connected) {
                 backoff = initialBackoff
@@ -151,6 +141,5 @@ class RealtimeClient(
 
     private companion object {
         const val CONNECTED_EVENT_TYPE = "connected"
-        val BACKOFF_POLL = 500.milliseconds
     }
 }

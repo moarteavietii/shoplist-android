@@ -130,6 +130,23 @@ class RealtimeSyncManagerTest {
 
         assertEquals(emptyList<Item>(), repository.items.value)
     }
+
+    @Test
+    fun `restart after stop reconnects the client`() = runTest {
+        val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
+        val client = FakeRealtimeClient()
+        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(FakeShopsApi(emptyList())))
+
+        manager.start(this)
+        advanceUntilIdle()
+        manager.stop()
+        manager.start(this)
+        advanceUntilIdle()
+
+        assertEquals(2, client.startCalls)
+        assertEquals(1, client.stopCalls)
+        manager.stop()
+    }
 }
 
 private fun sampleItem() = Item(

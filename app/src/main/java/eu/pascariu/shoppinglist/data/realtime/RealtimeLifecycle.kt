@@ -6,6 +6,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
 @Singleton
@@ -17,7 +18,12 @@ class RealtimeLifecycle @Inject constructor(
         scope.launch {
             val owner = ProcessLifecycleOwner.get()
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                syncManager.start(this)
+                try {
+                    syncManager.start(this)
+                    awaitCancellation()
+                } finally {
+                    syncManager.stop()
+                }
             }
         }
     }
