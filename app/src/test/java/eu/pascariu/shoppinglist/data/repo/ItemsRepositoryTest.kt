@@ -88,6 +88,19 @@ class ItemsRepositoryTest {
         assertTrue(repository.items.first().isEmpty())
         assertTrue(api.deleted)
     }
+
+    @Test
+    fun `404 on delete surfaces error and leaves cache unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.deleteResponse = Response.error(404, okhttp3.ResponseBody.create(null, ""))
+
+        val thrown = runCatching { repository.delete(itemId = 42L) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(sampleItems(), repository.items.first())
+    }
 }
 
 private fun sampleItems(): List<Item> = listOf(
@@ -114,6 +127,7 @@ private class FakeItemsApi(
     var createdItem: Item? = null
     var updatedItem: Item? = null
     var deleted = false
+    var deleteResponse: Response<Unit> = Response.success(Unit)
 
     override suspend fun listItems(listId: Long): List<Item> {
         listCalls++
@@ -129,7 +143,7 @@ private class FakeItemsApi(
 
     override suspend fun deleteItem(itemId: Long): Response<Unit> {
         deleted = true
-        return Response.success(Unit)
+        return deleteResponse
     }
 }
 
