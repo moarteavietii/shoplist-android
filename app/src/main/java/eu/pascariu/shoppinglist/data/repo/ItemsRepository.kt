@@ -38,7 +38,13 @@ class ItemsRepository @Inject constructor(
     suspend fun update(itemId: Long, request: UpdateItemRequest): Item {
         val updated = itemsApi.updateItem(itemId, request)
         if (updated.listId == cachedListId.value) {
-            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            cache.update { current ->
+                if (current.any { it.id == updated.id }) {
+                    current.map { if (it.id == updated.id) updated else it }
+                } else {
+                    current + updated
+                }
+            }
         }
         return updated
     }
