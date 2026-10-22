@@ -13,6 +13,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,7 +79,9 @@ fun AddItemModal(
                 text = if (modal.allViewsSelected) "Deselect all" else "Select all",
                 style = typography.label,
                 color = colors.ledOn,
-                modifier = Modifier.clickable(role = Role.Button) { onToggleAll() },
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .clickable(role = Role.Button) { onToggleAll() },
             )
         }
 
@@ -114,19 +117,19 @@ fun AddItemModal(
                 style = typography.label,
                 color = colors.contentMuted,
                 modifier = Modifier
-                    .clickable(role = Role.Button) { onDiscard() }
-                    .padding(8.dp),
+                    .minimumInteractiveComponentSize()
+                    .clickable(role = Role.Button) { onDiscard() },
             )
             Text(
                 text = "Save",
                 style = typography.label,
                 color = if (modal.canSave) colors.ledOn else colors.ledOff,
                 modifier = Modifier
+                    .minimumInteractiveComponentSize()
                     .clickable(
                         role = Role.Button,
                         enabled = modal.canSave,
-                    ) { onSave() }
-                    .padding(8.dp),
+                    ) { onSave() },
             )
         }
     }
