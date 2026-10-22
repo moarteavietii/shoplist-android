@@ -68,16 +68,16 @@ class UndoHistoryStoreTest {
     fun `record evicts oldest beyond 50 entries`() = runTest(testDispatcher) {
         val store = createStore()
         val now = System.currentTimeMillis()
-        repeat(UndoConfig.MAX_ENTRIES) { index ->
-            store.record(UndoEntry(index.toLong(), from = false, to = true, at = now + index))
+        repeat(50) { index ->
+            store.record(UndoEntry(index.toLong() + 1, from = false, to = true, at = now + index))
         }
         store.record(UndoEntry(999, from = false, to = true, at = now + 9999))
         advanceUntilIdle()
 
         val entries = store.entries.value
-        assertEquals(UndoConfig.MAX_ENTRIES, entries.size)
+        assertEquals(50, entries.size)
         assertEquals(999L, entries.first().itemId)
-        assertEquals(1L, entries.last().itemId)
+        assertEquals(2L, entries.last().itemId)
     }
 
     @Test
