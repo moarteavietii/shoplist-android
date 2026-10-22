@@ -19,10 +19,6 @@ class HealthViewModel @Inject constructor(
     private val _healthStatus = MutableStateFlow<HealthStatus>(HealthStatus.Loading)
     val healthStatus: StateFlow<HealthStatus> = _healthStatus.asStateFlow()
 
-    init {
-        checkHealth()
-    }
-
     fun checkHealth() {
         viewModelScope.launch {
             _healthStatus.value = HealthStatus.Loading
