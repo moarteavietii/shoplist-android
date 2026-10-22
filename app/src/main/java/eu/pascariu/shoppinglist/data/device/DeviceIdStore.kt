@@ -7,6 +7,7 @@ import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.security.GeneralSecurityException
+import java.security.KeyStore
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,8 +47,16 @@ class EncryptedDeviceIdStore @Inject constructor(
         error: Exception,
     ): SharedPreferences {
         if (!retryOnCorruption) throw error
-        context.deleteSharedPreferences(PREFS_FILE)
+        deleteMasterKey()
+        if (!context.deleteSharedPreferences(PREFS_FILE)) throw error
         return createPrefs(retryOnCorruption = false)
+    }
+
+    private fun deleteMasterKey() {
+        val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
+        if (keyStore.containsAlias(MASTER_KEY_ALIAS)) {
+            keyStore.deleteEntry(MASTER_KEY_ALIAS)
+        }
     }
 
     override fun getOrCreate(): String {
@@ -60,5 +69,7 @@ class EncryptedDeviceIdStore @Inject constructor(
     private companion object {
         const val PREFS_FILE = "shoplist_device_identity"
         const val KEY_DEVICE_ID = "device_id"
+        const val ANDROID_KEY_STORE = "AndroidKeyStore"
+        const val MASTER_KEY_ALIAS = "_androidx_security_master_key_"
     }
 }
