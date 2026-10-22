@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -154,5 +156,21 @@ class UndoHistoryStoreTest {
         advanceUntilIdle()
 
         assertTrue(store.entries.value.isEmpty())
+    }
+
+    @Test
+    fun `concurrent records all land in history`() = runTest(testDispatcher) {
+        val store = createStore()
+        val now = System.currentTimeMillis()
+
+        val jobs = (1..20).map { index ->
+            launch {
+                store.record(UndoEntry(index.toLong(), from = false, to = true, at = now + index))
+            }
+        }
+        jobs.joinAll()
+        advanceUntilIdle()
+
+        assertEquals(20, store.entries.value.size)
     }
 }
