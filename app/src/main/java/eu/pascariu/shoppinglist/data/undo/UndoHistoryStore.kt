@@ -1,17 +1,21 @@
 package eu.pascariu.shoppinglist.data.undo
 
+import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.core.CorruptionException
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import eu.pascariu.shoppinglist.di.ApplicationScope
+import eu.pascariu.shoppinglist.di.IoDispatcher
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.time.Duration
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,11 +27,22 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 @Singleton
-class UndoHistoryStore @Inject constructor(
+class UndoHistoryStore(
     private val dataStore: DataStore<Preferences>,
     private val json: Json,
-    @ApplicationScope storeScope: CoroutineScope,
+    storeScope: CoroutineScope,
+    ioDispatcher: CoroutineDispatcher,
+    private val pruneInterval: Duration,
+    private val clock: () -> Long,
 ) {
+
+    @Inject
+    constructor(
+        dataStore: DataStore<Preferences>,
+        json: Json,
+        @ApplicationScope storeScope: CoroutineScope,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ) : this(dataStore, json, storeScope, ioDispatcher, UndoConfig.PRUNE_INTERVAL, System::currentTimeMillis)
 
     private val history = MutableStateFlow<List<UndoEntry>>(emptyList())
     val entries: StateFlow<List<UndoEntry>> = history.asStateFlow()
@@ -38,6 +53,12 @@ class UndoHistoryStore @Inject constructor(
 
     init {
         restoreJob = storeScope.launch { restore() }
+        storeScope.launch(ioDispatcher) {
+            while (true) {
+                delay(pruneInterval.toMillis())
+                prune()
+            }
+        }
     }
 
     suspend fun record(entry: UndoEntry) = mutationMutex.withLock {
@@ -69,7 +90,7 @@ class UndoHistoryStore @Inject constructor(
     }
 
     private fun pruneExpired(entries: List<UndoEntry>): List<UndoEntry> {
-        val cutoff = System.currentTimeMillis() - UndoConfig.TTL.toMillis()
+        val cutoff = clock() - UndoConfig.TTL.toMillis()
         return entries.filter { it.at > cutoff }
     }
 

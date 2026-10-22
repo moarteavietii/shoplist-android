@@ -3,6 +3,7 @@ package eu.pascariu.shoppinglist.data.undo
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -54,6 +55,9 @@ class UndoHistoryStoreTest {
             dataStore = dataStore,
             json = json,
             storeScope = storeScope,
+            ioDispatcher = Dispatchers.IO,
+            pruneInterval = UndoConfig.PRUNE_INTERVAL,
+            clock = System::currentTimeMillis,
         )
 
     @Test
@@ -80,6 +84,34 @@ class UndoHistoryStoreTest {
         assertEquals(50, entries.size)
         assertEquals(999L, entries.first().itemId)
         assertEquals(2L, entries.last().itemId)
+    }
+
+    @Test
+    fun `expired entries are pruned periodically without manual prune`() {
+        var fakeNow = System.currentTimeMillis()
+        val store = UndoHistoryStore(
+            dataStore = dataStore,
+            json = json,
+            storeScope = storeScope,
+            ioDispatcher = Dispatchers.IO,
+            pruneInterval = java.time.Duration.ofMillis(50),
+            clock = { fakeNow },
+        )
+        runTest(testDispatcher) {
+            val now = fakeNow
+            store.record(UndoEntry(1, from = false, to = true, at = now))
+            advanceUntilIdle()
+            assertEquals(listOf(UndoEntry(1, false, true, now)), store.entries.value)
+
+            fakeNow += UndoConfig.TTL.toMillis() + 1
+            val deadline = System.currentTimeMillis() + 5_000
+            while (store.entries.value.isNotEmpty() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10)
+                advanceUntilIdle()
+            }
+
+            assertTrue(store.entries.value.isEmpty())
+        }
     }
 
     @Test
@@ -152,6 +184,9 @@ class UndoHistoryStoreTest {
             dataStore = secondDataStore,
             json = json,
             storeScope = secondScope,
+            ioDispatcher = Dispatchers.IO,
+            pruneInterval = UndoConfig.PRUNE_INTERVAL,
+            clock = System::currentTimeMillis,
         )
         advanceUntilIdle()
 
