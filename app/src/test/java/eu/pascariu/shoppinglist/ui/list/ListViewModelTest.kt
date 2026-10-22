@@ -73,6 +73,9 @@ class ListViewModelTest {
             },
             json = json,
             storeScope = storeScope,
+            ioDispatcher = Dispatchers.IO,
+            pruneInterval = java.time.Duration.ofHours(1),
+            clock = System::currentTimeMillis,
         )
         viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore)
     }
