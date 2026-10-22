@@ -77,37 +77,39 @@ class FractionalIndexingTest {
         assertTrue(key < "a1")
     }
 
-    @Test
+    @Test(expected = IllegalArgumentException::class)
     fun `equal neighbors throw`() {
-        var thrown = false
-        try {
-            generateKeyBetween("a0", "a0")
-        } catch (error: IllegalArgumentException) {
-            thrown = true
-        }
-        assertTrue(thrown)
+        generateKeyBetween("a0", "a0")
     }
 
-    @Test
+    @Test(expected = IllegalArgumentException::class)
     fun `trailing zero keys are rejected`() {
-        var thrown = false
-        try {
-            generateKeyBetween("a0", "aZ0")
-        } catch (error: IllegalArgumentException) {
-            thrown = true
-        }
-        assertTrue(thrown)
+        generateKeyBetween("a0", "aZ0")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `key with too-short integer part is rejected`() {
+        generateKeyBetween("z9", null)
     }
 
     @Test
-    fun `key with too-short integer part is rejected`() {
-        var thrown = false
-        try {
-            generateKeyBetween("z9", null)
-        } catch (error: IllegalArgumentException) {
-            thrown = true
+    fun `generated keys re-validate as order keys`() {
+        val generated = listOf(
+            generateKeyBetween(null, null),
+            generateKeyBetween("a0", null),
+            generateKeyBetween(null, "a0"),
+            generateKeyBetween("a0", "a1"),
+            generateKeyBetween("a0z", "a1"),
+            generateKeyBetween("Zz", null),
+            generateKeyBetween("az", null),
+            generateKeyBetween(null, "b00"),
+            generateKeyBetween("z".repeat(27) + "z", null),
+            generateKeyBetween(null, "A" + "0".repeat(26) + "z"),
+        )
+        for (key in generated) {
+            generateKeyBetween(key, null)
+            generateKeyBetween(null, key)
         }
-        assertTrue(thrown)
     }
 
     @Test
