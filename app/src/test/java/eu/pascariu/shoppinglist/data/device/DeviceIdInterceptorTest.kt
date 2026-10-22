@@ -23,7 +23,7 @@ class DeviceIdInterceptorTest {
         server = MockWebServer()
         server.start()
         client = OkHttpClient.Builder()
-            .addInterceptor(DeviceIdInterceptor(fakeStore))
+            .addInterceptor(DeviceIdInterceptor(fakeStore, server.url("/").toString()))
             .build()
     }
 
@@ -100,6 +100,27 @@ class DeviceIdInterceptorTest {
         val second = server.takeRequest().getHeader("X-Device-Id")
         assertEquals(first, second)
         assertTrue(fakeStore.creationCount == 1)
+    }
+
+    @Test
+    fun `mutation to non-api host omits device id header`() {
+        val otherServer = MockWebServer()
+        otherServer.start()
+        otherServer.enqueue(MockResponse().setResponseCode(200))
+        val scopedClient = OkHttpClient.Builder()
+            .addInterceptor(DeviceIdInterceptor(fakeStore, "https://api.example.com/"))
+            .build()
+        val request = Request.Builder()
+            .url(otherServer.url("/api/shops"))
+            .post("{}".toRequestBody())
+            .build()
+
+        try {
+            scopedClient.newCall(request).execute().close()
+            assertNull(otherServer.takeRequest().getHeader("X-Device-Id"))
+        } finally {
+            otherServer.shutdown()
+        }
     }
 }
 
