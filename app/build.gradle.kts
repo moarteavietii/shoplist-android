@@ -159,7 +159,6 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.okhttp)
-    debugImplementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.security.crypto)
