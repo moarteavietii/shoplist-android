@@ -6,7 +6,9 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBus
@@ -27,9 +29,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch {
-            authEventBus.events.collect {
-                if (it is AuthEvent.CredentialsRejected) {
-                    credentialsRejected = true
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                authEventBus.events.collect {
+                    if (it is AuthEvent.CredentialsRejected) {
+                        credentialsRejected = true
+                    }
                 }
             }
         }
