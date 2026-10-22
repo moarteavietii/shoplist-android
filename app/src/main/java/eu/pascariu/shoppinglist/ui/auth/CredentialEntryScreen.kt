@@ -45,7 +45,10 @@ fun CredentialEntryScreen(
     var isScanning by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.saved) {
-        if (state.saved) onCredentialsSaved()
+        if (state.saved) {
+            onCredentialsSaved()
+            viewModel.onSavedHandled()
+        }
     }
 
     if (isScanning) {

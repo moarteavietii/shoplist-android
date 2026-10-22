@@ -67,6 +67,10 @@ class CredentialEntryViewModel @Inject constructor(
         saveCredentials(AccessCredentials(state.clientId.trim(), state.clientSecret.trim()))
     }
 
+    fun onSavedHandled() {
+        _uiState.update { it.copy(saved = false) }
+    }
+
     private fun saveCredentials(credentials: AccessCredentials) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
