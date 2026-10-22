@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -79,8 +79,7 @@ fun ListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.background)
-            .statusBarsPadding()
-            .imePadding(),
+            .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         Text(
             text = state.watermarkName,
@@ -93,8 +92,7 @@ fun ListScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding(),
+                .fillMaxSize(),
         ) {
             LazyColumn(
                 state = listState,
