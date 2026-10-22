@@ -25,7 +25,9 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -55,6 +57,10 @@ fun ListScreen(
     val listState = rememberLazyListState()
     val searchFocusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    var lastAddItemModal by remember { mutableStateOf<AddItemUiState?>(null) }
+    if (state.addItemModal != null) {
+        lastAddItemModal = state.addItemModal
+    }
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -146,7 +152,7 @@ fun ListScreen(
                 enter = fadeIn() + slideInVertically { it },
                 exit = fadeOut() + slideOutVertically { it },
             ) {
-                state.addItemModal?.let { modal ->
+                lastAddItemModal?.let { modal ->
                     AddItemModal(
                         modal = modal,
                         onTitleChanged = viewModel::onAddItemTitleChanged,
