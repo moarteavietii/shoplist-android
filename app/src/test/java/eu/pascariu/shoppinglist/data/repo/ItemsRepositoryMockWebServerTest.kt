@@ -263,4 +263,26 @@ class ItemsRepositoryMockWebServerTest {
         assertTrue(thrown.exceptionOrNull() is HttpException)
         assertEquals(false, repository.items.first().single().isChecked)
     }
+
+    @Test
+    fun `failed setChecked rollback only reverts isChecked keeping remote fields`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10, isChecked = false)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.setChecked(itemId = 10, isChecked = true) } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString(enqueueItemJson(id = 10, name = "Organic Milk", isChecked = true)),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertEquals(false, rolledBack.isChecked)
+        assertEquals("Organic Milk", rolledBack.name)
+    }
 }
