@@ -18,21 +18,28 @@ class ItemsRepository @Inject constructor(
 ) {
 
     private val cache = MutableStateFlow<List<Item>>(emptyList())
+    private val cachedListId = MutableStateFlow<Long?>(null)
     val items: StateFlow<List<Item>> = cache.asStateFlow()
+    val cachedListIdFlow: StateFlow<Long?> = cachedListId.asStateFlow()
 
     suspend fun refetch(listId: Long) {
+        cachedListId.value = listId
         cache.value = itemsApi.listItems(listId)
     }
 
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
         val created = itemsApi.createItem(listId, request)
-        cache.update { it + created }
+        if (listId == cachedListId.value) {
+            cache.update { it + created }
+        }
         return created
     }
 
     suspend fun update(itemId: Long, request: UpdateItemRequest): Item {
         val updated = itemsApi.updateItem(itemId, request)
-        cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+        if (updated.listId == cachedListId.value) {
+            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+        }
         return updated
     }
 

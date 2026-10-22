@@ -78,6 +78,46 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `create for a different list leaves cache untouched`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+
+        api.createdItem = sampleItems().first().copy(id = 7, listId = 2)
+        repository.create(listId = 2, CreateItemRequest(name = "Other"))
+
+        assertEquals(sampleItems(), repository.items.first())
+        assertEquals(1L, repository.cachedListIdFlow.first())
+    }
+
+    @Test
+    fun `update of item from another list leaves cache untouched`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        val otherListItem = sampleItems().first().copy(id = 7, listId = 2)
+
+        api.updatedItem = otherListItem
+        repository.update(itemId = 7, UpdateItemRequest(isChecked = true))
+
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
+    fun `refetching another list retargets the cache`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        val otherListItems = listOf(sampleItems().first().copy(id = 9, listId = 2))
+
+        api.itemsForFetch = otherListItems
+        repository.refetch(listId = 2)
+
+        assertEquals(otherListItems, repository.items.first())
+        assertEquals(2L, repository.cachedListIdFlow.first())
+    }
+
+    @Test
     fun `delete removes cached entry`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
         val repository = ItemsRepository(api)
