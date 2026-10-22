@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import eu.pascariu.shoppinglist.data.auth.AccessCredentials
+import eu.pascariu.shoppinglist.data.auth.AuthEvent
+import eu.pascariu.shoppinglist.data.auth.AuthEventBus
 import eu.pascariu.shoppinglist.data.auth.TokenStore
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,10 +25,21 @@ data class CredentialEntryUiState(
 @HiltViewModel
 class CredentialEntryViewModel @Inject constructor(
     private val tokenStore: TokenStore,
+    authEventBus: AuthEventBus,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CredentialEntryUiState())
     val uiState: StateFlow<CredentialEntryUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            authEventBus.events.collect { event ->
+                if (event is AuthEvent.CredentialsRejected) {
+                    _uiState.update { it.copy(saved = false) }
+                }
+            }
+        }
+    }
 
     fun onClientIdChange(value: String) {
         _uiState.update { it.copy(clientId = value, error = null) }
