@@ -54,4 +54,23 @@ class ItemsRepository @Inject constructor(
         if (!response.isSuccessful) throw HttpException(response)
         cache.update { current -> current.filterNot { it.id == itemId } }
     }
+
+    fun applyCreated(item: Item) {
+        if (item.listId != cachedListId.value) return
+        cache.update { current ->
+            if (current.any { it.id == item.id }) current else current + item
+        }
+    }
+
+    fun applyUpdated(item: Item) {
+        if (item.listId != cachedListId.value) return
+        cache.update { current ->
+            val existing = current.firstOrNull { it.id == item.id } ?: return@update current
+            if (existing == item) current else current.map { if (it.id == item.id) item else it }
+        }
+    }
+
+    fun applyDeleted(itemId: Long) {
+        cache.update { current -> current.filterNot { it.id == itemId } }
+    }
 }

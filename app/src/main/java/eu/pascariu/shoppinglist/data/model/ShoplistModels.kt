@@ -65,3 +65,20 @@ data class RenameShopRequest(
 data class ErrorPayload(
     val error: String,
 )
+
+@Serializable
+data class ItemEvent(
+    val type: String,
+    val listId: Long,
+    val item: Item? = null,
+    val itemId: Long? = null,
+    val originDeviceId: String? = null,
+)
+
+@Serializable
+data class ShopEvent(
+    val type: String,
+    val shop: Shop? = null,
+    val shopId: Long? = null,
+    val originDeviceId: String? = null,
+)

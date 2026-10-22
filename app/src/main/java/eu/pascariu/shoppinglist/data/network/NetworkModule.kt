@@ -92,9 +92,17 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideItemsRepository(impl: ItemsRepository): ItemsRepository = impl
+    fun provideRealtimeClient(
+        okHttpClient: OkHttpClient,
+        json: Json,
+        baseUrl: String,
+    ): eu.pascariu.shoppinglist.data.realtime.RealtimeClientContract =
+        eu.pascariu.shoppinglist.data.realtime.RealtimeClient(
+            okHttpClient = okHttpClient,
+            json = json,
+            baseUrl = baseUrl,
+            listId = DEFAULT_LIST_ID,
+        )
 
-    @Provides
-    @Singleton
-    fun provideShopsRepository(impl: ShopsRepository): ShopsRepository = impl
+    private const val DEFAULT_LIST_ID = 1L
 }

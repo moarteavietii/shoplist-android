@@ -123,6 +123,75 @@ class ShopsRepositoryTest {
         assertTrue(thrown.exceptionOrNull() is HttpException)
         assertEquals(listOf("Global", "Bakery"), repository.shops.first().map { it.name })
     }
+
+    @Test
+    fun `applyCreated appends and re-sorts`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+
+        repository.applyCreated(shop(3, "Alpine"))
+
+        assertEquals(
+            listOf("Global", "Alpine", "Bakery"),
+            repository.shops.first().map { it.name },
+        )
+    }
+
+    @Test
+    fun `applyCreated for an already-cached id leaves the cache unchanged`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+
+        repository.applyCreated(bakery())
+
+        assertEquals(listOf("Global", "Bakery"), repository.shops.first().map { it.name })
+    }
+
+    @Test
+    fun `applyUpdated replaces a changed shop and re-sorts`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), supermarket(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+
+        repository.applyUpdated(shop(1, "Zoo"))
+
+        assertEquals(
+            listOf("Global", "Supermarket", "Zoo"),
+            repository.shops.first().map { it.name },
+        )
+    }
+
+    @Test
+    fun `applyUpdated with an identical payload leaves the cache unchanged`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+
+        repository.applyUpdated(bakery())
+
+        assertEquals(listOf("Global", "Bakery"), repository.shops.first().map { it.name })
+    }
+
+    @Test
+    fun `applyDeleted removes a cached id and ignores an absent one`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), supermarket(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+
+        repository.applyDeleted(shopId = 999L)
+        assertEquals(
+            listOf("Global", "Bakery", "Supermarket"),
+            repository.shops.first().map { it.name },
+        )
+
+        repository.applyDeleted(shopId = 1L)
+        assertEquals(
+            listOf("Global", "Supermarket"),
+            repository.shops.first().map { it.name },
+        )
+    }
 }
 
 private fun shop(id: Long, name: String) = Shop(
