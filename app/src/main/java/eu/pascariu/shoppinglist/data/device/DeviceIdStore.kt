@@ -59,6 +59,7 @@ class EncryptedDeviceIdStore @Inject constructor(
         }
     }
 
+    @Synchronized
     override fun getOrCreate(): String {
         prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
         val deviceId = UUID.randomUUID().toString()
