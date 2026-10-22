@@ -27,6 +27,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 @Composable
@@ -55,7 +56,7 @@ fun QrScanEffect(
 
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val barcodeScanner = remember { BarcodeScanning.getClient() }
-    var lastPayload by remember { mutableStateOf<String?>(null) }
+    val lastPayload = remember { AtomicReference<String?>(null) }
     val cameraBindings = remember { CameraBindings() }
     var isDisposed by remember { mutableStateOf(false) }
 
@@ -76,9 +77,10 @@ fun QrScanEffect(
                 analysis.setAnalyzer(analysisExecutor, processFrameAnalyzer(
                     barcodeScanner,
                     onPayload = { payload ->
-                        if (lastPayload == null) {
-                            lastPayload = payload
-                            previewView.post { onQrPayload(payload) }
+                        if (lastPayload.compareAndSet(null, payload)) {
+                            previewView.post {
+                                if (!isDisposed) onQrPayload(payload)
+                            }
                         }
                     },
                 ))
