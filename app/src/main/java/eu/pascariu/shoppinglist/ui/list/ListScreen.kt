@@ -90,28 +90,33 @@ fun ListScreen(
             .background(colors.background)
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-        Text(
-            text = state.watermarkName,
-            style = typography.display,
-            color = colors.content,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .graphicsLayer(alpha = 0.07f),
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize(),
         ) {
-            LazyColumn(
-                state = listState,
-                reverseLayout = true,
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
             ) {
-                items(state.filteredItems, key = { it.id }) { item ->
-                    ItemRow(item = item, onCheckToggled = viewModel::onCheckToggled)
+                Text(
+                    text = state.watermarkName,
+                    style = typography.display,
+                    color = colors.content,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer(alpha = 0.07f),
+                )
+
+                LazyColumn(
+                    state = listState,
+                    reverseLayout = true,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                ) {
+                    items(state.filteredItems, key = { it.id }) { item ->
+                        ItemRow(item = item, onCheckToggled = viewModel::onCheckToggled)
+                    }
                 }
             }
 
