@@ -37,8 +37,8 @@ val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
     defaultDevBaseUrl
 }
 
-require(devBaseUrl.none { it == '"' || it == '\\' || it.isWhitespace() }) {
-    "shoplist.devBaseUrl must not contain quotes, backslashes, or whitespace"
+require(devBaseUrl.none { it == '"' || it == '\\' || it == '<' || it == '>' || it == '&' || it.isWhitespace() }) {
+    "shoplist.devBaseUrl must not contain quotes, backslashes, XML metacharacters, or whitespace"
 }
 
 val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
@@ -154,11 +154,11 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.errorprone.annotations)
 
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.okhttp)
-    debugImplementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.security.crypto)
@@ -168,11 +168,11 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.mlkit.barcode.scanning)
-    implementation(libs.accompanist.permissions)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.hilt.android.testing)

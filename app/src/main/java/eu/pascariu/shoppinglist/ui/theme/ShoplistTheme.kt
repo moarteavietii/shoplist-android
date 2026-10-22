@@ -1,7 +1,5 @@
 package eu.pascariu.shoppinglist.ui.theme
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -29,8 +27,6 @@ val LocalShoplistTypography = staticCompositionLocalOf<ShoplistTypography> {
 val LocalShoplistShapes = staticCompositionLocalOf<ShoplistShapes> {
     error("ShoplistShapes not provided")
 }
-
-private val DarkShoplistColors = ShoplistDarkColors
 
 private val ShoplistTypographyDefault = ShoplistTypography(
     display = TextStyle(
@@ -65,19 +61,10 @@ private val ShoplistTypographyDefault = ShoplistTypography(
     ),
 )
 
-private val ShoplistDarkColorScheme = darkColorScheme(
-    background = DarkShoplistColors.background,
-    surface = DarkShoplistColors.surface,
-    onBackground = DarkShoplistColors.content,
-    onSurface = DarkShoplistColors.content,
-    primary = DarkShoplistColors.ledOn,
-    error = DarkShoplistColors.danger,
-)
-
 @Composable
 fun ShoplistTheme(content: @Composable () -> Unit) {
     val tokens = ShoplistThemeTokens(
-        colors = DarkShoplistColors,
+        colors = ShoplistDarkColors,
         typography = ShoplistTypographyDefault,
         shapes = ShoplistShapesDefault,
     )
@@ -86,11 +73,6 @@ fun ShoplistTheme(content: @Composable () -> Unit) {
         LocalShoplistTypography provides tokens.typography,
         LocalShoplistShapes provides tokens.shapes,
     ) {
-        MaterialTheme(
-            colorScheme = ShoplistDarkColorScheme,
-            typography = tokens.typography.toMaterialTypography(),
-            shapes = MaterialTheme.shapes,
-            content = content,
-        )
+        content()
     }
 }

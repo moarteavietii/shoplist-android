@@ -1,3 +1,5 @@
 <resources>
-    <style name="Theme.Shoplistandroid" parent="android:Theme.Material.NoActionBar" />
+    <style name="Theme.Shoplistandroid" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF0B0E11</item>
+    </style>
 </resources>

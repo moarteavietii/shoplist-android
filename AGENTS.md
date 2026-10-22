@@ -2,14 +2,14 @@
 
 ## Project State
 
-This is an **OpenSpec-managed repo** for a native Android shopping list app. The project is at scaffolding stage: a single `:app` module built with the Android Gradle Plugin, configured through a version catalog (`gradle/libs.versions.toml`), with no feature code yet. Detailed feature behavior will live in the capability specs under `openspec/specs/` — consult those instead of this file for feature-level contracts.
+This is an **OpenSpec-managed repo** for a native Android shopping list app. The `:app` module hosts a Jetpack Compose app with a custom design language (token-based theming via CompositionLocals), Hilt DI, Retrofit/OkHttp/kotlinx-serialization networking, and Cloudflare Access service-token auth (no-op in debug builds). Feature behavior lives in the capability specs under `openspec/specs/` — consult those instead of this file for feature-level contracts.
 
 ## Architecture & Stack
 
 - **Platform:** Android (minSdk 35, target/compile SDK 37)
 - **Build system:** Gradle with Kotlin DSL (`build.gradle.kts`), Android Gradle Plugin via version catalog
 - **Module layout:** Single `:app` module
-- **UI:** AppCompat + Material Components
+- **UI:** Jetpack Compose with a custom design language (token-based theming via CompositionLocals; Material 3 only as an unthemed component toolkit)
 - **Testing:** JUnit4 (unit), AndroidX Test + Espresso (instrumented)
 
 ## Safe Agent Commands
@@ -73,3 +73,9 @@ The Android app replaces the shoppinglist web frontend; the backend REST + SSE A
 - **TDD: always write tests for the code you're about to write.** Run the tests after an implementation is done (all tasks are done).
 - **Avoid code comments.** Write self-explanatory code instead. Only add a comment when it is truly necessary (non-obvious intent, workaround, or gotcha), and keep it to one short line.
 - **After each `/opsx-archive` command,** check `AGENTS.md` and `README.md` against the just-archived change and its synced specs. Decide whether either file needs updating to reflect the new project state, capabilities, or workflow. If changes are warranted, present the proposed edits to the user and wait for confirmation before applying them.
+
+## Project Particularities
+
+- **Per-build-type bindings: only the auth interceptor differs.** Shared bindings (`TokenStore`, `AuthEventBus`, networking) live in the main-source-set `NetworkModule` — both build types need them. The `AuthInterceptor` binding is the only build-type switch: `app/src/debug/.../DebugAuthModule.kt` binds the no-op, `app/src/release/.../ReleaseAuthModule.kt` binds the real one. When adding new per-build-type behavior, follow this split; do not move shared bindings into a build-type source set (that broke the debug build once already).
+- **androidx opt-in APIs need the androidx `@OptIn`, not Kotlin's.** For CameraX-style `@Experimental*` APIs, annotate with `@androidx.annotation.OptIn(Experimental…::class)` on the calling declaration. Android lint's `UnsafeOptInUsageError` check does not recognize Kotlin's own `@OptIn`, and the opt-in requirement propagates to every call site (a lambda calling an annotated function must itself be covered).
+- **Testing convention: hand-written fakes, no mocking framework.** Unit tests use small hand-written fakes (`FakeTokenStore`, `FakeHealthApi`) and plain JUnit4; HTTP behavior is tested with MockWebServer, flows with Turbine. Do not introduce MockK/Mockito.
