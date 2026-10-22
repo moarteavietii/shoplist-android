@@ -98,4 +98,47 @@ class FractionalIndexingTest {
         }
         assertTrue(thrown)
     }
+
+    @Test
+    fun `key with too-short integer part is rejected`() {
+        var thrown = false
+        try {
+            generateKeyBetween("z9", null)
+        } catch (error: IllegalArgumentException) {
+            thrown = true
+        }
+        assertTrue(thrown)
+    }
+
+    @Test
+    fun `append at integer exhaustion grows the fractional part`() {
+        val highest = "z".repeat(27) + "z"
+        val key = generateKeyBetween(highest, null)
+
+        assertTrue(highest < key)
+    }
+
+    @Test
+    fun `prepend at integer exhaustion dips into the fractional part`() {
+        val smallest = "A" + "0".repeat(26)
+        val key = generateKeyBetween(null, smallest + "z")
+
+        assertTrue(key > smallest)
+        assertTrue(key < smallest + "z")
+    }
+
+    @Test
+    fun `append past Zz rolls into the a head`() {
+        assertEquals("a0", generateKeyBetween("Zz", null))
+    }
+
+    @Test
+    fun `prepend below b00 drops to the previous head`() {
+        assertEquals("az", generateKeyBetween(null, "b00"))
+    }
+
+    @Test
+    fun `append past az carries into a longer integer part`() {
+        assertEquals("b00", generateKeyBetween("az", null))
+    }
 }
