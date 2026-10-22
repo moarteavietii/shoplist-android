@@ -2,11 +2,14 @@ package eu.pascariu.shoppinglist.data.undo
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.core.CorruptionException
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import eu.pascariu.shoppinglist.di.ApplicationScope
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,7 +83,13 @@ class UndoHistoryStore @Inject constructor(
     private suspend fun restore() {
         val raw = try {
             dataStore.data.first()[KEY_HISTORY]
-        } catch (_: Exception) {
+        } catch (e: CorruptionException) {
+            null
+        } catch (e: IOException) {
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             null
         }
         val restored = raw?.let {
