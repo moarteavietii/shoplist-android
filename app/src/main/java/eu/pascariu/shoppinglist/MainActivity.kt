@@ -28,6 +28,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            credentialsRejected = savedInstanceState.getBoolean(KEY_CREDENTIALS_REJECTED)
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 authEventBus.events.collect {
@@ -46,5 +49,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_CREDENTIALS_REJECTED, credentialsRejected)
+    }
+
+    private companion object {
+        const val KEY_CREDENTIALS_REJECTED = "credentialsRejected"
     }
 }
