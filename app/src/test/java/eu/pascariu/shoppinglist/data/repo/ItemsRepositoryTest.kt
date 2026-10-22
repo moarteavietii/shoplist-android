@@ -110,6 +110,19 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `update of item absent from cache inserts it`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        val updated = sampleItems().first().copy(isChecked = true)
+
+        api.updatedItem = updated
+        repository.update(itemId = updated.id, UpdateItemRequest(isChecked = true))
+
+        assertEquals(listOf(updated), repository.items.first())
+    }
+
+    @Test
     fun `refetching another list retargets the cache`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
         val repository = ItemsRepository(api)
