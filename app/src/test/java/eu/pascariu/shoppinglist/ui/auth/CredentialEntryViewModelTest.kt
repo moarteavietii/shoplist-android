@@ -4,9 +4,11 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.TokenStore
+import eu.pascariu.shoppinglist.di.IoDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -20,6 +22,7 @@ import org.junit.Test
 class CredentialEntryViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    private val ioDispatcher: TestDispatcher = StandardTestDispatcher(testDispatcher.scheduler)
     private val authEventBus = AuthEventBusImpl()
     private lateinit var fakeTokenStore: FakeTokenStore
 
@@ -36,7 +39,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `submit saves trimmed credentials and marks state saved`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
         viewModel.onClientIdChange(" id-1 ")
         viewModel.onClientSecretChange(" secret-1 ")
 
@@ -49,7 +52,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `submit with blank fields shows error and does not save`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
 
         viewModel.submit()
 
@@ -59,7 +62,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `saved flag resets after handling so a reused screen does not close immediately`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
         viewModel.submit()
@@ -73,7 +76,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `saved flag can be set again after being handled`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
         viewModel.submit()
@@ -91,7 +94,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `credentials rejected event resets saved flag`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
         viewModel.submit()
@@ -106,7 +109,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `unrelated auth events do not reset saved flag`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
         viewModel.submit()
@@ -121,7 +124,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `scanned qr payload populates fields without saving`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
 
         viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -134,7 +137,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `scanned qr credentials are only saved after user submits`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
         viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
 
         viewModel.submit()
@@ -146,7 +149,7 @@ class CredentialEntryViewModelTest {
 
     @Test
     fun `unrecognized qr payload shows error and does not save`() {
-        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus)
+        val viewModel = CredentialEntryViewModel(fakeTokenStore, authEventBus, ioDispatcher)
 
         viewModel.onQrPayloadScanned("not-a-credential-payload")
 

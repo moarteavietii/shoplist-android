@@ -7,12 +7,15 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBus
 import eu.pascariu.shoppinglist.data.auth.TokenStore
+import eu.pascariu.shoppinglist.di.IoDispatcher
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class CredentialEntryUiState(
     val clientId: String = "",
@@ -26,6 +29,7 @@ data class CredentialEntryUiState(
 class CredentialEntryViewModel @Inject constructor(
     private val tokenStore: TokenStore,
     authEventBus: AuthEventBus,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CredentialEntryUiState())
@@ -80,7 +84,9 @@ class CredentialEntryViewModel @Inject constructor(
     private fun saveCredentials(credentials: AccessCredentials) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
-            tokenStore.save(credentials)
+            withContext(ioDispatcher) {
+                tokenStore.save(credentials)
+            }
             _uiState.update { it.copy(isSaving = false, saved = true) }
         }
     }
