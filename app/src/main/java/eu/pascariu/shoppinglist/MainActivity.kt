@@ -13,7 +13,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBus
 import eu.pascariu.shoppinglist.ui.auth.CredentialEntryScreen
-import eu.pascariu.shoppinglist.ui.health.HealthScreen
+import eu.pascariu.shoppinglist.ui.list.ListScreen
 import eu.pascariu.shoppinglist.ui.theme.ShoplistTheme
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
                 if (credentialsRejected) {
                     CredentialEntryScreen(onCredentialsSaved = { credentialsRejected = false })
                 } else {
-                    HealthScreen()
+                    ListScreen()
                 }
             }
         }

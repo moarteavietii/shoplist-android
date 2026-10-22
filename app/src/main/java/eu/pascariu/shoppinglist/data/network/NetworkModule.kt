@@ -1,8 +1,13 @@
 package eu.pascariu.shoppinglist.data.network
 
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import eu.pascariu.shoppinglist.BuildConfig
 import eu.pascariu.shoppinglist.data.auth.AuthEventBus
@@ -18,8 +23,12 @@ import eu.pascariu.shoppinglist.data.device.DeviceIdStore
 import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
+import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
+import eu.pascariu.shoppinglist.di.ApplicationScope
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -89,6 +98,22 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideDeviceIdStore(impl: EncryptedDeviceIdStore): DeviceIdStore = impl
+
+    @Provides
+    @Singleton
+    fun provideUndoHistoryDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        File(context.filesDir, "datastore/undo_history.preferences_pb")
+    }
+
+    @Provides
+    @Singleton
+    fun provideUndoHistoryStore(
+        dataStore: DataStore<Preferences>,
+        json: Json,
+        @ApplicationScope scope: CoroutineScope,
+    ): UndoHistoryStore = UndoHistoryStore(dataStore, json, scope)
 
     @Provides
     @Singleton

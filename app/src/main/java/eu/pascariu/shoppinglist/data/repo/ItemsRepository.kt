@@ -55,6 +55,20 @@ class ItemsRepository @Inject constructor(
         cache.update { current -> current.filterNot { it.id == itemId } }
     }
 
+    suspend fun setChecked(itemId: Long, isChecked: Boolean, isUndo: Boolean = false): Item {
+        val previous = cache.value.firstOrNull { it.id == itemId }
+            ?: throw IllegalArgumentException("item $itemId not cached")
+        cache.update { current -> current.map { if (it.id == itemId) previous.copy(isChecked = isChecked) else it } }
+        try {
+            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(isChecked = isChecked, isUndo = if (isUndo) true else null))
+            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            return updated
+        } catch (error: Exception) {
+            cache.update { current -> current.map { if (it.id == itemId) previous else it } }
+            throw error
+        }
+    }
+
     fun applyCreated(item: Item) {
         if (item.listId != cachedListId.value) return
         cache.update { current ->
