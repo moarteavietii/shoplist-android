@@ -54,7 +54,13 @@ class CredentialEntryViewModel @Inject constructor(
         if (credentials == null) {
             _uiState.update { it.copy(error = "Unrecognized QR code format") }
         } else {
-            saveCredentials(credentials)
+            _uiState.update {
+                it.copy(
+                    clientId = credentials.clientId,
+                    clientSecret = credentials.clientSecret,
+                    error = null,
+                )
+            }
         }
     }
 
