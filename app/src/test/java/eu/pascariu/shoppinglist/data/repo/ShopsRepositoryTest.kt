@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import retrofit2.HttpException
 import retrofit2.Response
 
 class ShopsRepositoryTest {
@@ -79,6 +80,19 @@ class ShopsRepositoryTest {
         assertEquals(listOf("Global"), repository.shops.first().map { it.name })
         assertTrue(api.deleted)
     }
+
+    @Test
+    fun `403 on delete surfaces error and leaves cache unchanged`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
+        val repository = ShopsRepository(api)
+        repository.refetch()
+        api.deleteResponse = Response.error(403, okhttp3.ResponseBody.create(null, ""))
+
+        val thrown = runCatching { repository.delete(shopId = 4) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(listOf("Global", "Bakery"), repository.shops.first().map { it.name })
+    }
 }
 
 private fun shop(id: Long, name: String) = Shop(
@@ -97,6 +111,7 @@ private class FakeShopsApi(
     var createdShop: Shop? = null
     var renamedShop: Shop? = null
     var deleted = false
+    var deleteResponse: Response<Unit> = Response.success(Unit)
 
     override suspend fun listShops(): List<Shop> = shopsForFetch
 
@@ -108,6 +123,6 @@ private class FakeShopsApi(
 
     override suspend fun deleteShop(shopId: Long): Response<Unit> {
         deleted = true
-        return Response.success(Unit)
+        return deleteResponse
     }
 }

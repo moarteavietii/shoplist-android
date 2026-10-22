@@ -9,6 +9,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import retrofit2.HttpException
 
 @Singleton
 class ItemsRepository @Inject constructor(
@@ -35,7 +36,8 @@ class ItemsRepository @Inject constructor(
     }
 
     suspend fun delete(itemId: Long) {
-        itemsApi.deleteItem(itemId)
+        val response = itemsApi.deleteItem(itemId)
+        if (!response.isSuccessful) throw HttpException(response)
         cache.value = cache.value.filterNot { it.id == itemId }
     }
 }
