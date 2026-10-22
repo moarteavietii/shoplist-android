@@ -43,9 +43,17 @@ While a search query is active, checked items matching the query SHALL stay visi
 - **WHEN** the query is cleared
 - **THEN** checked items are hidden again (toggle still disabled)
 
-### Requirement: Drag reveals hidden items
-While a drag is in progress, all items in the active view — including hidden checked ones — SHALL be revealed in sorted position so drop targets reflect the full order; hidden state SHALL restore on drag end. (Depends on the drag-and-drop batch.)
+### Requirement: Manual sort engagement overrides the hide toggle
+While manual sort is engaged (sort mode ON and Manual order), all items in the active view SHALL always be visible — including checked items — regardless of this toggle, so the list never reflows when a drag starts. Hidden checked items SHALL reappear the moment manual sort is engaged and hide again when it is disengaged (order switched to A→Z/Frequency or sort mode disabled). This supersedes the web spec's "reveal at drag start" rule.
 
-#### Scenario: Drag reveals hidden checked items
-- **WHEN** a drag starts while checked items are hidden
-- **THEN** all items appear instantly in sorted position, and hidden state is restored on drag end
+#### Scenario: Engaging manual sort reveals all items
+- **WHEN** the user enables manual sort while checked items are hidden
+- **THEN** all items appear instantly in sorted position, with no reflow of the unchecked items
+
+#### Scenario: No list change at drag start
+- **WHEN** the user starts dragging a row while checked items are hidden
+- **THEN** the list does not change — no items appear or disappear at drag start
+
+#### Scenario: Disengaging manual sort restores hiding
+- **WHEN** the user switches to A→Z or Frequency order, or disables sort mode
+- **THEN** hidden checked items are hidden again per this toggle

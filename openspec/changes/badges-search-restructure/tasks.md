@@ -16,7 +16,7 @@
 
 ## 3. Hide-checked toggle
 
-- [ ] 3.1 Add `showChecked` (persisted, default showing) to the list state; implement the single-derivation rule with search override and drag reveal (TDD: toggle × query × drag matrix)
+- [ ] 3.1 Add `showChecked` (persisted, default showing) to the list state; implement the single-derivation rule with search override and manual-sort override (all items visible while manual sort is engaged; no reflow at drag start) (TDD: toggle × query × manual-sort matrix)
 - [ ] 3.2 Replace the Checked-Items Toggle placeholder with the real control: LED dot per state, pressed state exposed to accessibility (TDD: dot + pressed-state semantics)
 - [ ] 3.3 Add hide/show animations: shrink+fade out on check, grow+fade in on re-enable, undo restores an item that animated out (TDD: commit-instant property regardless of toggle)
 

@@ -13,8 +13,8 @@ The list screen SHALL NOT render a persistent bottom search field; search SHALL 
 - **WHEN** the search input is expanded
 - **THEN** all items remain fully visible above it and the keyboard, with no content scrolling behind
 
-### Requirement: The list derivation applies hide-checked with search override
-The list derivation SHALL exclude checked items while the hide toggle is disabled, except while a search query is active: checked items matching the query SHALL stay visible, and hiding SHALL resume when the query is cleared. During a drag, all items SHALL be revealed.
+### Requirement: The list derivation applies hide-checked with manual-sort and search overrides
+The list derivation SHALL exclude checked items while the hide toggle is disabled, except while a search query is active: checked items matching the query SHALL stay visible, and hiding SHALL resume when the query is cleared. While manual sort is engaged (sort mode ON and Manual order), all items SHALL always be visible regardless of the toggle, so a drag start never reflows the list.
 
 #### Scenario: Hiding excludes checked items
 - **WHEN** the toggle is disabled and no query is active

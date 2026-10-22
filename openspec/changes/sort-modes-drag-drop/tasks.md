@@ -16,7 +16,7 @@
 - [ ] 3.2 Add handle rendering to `ItemRow` (only when drag enabled) and handle-initiated drag detection with slop; dragged row renders above all content, displaced rows stay fully visible (TDD: handle visibility gating)
 - [ ] 3.3 Compute drop target + fractional key on drop; optimistic position held until PATCH completes (TDD: between-neighbors, start-boundary, end-boundary key generation)
 - [ ] 3.4 Implement suppression: drag disabled while add-item/shop/delete overlays are open, sort mode off, or order A→Z/Frequency; resumes on close (TDD: gating matrix)
-- [ ] 3.5 Establish the drag-reveal derivation (`dragInProgress` → all items visible), inert until hide-checked lands (TDD: reveal rule)
+- [ ] 3.5 Implement the always-visible rule: while manual sort is engaged, all items in the active view are visible regardless of the hide toggle; no list change at drag start (TDD: engage reveals all with no reflow, drag start is inert, disengage restores hiding)
 
 ## 4. Verification
 

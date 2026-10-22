@@ -54,6 +54,17 @@ Row drag-and-drop SHALL be enabled only while sort mode is ON and the order is M
 - **WHEN** the order is A→Z or Frequency
 - **THEN** drag attempts do not reorder items and the list does not switch to manual order mid-gesture
 
+### Requirement: No viewport highlight border while drag-and-drop is active
+The app SHALL NOT render the web app's fullscreen highlight border while drag-and-drop is active (sort mode ON and Manual order). Sort-mode visibility SHALL be carried by the Sort Mode control's LED dot only.
+
+#### Scenario: No border in manual sort
+- **WHEN** sort mode is ON and the order is Manual
+- **THEN** no highlight border is rendered around the viewport
+
+#### Scenario: No border during a drag
+- **WHEN** the user drags a row
+- **THEN** no highlight border appears around the viewport
+
 ### Requirement: Sort mode and order persist across sessions
 Sort mode SHALL persist across sessions (default ON) and the sort-order choice SHALL persist (default Manual). Toggling sort mode SHALL NOT change the app theme.
 

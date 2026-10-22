@@ -47,12 +47,20 @@ During a drag, the dragged item SHALL render above all other content for the who
 - **WHEN** rows are displaced during a drag
 - **THEN** they remain fully visible with no collapse or fade
 
-### Requirement: Drag start reveals all items in the active view
-When a drag starts, the app SHALL instantly reveal all items in the active view — including hidden checked items — without animation, so drop targets reflect the full order; visibility SHALL restore on drag end or cancel. (Until the hide-checked batch lands, all items are always visible and this rule is inert.)
+### Requirement: All items are always visible while manual sort is engaged
+While manual sort is engaged (sort mode ON and Manual order), all items in the active view SHALL always be visible — including checked items — regardless of the hide-checked toggle, so the list never reflows when a drag starts. Hidden checked items SHALL reappear the moment manual sort is engaged and hide again when it is disengaged. (Until the hide-checked batch lands, all items are always visible in every mode, so this rule is inert.)
 
-#### Scenario: Hidden items revealed during drag
-- **WHEN** a drag starts while some checked items are hidden
-- **THEN** all items in the active view appear instantly in sorted position, and hidden state is restored on drag end
+#### Scenario: Engaging manual sort reveals all items
+- **WHEN** the user enables manual sort while some checked items are hidden
+- **THEN** all items in the active view appear instantly in sorted position, with no reflow of the unchecked items
+
+#### Scenario: No reveal at drag start
+- **WHEN** the user starts dragging a row while checked items are hidden
+- **THEN** the list does not change — no items appear or disappear at drag start
+
+#### Scenario: Disengaging manual sort restores hiding
+- **WHEN** the user switches to A→Z or Frequency order, or disables sort mode
+- **THEN** hidden checked items are hidden again per the hide toggle
 
 ### Requirement: Drag is suppressed while overlays are open
 Drag SHALL be suppressed while the add-item overlay, shop editor modal, or delete confirmation is open, and while sort mode is off or the order is A→Z/Frequency. Drag SHALL resume when the overlay closes.

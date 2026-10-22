@@ -13,7 +13,7 @@ The widget stack (batch 1) has Search and Checked-Items Toggle placeholders; the
 **Non-Goals:**
 
 - Settings behavior (real burger menu — future change, settled roadmap note)
-- Drag behavior itself (batch 2); only the reveal rule is wired here
+- Drag behavior itself (batch 2); only the manual-sort override is wired here
 - Theme system, feature-parity modals (roadmap 6+)
 
 ## Decisions
@@ -32,7 +32,7 @@ The first change's hollow-circle indicator is superseded by the count badge (the
 *Alternative:* `SwipeToDismissBox`. Rejected — it's a Material-chrome component with anchored states; a simple threshold drag matches the chromeless aesthetic and the drawer's existing gesture code.
 
 ### Hide-checked as a list-derivation rule
-`showChecked: Boolean` (persisted, default true) filters the derivation: `items.filter { showChecked || !it.isChecked || queryMatches(it) || dragging }`. The search-override and drag-reveal rules live in this single expression — one place, unit-testable, no UI branching.
+`showChecked: Boolean` (persisted, default true) filters the derivation: `items.filter { showChecked || !it.isChecked || queryMatches(it) || manualSortEngaged }`. The search-override and manual-sort-override rules live in this single expression — one place, unit-testable, no UI branching. The manual-sort override (all items visible while sort mode is ON and Manual order) supersedes the web spec's "reveal at drag start" rule: engaging manual sort reveals everything at once, so a drag start never reflows the list.
 
 ### Clear button and touch targets
 One clear button while the query is non-empty, 48dp minimum target (the app's existing convention; the web's 44px maps up).
@@ -41,7 +41,7 @@ One clear button while the query is non-empty, 48dp minimum target (the app's ex
 
 - [Badge pill may overlap row label on long names] → Badge is trailing with fixed width; label ellipsizes; instrumented check on narrow screens.
 - [Search restructure may regress keyboard insets] → The existing `WindowInsets.ime` handling in `ListScreen` is preserved; the input stays bottom-anchored with `imePadding()`.
-- [Hide-checked + drag-reveal interaction] → Single-derivation rule (`|| dragging`) keeps it correct; unit-tested matrix (toggle × query × drag).
+- [Hide-checked + manual-sort override interaction] → Single-derivation rule (`|| manualSortEngaged`) keeps it correct; unit-tested matrix (toggle × query × manual sort).
 - [Fuzzy semantics drift] → `FuzzyMatch.kt` is reused as-is; a task verifies the web spec's "out-of-order within the word" nuance against the current in-order subsequence implementation and aligns tests if needed.
 
 ## Migration Plan

@@ -12,7 +12,7 @@ The list sorts by `orderMap[activeView]` fractional keys only (`ListViewModel.so
 
 **Non-Goals:**
 
-- Hide-checked behavior (batch 3; the drag-reveal rule is established but inert)
+- Hide-checked behavior (batch 3; the always-visible-while-manual-sort rule is established but inert)
 - Keyboard drag accessibility (descoped — pointer drag only; revisit later)
 - The removed auto-theme behavior (never ported)
 - Edit-modal "Checked N times" line (belongs to the edit/delete modals batch, roadmap 6)
@@ -30,7 +30,7 @@ The list sorts by `orderMap[activeView]` fractional keys only (`ListViewModel.so
 ### Drag: custom handle-based detection, no library
 A `pointerInput` on the handle starts a drag after a small slop; the row's y-offset follows the drag; on drop, `FractionalIndexing.generateKeyBetween` computes the new key. Compose has no built-in reorder container that fits the chromeless design; a library (e.g. a Compose DnD port) is a heavy dependency for one list. The drag-accumulator pattern from `DrawerGestures.kt` is reused.
 
-*Alternative:* a Compose DnD library. Rejected — none is established in the catalog, and handle-based custom drag is ~100 lines with full control over the "float above" and "reveal all" rules.
+*Alternative:* a Compose DnD library. Rejected — none is established in the catalog, and handle-based custom drag is ~100 lines with full control over the "float above" and "no reflow" rules.
 
 ### Optimistic reorder in ItemsRepository
 `reorder(itemId, orderMap)` updates the cache first, then PATCHes; on failure it restores the previous cache entry and the existing error-state path surfaces it. This mirrors the existing check-off optimistic pattern.
@@ -38,8 +38,8 @@ A `pointerInput` on the handle starts a drag after a small slop; the row's y-off
 ### Sort-order selector as an anchored Popup
 `DropdownMenu` anchored to the Sort Mode control — unthemed M3 popup per the "unthemed component toolkit" rule, with token-styled content. Outside-tap and scroll-to-close are free with `DropdownMenu`; long-press via `combinedClickable`.
 
-### Drag-reveal state shared now, inert until batch 3
-`dragInProgress: Boolean` in the UI state; the reveal rule is a one-line derivation (`if (dragging) allItems else visibleItems`). Inert today, correct when hide-checked arrives.
+### All-items-visible while manual sort is engaged (replaces drag-reveal)
+The web spec's "reveal hidden items at drag start" rule is replaced: while manual sort is engaged (sort mode ON and Manual order), all items in the active view are always visible regardless of the hide toggle. The derivation is `if (manualSortEngaged) allItems else visibleItems` — engaging manual sort reveals everything at once, so a drag start never reflows the list. This supersedes the drag-reveal rule in the later hide-checked batch.
 
 ## Risks / Trade-offs
 
