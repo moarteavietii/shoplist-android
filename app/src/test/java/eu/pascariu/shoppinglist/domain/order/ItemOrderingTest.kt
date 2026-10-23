@@ -52,6 +52,19 @@ class ItemOrderingTest {
     }
 
     @Test
+    fun `manual order with null view returns items unchanged`() {
+        val items = listOf(
+            item(id = 3, name = "Third", orderKey = "a2"),
+            item(id = 1, name = "First", orderKey = "a0"),
+            item(id = 2, name = "Second"),
+        )
+
+        val ordered = orderItems(items, viewId = null, order = SortOrder.MANUAL)
+
+        assertEquals(listOf("Third", "First", "Second"), ordered.map { it.name })
+    }
+
+    @Test
     fun `alphabetical order is case-insensitive`() {
         val items = listOf(
             item(id = 1, name = "banana"),
