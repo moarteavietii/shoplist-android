@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import retrofit2.HttpException
 
 @Singleton
@@ -70,18 +71,34 @@ class ItemsRepository @Inject constructor(
     }
 
     suspend fun reorder(itemId: Long, viewId: Long, newKey: String): Item {
-        val previous = cache.value.firstOrNull { it.id == itemId }
+        val viewKey = viewId.toString()
+        var previousKey: String? = null
+        val mergedItem = cache.updateAndGet { current ->
+            current.map { item ->
+                if (item.id == itemId) {
+                    previousKey = item.orderMap[viewKey]
+                    item.copy(orderMap = item.orderMap + (viewKey to newKey))
+                } else {
+                    item
+                }
+            }
+        }.firstOrNull { it.id == itemId }
             ?: throw IllegalArgumentException("item $itemId not cached")
-        val mergedOrderMap = previous.orderMap + (viewId.toString() to newKey)
-        cache.update { current ->
-            current.map { if (it.id == itemId) it.copy(orderMap = mergedOrderMap) else it }
-        }
         try {
-            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedOrderMap))
+            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap))
             cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
             return updated
         } catch (error: Exception) {
-            cache.update { current -> current.map { if (it.id == itemId) it.copy(orderMap = previous.orderMap) else it } }
+            cache.update { current ->
+                current.map { item ->
+                    if (item.id == itemId) {
+                        val restoredOrderMap = if (previousKey == null) item.orderMap - viewKey else item.orderMap + (viewKey to previousKey)
+                        item.copy(orderMap = restoredOrderMap)
+                    } else {
+                        item
+                    }
+                }
+            }
             throw error
         }
     }
