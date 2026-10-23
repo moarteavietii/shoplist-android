@@ -308,9 +308,10 @@ class ListViewModel @Inject constructor(
     }
 
     fun onViewSelected(shopId: Long) {
-        localState.update { it.copy(activeViewId = shopId, drawerOpen = false) }
+        val activeShopId = if (shopId == GLOBAL_PLACEHOLDER_ID) null else shopId
+        localState.update { it.copy(activeViewId = activeShopId, drawerOpen = false) }
         viewModelScope.launch {
-            listPreferences.setActiveShopId(shopId)
+            listPreferences.setActiveShopId(activeShopId)
         }
     }
 
@@ -595,7 +596,7 @@ class ListViewModel @Inject constructor(
         val errorMessage: String? = null,
     )
 
-    private companion object {
-        const val GLOBAL_PLACEHOLDER_ID = -1L
+    companion object {
+        internal const val GLOBAL_PLACEHOLDER_ID = -1L
     }
 }
