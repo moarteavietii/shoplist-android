@@ -398,14 +398,15 @@ class ListViewModel @Inject constructor(
     fun onShopSave() {
         val modal = localState.value.shopModal ?: return
         if (!modal.canSave || modal.saving) return
+        val shopId = if (modal.mode == ShopModalMode.EDIT) modal.shopId ?: return else null
         localState.update { it.copy(shopModal = it.shopModal?.copy(saving = true, error = null)) }
         viewModelScope.launch {
             try {
                 val trimmed = modal.trimmedName
-                if (modal.mode == ShopModalMode.CREATE) {
+                if (shopId == null) {
                     shopsRepository.create(trimmed)
                 } else {
-                    shopsRepository.rename(modal.shopId ?: return@launch, trimmed)
+                    shopsRepository.rename(shopId, trimmed)
                 }
                 localState.update { it.copy(shopModal = null) }
             } catch (e: CancellationException) {
