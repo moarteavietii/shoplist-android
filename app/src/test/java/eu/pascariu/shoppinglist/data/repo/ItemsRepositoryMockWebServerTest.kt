@@ -13,6 +13,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -329,6 +330,8 @@ class ItemsRepositoryMockWebServerTest {
         val thrown = runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") }
 
         assertTrue(thrown.exceptionOrNull() is HttpException)
-        assertEquals("a1", repository.items.first().single().orderMap["a0"])
+        val rolledBack = repository.items.first().single()
+        assertNull(rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
     }
 }
