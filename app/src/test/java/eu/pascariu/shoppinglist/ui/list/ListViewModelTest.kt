@@ -1249,6 +1249,12 @@ class ListViewModelTest {
 
         assertFalse(listPreferences.sortModeEnabled.value)
         assertEquals(SortOrder.FREQUENCY, listPreferences.sortOrder.value)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertFalse(restarted.uiState.value.sortModeEnabled)
+        assertEquals(SortOrder.FREQUENCY, restarted.uiState.value.sortOrder)
     }
 
     @Test
