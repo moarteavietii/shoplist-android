@@ -38,8 +38,6 @@ import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 
-const val GLOBAL_SHOP_NAME = "Global"
-
 data class DrawerShop(
     val id: Long,
     val name: String,
