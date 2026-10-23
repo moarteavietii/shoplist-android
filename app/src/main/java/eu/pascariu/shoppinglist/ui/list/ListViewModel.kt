@@ -129,10 +129,6 @@ class ListViewModel @Inject constructor(
         }
     }
 
-    fun onManualSortEngaged(engaged: Boolean) {
-        localState.update { it.copy(isManualSortEngaged = engaged) }
-    }
-
     fun onSortModeToggled() {
         val enabled = !localState.value.sortModeEnabled
         localState.update { it.copy(sortModeEnabled = enabled) }
@@ -486,7 +482,9 @@ class ListViewModel @Inject constructor(
         val query = local.searchQuery.trim()
         val queryActive = query.isNotEmpty()
         val filtered = if (queryActive) sorted.filter { fuzzyMatch(query, it.name) } else sorted
-        val hideChecked = !local.showChecked && !queryActive && !local.isManualSortEngaged
+        val hideChecked = !local.showChecked &&
+            !queryActive &&
+            !(local.sortModeEnabled && local.sortOrder == SortOrder.MANUAL)
         val activeName = when {
             activeShop != null -> activeShop.name
             globalShop != null -> globalShop.name
@@ -601,7 +599,6 @@ class ListViewModel @Inject constructor(
         val searchQuery: String = "",
         val searchExpanded: Boolean = false,
         val showChecked: Boolean = true,
-        val isManualSortEngaged: Boolean = false,
         val sortModeEnabled: Boolean = true,
         val sortOrder: SortOrder = SortOrder.MANUAL,
         val activeViewId: Long? = null,

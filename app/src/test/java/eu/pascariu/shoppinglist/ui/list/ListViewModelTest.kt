@@ -1114,10 +1114,11 @@ class ListViewModelTest {
         server.takeRequest(5, TimeUnit.SECONDS)
         server.takeRequest(5, TimeUnit.SECONDS)
 
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
         viewModel.onShowCheckedChanged(false)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.hideChecked)
-        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.filteredItems.map { it.name })
 
         viewModel.onSearchQueryChanged("bre")
         advanceUntilIdle()
@@ -1127,6 +1128,7 @@ class ListViewModelTest {
         viewModel.onSearchQueryChanged("")
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.filteredItems.map { it.name })
     }
 
     @Test
@@ -1143,16 +1145,18 @@ class ListViewModelTest {
 
         viewModel.onShowCheckedChanged(false)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.hideChecked)
-
-        viewModel.onManualSortEngaged(true)
-        advanceUntilIdle()
         assertFalse(viewModel.uiState.value.hideChecked)
         assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
 
-        viewModel.onManualSortEngaged(false)
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSortOrderChanged(SortOrder.MANUAL)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
     }
 
     @Test
