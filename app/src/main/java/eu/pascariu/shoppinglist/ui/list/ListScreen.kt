@@ -119,7 +119,11 @@ fun ListScreen(
         viewModel.onShopDiscard()
     }
 
-    BackHandler(enabled = state.searchExpanded) {
+    BackHandler(
+        enabled = state.searchExpanded &&
+            state.addItemModal == null &&
+            state.shopModal == null,
+    ) {
         viewModel.onSearchExpandedChanged(false)
     }
 
