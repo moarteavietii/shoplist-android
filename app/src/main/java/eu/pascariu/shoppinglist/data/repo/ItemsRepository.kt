@@ -97,8 +97,12 @@ class ItemsRepository @Inject constructor(
             cache.update { current ->
                 current.map { item ->
                     if (item.id == itemId) {
-                        val restoredOrderMap = if (previousKey == null) item.orderMap - viewKey else item.orderMap + (viewKey to previousKey)
-                        item.copy(orderMap = restoredOrderMap)
+                        if (item.orderMap[viewKey] == newKey) {
+                            val restoredOrderMap = if (previousKey == null) item.orderMap - viewKey else item.orderMap + (viewKey to previousKey)
+                            item.copy(orderMap = restoredOrderMap)
+                        } else {
+                            item
+                        }
                     } else {
                         item
                     }
