@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -220,7 +222,7 @@ class ListPreferencesDataSourceTest {
         }
 
     @Test
-    fun `setter keeps in-memory state and does not throw when persistence fails`() =
+    fun `setter reverts in-memory state when persistence fails`() =
         runTest(testDispatcher) {
             val unreadableFile = File(tmpFolder.root, "unreadable.preferences_pb")
             unreadableFile.mkdirs()
@@ -235,9 +237,23 @@ class ListPreferencesDataSourceTest {
             failing.setWidgetStackExpanded(true)
             failing.setActiveShopId(3L)
 
-            assertTrue(failing.widgetStackExpanded.value)
-            assertEquals(3L, failing.activeShopId.value)
+            assertFalse(failing.widgetStackExpanded.value)
+            assertNull(failing.activeShopId.value)
 
             failingScope.cancel()
         }
+
+    @Test
+    fun `concurrent setters do not revert each other`() = runTest(testDispatcher) {
+        settle()
+
+        coroutineScope {
+            launch { dataSource.setSortModeEnabled(false) }
+            launch { dataSource.setSortOrder(SortOrder.FREQUENCY) }
+        }
+        settle()
+
+        assertFalse(dataSource.sortModeEnabled.value)
+        assertEquals(SortOrder.FREQUENCY, dataSource.sortOrder.value)
+    }
 }

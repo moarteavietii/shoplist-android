@@ -18,9 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class ListPreferencesDataSource(
     private val dataStore: DataStore<Preferences>,
@@ -50,76 +49,76 @@ class ListPreferencesDataSource(
     val isReady: StateFlow<Boolean> = ready.asStateFlow()
 
     init {
-        dataStore.data
-            .catch { failure ->
-                Log.w(TAG, "List preferences load failed; using defaults", failure)
-                emit(emptyPreferences())
-            }
-            .onEach { prefs ->
-                expanded.value = prefs[KEY_WIDGET_STACK_EXPANDED] ?: false
-                activeShop.value = prefs[KEY_ACTIVE_SHOP_ID]
-                searchExpandedFlow.value = prefs[KEY_SEARCH_EXPANDED] ?: false
-                showCheckedFlow.value = prefs[KEY_SHOW_CHECKED] ?: true
-                sortModeEnabledFlow.value = prefs[KEY_SORT_MODE_ENABLED] ?: true
-                sortOrderFlow.value = prefs[KEY_SORT_ORDER]?.let(SortOrder::fromName) ?: SortOrder.MANUAL
-                ready.value = true
-            }
-            .flowOn(ioDispatcher)
-            .launchIn(storeScope)
+        storeScope.launch(ioDispatcher) {
+            val prefs = dataStore.data
+                .catch { failure ->
+                    Log.w(TAG, "List preferences load failed; using defaults", failure)
+                    emit(emptyPreferences())
+                }
+                .first()
+            expanded.value = prefs[KEY_WIDGET_STACK_EXPANDED] ?: false
+            activeShop.value = prefs[KEY_ACTIVE_SHOP_ID]
+            searchExpandedFlow.value = prefs[KEY_SEARCH_EXPANDED] ?: false
+            showCheckedFlow.value = prefs[KEY_SHOW_CHECKED] ?: true
+            sortModeEnabledFlow.value = prefs[KEY_SORT_MODE_ENABLED] ?: true
+            sortOrderFlow.value = prefs[KEY_SORT_ORDER]?.let(SortOrder::fromName) ?: SortOrder.MANUAL
+            ready.value = true
+        }
     }
 
     suspend fun setWidgetStackExpanded(isExpanded: Boolean) {
-        expanded.value = isExpanded
-        persist { prefs ->
-            prefs[KEY_WIDGET_STACK_EXPANDED] = isExpanded
+        update(expanded, isExpanded) { prefs, value ->
+            prefs[KEY_WIDGET_STACK_EXPANDED] = value
         }
     }
 
     suspend fun setActiveShopId(shopId: Long?) {
-        activeShop.value = shopId
-        persist { prefs ->
-            if (shopId == null) {
+        update(activeShop, shopId) { prefs, value ->
+            if (value == null) {
                 prefs.remove(KEY_ACTIVE_SHOP_ID)
             } else {
-                prefs[KEY_ACTIVE_SHOP_ID] = shopId
+                prefs[KEY_ACTIVE_SHOP_ID] = value
             }
         }
     }
 
     suspend fun setSearchExpanded(isExpanded: Boolean) {
-        searchExpandedFlow.value = isExpanded
-        persist { prefs ->
-            prefs[KEY_SEARCH_EXPANDED] = isExpanded
+        update(searchExpandedFlow, isExpanded) { prefs, value ->
+            prefs[KEY_SEARCH_EXPANDED] = value
         }
     }
 
     suspend fun setShowChecked(show: Boolean) {
-        showCheckedFlow.value = show
-        persist { prefs ->
-            prefs[KEY_SHOW_CHECKED] = show
+        update(showCheckedFlow, show) { prefs, value ->
+            prefs[KEY_SHOW_CHECKED] = value
         }
     }
 
     suspend fun setSortModeEnabled(enabled: Boolean) {
-        sortModeEnabledFlow.value = enabled
-        persist { prefs ->
-            prefs[KEY_SORT_MODE_ENABLED] = enabled
+        update(sortModeEnabledFlow, enabled) { prefs, value ->
+            prefs[KEY_SORT_MODE_ENABLED] = value
         }
     }
 
     suspend fun setSortOrder(order: SortOrder) {
-        sortOrderFlow.value = order
-        persist { prefs ->
-            prefs[KEY_SORT_ORDER] = order.name
+        update(sortOrderFlow, order) { prefs, value ->
+            prefs[KEY_SORT_ORDER] = value.name
         }
     }
 
-    private suspend fun persist(transform: (MutablePreferences) -> Unit) {
+    private suspend fun <T> update(
+        flow: MutableStateFlow<T>,
+        newValue: T,
+        write: (MutablePreferences, T) -> Unit,
+    ) {
+        val previousValue = flow.value
+        flow.value = newValue
         try {
-            dataStore.edit(transform)
+            dataStore.edit { prefs -> write(prefs, newValue) }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
+            flow.value = previousValue
             Log.w(TAG, "List preferences write failed", error)
         }
     }
