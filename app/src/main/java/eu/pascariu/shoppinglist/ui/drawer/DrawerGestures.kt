@@ -10,11 +10,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 
 private class DragAccumulator {
     var total by mutableFloatStateOf(0f)
     var startedAtEdge by mutableStateOf(false)
+    val velocityTracker = VelocityTracker()
 }
 
 fun Modifier.leftEdgeSwipeToOpen(
@@ -31,8 +33,20 @@ fun Modifier.leftEdgeSwipeToOpen(
             onDragStart = { startOffset ->
                 drag.startedAtEdge = startOffset.x <= edgeSlopPx
                 drag.total = 0f
+                drag.velocityTracker.resetTracking()
             },
-        ) { _, dragAmount ->
+            onDragEnd = {
+                if (drag.startedAtEdge) {
+                    val velocity = drag.velocityTracker.calculateVelocity().x
+                    if (velocity >= DrawerConstants.VELOCITY_THRESHOLD) {
+                        drag.startedAtEdge = false
+                        drag.total = 0f
+                        onOpen()
+                    }
+                }
+            },
+        ) { event, dragAmount ->
+            drag.velocityTracker.addPosition(event.uptimeMillis, event.position)
             drag.total += dragAmount
             if (drag.startedAtEdge && drag.total >= openThresholdPx) {
                 drag.startedAtEdge = false
@@ -52,8 +66,19 @@ fun Modifier.swipeLeftToClose(
     pointerInput(isEnabled) {
         if (!isEnabled) return@pointerInput
         detectHorizontalDragGestures(
-            onDragStart = { drag.total = 0f },
-        ) { _, dragAmount ->
+            onDragStart = {
+                drag.total = 0f
+                drag.velocityTracker.resetTracking()
+            },
+            onDragEnd = {
+                val velocity = drag.velocityTracker.calculateVelocity().x
+                if (velocity <= -DrawerConstants.VELOCITY_THRESHOLD) {
+                    drag.total = 0f
+                    onClose()
+                }
+            },
+        ) { event, dragAmount ->
+            drag.velocityTracker.addPosition(event.uptimeMillis, event.position)
             drag.total += dragAmount
             if (drag.total <= -closeThresholdPx) {
                 drag.total = 0f
@@ -77,11 +102,23 @@ fun Modifier.swipeUpFromBottomToClose(
             onDragStart = { startOffset ->
                 drag.startedAtEdge = startOffset.y >= size.height - bottomSlopPx
                 drag.total = 0f
+                drag.velocityTracker.resetTracking()
             },
-            onVerticalDrag = { _, dragAmount ->
+            onVerticalDrag = { event, dragAmount ->
+                drag.velocityTracker.addPosition(event.uptimeMillis, event.position)
                 if (drag.startedAtEdge) {
                     drag.total += dragAmount
                     if (drag.total <= -closeThresholdPx) {
+                        drag.startedAtEdge = false
+                        drag.total = 0f
+                        onClose()
+                    }
+                }
+            },
+            onDragEnd = {
+                if (drag.startedAtEdge) {
+                    val velocity = drag.velocityTracker.calculateVelocity().y
+                    if (velocity <= -DrawerConstants.VELOCITY_THRESHOLD) {
                         drag.startedAtEdge = false
                         drag.total = 0f
                         onClose()
