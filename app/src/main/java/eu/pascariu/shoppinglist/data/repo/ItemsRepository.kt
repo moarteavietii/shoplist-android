@@ -119,6 +119,18 @@ class ItemsRepository @Inject constructor(
         }
     }
 
+    fun applyRestored(item: Item, previousIndex: Int) {
+        if (item.listId != cachedListId.value) return
+        cache.update { current ->
+            if (current.any { it.id == item.id }) {
+                current
+            } else {
+                val index = previousIndex.coerceIn(0, current.size)
+                current.toMutableList().apply { add(index, item) }
+            }
+        }
+    }
+
     fun applyUpdated(item: Item) {
         if (item.listId != cachedListId.value) return
         cache.update { current ->

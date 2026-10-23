@@ -881,7 +881,42 @@ class ListViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
+        assertEquals(listOf(10L, 11L), itemsRepository.items.value.map { it.id })
         assertNotNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+    }
+
+    @Test
+    fun `delete failure restores item at its previous cache position`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        viewModel.onDeleteConfirmed()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+
+        assertEquals(listOf(10L, 11L), itemsRepository.items.value.map { it.id })
+    }
+
+    @Test
+    fun `delete 404 keeps item deleted without error`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+        server.enqueue(MockResponse().setResponseCode(404))
+
+        viewModel.onDeleteConfirmed()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
+        assertNull(viewModel.uiState.value.errorMessage)
         assertNull(viewModel.uiState.value.deleteConfirmItem)
     }
 

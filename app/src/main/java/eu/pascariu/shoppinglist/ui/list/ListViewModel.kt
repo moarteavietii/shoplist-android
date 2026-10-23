@@ -398,7 +398,8 @@ class ListViewModel @Inject constructor(
 
     fun onDeleteConfirmed() {
         val item = localState.value.deleteConfirmItem ?: return
-        if (itemsRepository.items.value.none { it.id == item.id }) {
+        val previousIndex = itemsRepository.items.value.indexOfFirst { it.id == item.id }
+        if (previousIndex < 0) {
             localState.update { it.copy(deleteConfirmItem = null) }
             return
         }
@@ -410,10 +411,14 @@ class ListViewModel @Inject constructor(
                 localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                itemsRepository.applyCreated(item)
-                localState.update {
-                    it.copy(errorMessage = "Couldn't delete the item")
+            } catch (e: Exception) {
+                if (e is HttpException && e.code() == 404) {
+                    localState.update { it.copy(errorMessage = null) }
+                } else {
+                    itemsRepository.applyRestored(item, previousIndex)
+                    localState.update {
+                        it.copy(errorMessage = "Couldn't delete the item")
+                    }
                 }
             }
         }
