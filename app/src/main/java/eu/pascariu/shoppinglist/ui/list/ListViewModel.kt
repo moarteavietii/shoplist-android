@@ -7,9 +7,11 @@ import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import eu.pascariu.shoppinglist.data.model.isExpiredAt
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
+import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoConfig
@@ -17,7 +19,10 @@ import eu.pascariu.shoppinglist.data.undo.UndoEntry
 import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStackControl
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
+import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
+import eu.pascariu.shoppinglist.di.ExpiryTicker
 import eu.pascariu.shoppinglist.domain.search.GLOBAL_VIEW_NAME
+import eu.pascariu.shoppinglist.domain.search.modalAvailableViews
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
 import eu.pascariu.shoppinglist.domain.order.dropKeyForIndex
 import eu.pascariu.shoppinglist.domain.order.manualOrderComparator
@@ -26,7 +31,9 @@ import eu.pascariu.shoppinglist.ui.drawer.DrawerShop
 import javax.inject.Inject
 import retrofit2.HttpException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
@@ -44,11 +51,19 @@ class ListViewModel @Inject constructor(
     private val shopsRepository: ShopsRepository,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
+    private val realtimeSyncManager: RealtimeSyncManagerContract,
+    @ExpiryTicker expiryTicker: StateFlow<Long>,
 ) : ViewModel() {
 
     private val localState = MutableStateFlow(LocalUiState())
     private val _uiState = MutableStateFlow(ListUiState())
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
+
+    private val _changeToast = MutableStateFlow<ChangeToast?>(null)
+    val changeToast: StateFlow<ChangeToast?> = _changeToast.asStateFlow()
+    private val pendingToastTexts = ArrayDeque<String>()
+    private var toastDismissJob: Job? = null
+    private var nextChangeToastId = 0L
 
     private val inFlightChecks = MutableStateFlow(0)
     private val undoMutex = Mutex()
@@ -63,8 +78,9 @@ class ListViewModel @Inject constructor(
                 shopsRepository.shops,
                 undoHistoryStore.entries,
                 localState,
-            ) { items, shops, undoEntries, local ->
-                buildUiState(items, shops, undoEntries, local)
+                expiryTicker,
+            ) { items, shops, undoEntries, local, nowMillis ->
+                buildUiState(items, shops, undoEntries, local, nowMillis)
             }.collect { newState ->
                 _uiState.value = newState
             }
@@ -86,6 +102,58 @@ class ListViewModel @Inject constructor(
                     sortOrder = sortOrder,
                 )
             }
+        }
+        viewModelScope.launch {
+            realtimeSyncManager.changeToastLabels.collect { labelBatch ->
+                val enabled = listPreferences.changeToastsEnabled.value
+                if (!enabled) {
+                    pendingToastTexts.clear()
+                    return@collect
+                }
+                showChangeToasts(labelBatch.map { it.text })
+            }
+        }
+    }
+
+    private fun showChangeToasts(texts: List<String>) {
+        if (texts.isEmpty()) return
+        if (_changeToast.value != null) {
+            pendingToastTexts.addAll(texts)
+        } else {
+            displayToast(texts.first())
+            pendingToastTexts.addAll(texts.drop(1))
+        }
+        trimPendingToasts()
+    }
+
+    private fun trimPendingToasts() {
+        while (pendingToastTexts.size > MAX_PENDING_TOASTS) {
+            pendingToastTexts.removeFirst()
+        }
+    }
+
+    private fun displayToast(text: String) {
+        _changeToast.value = ChangeToast(id = nextChangeToastId++, text = text)
+        toastDismissJob?.cancel()
+        toastDismissJob = viewModelScope.launch {
+            delay(TOAST_AUTO_DISMISS_MS)
+            dismissChangeToast()
+        }
+    }
+
+    fun onToastSwipedDismissed(toastId: Long) {
+        if (_changeToast.value?.id == toastId) {
+            dismissChangeToast()
+        }
+    }
+
+    private fun dismissChangeToast() {
+        toastDismissJob?.cancel()
+        toastDismissJob = null
+        _changeToast.value = null
+        val next = pendingToastTexts.removeFirstOrNull()
+        if (next != null) {
+            displayToast(next)
         }
     }
 
@@ -241,6 +309,20 @@ class ListViewModel @Inject constructor(
         }
     }
 
+    fun onAddItemQuantityChanged(quantity: Int) {
+        localState.update { state ->
+            state.copy(addItemModal = state.addItemModal?.copy(quantity = quantity))
+        }
+    }
+
+    fun onAddItemTemporaryToggled() {
+        localState.update { state ->
+            state.copy(addItemModal = state.addItemModal?.let { modal ->
+                modal.copy(isTemporary = !modal.isTemporary)
+            })
+        }
+    }
+
     fun onAddItemViewToggled(viewId: Long) {
         localState.update { state ->
             state.copy(addItemModal = state.addItemModal?.let { modal ->
@@ -277,7 +359,9 @@ class ListViewModel @Inject constructor(
                     listId = RealtimeClient.DEFAULT_LIST_ID,
                     request = CreateItemRequest(
                         name = modal.title.trim(),
-                        visibleIn = modal.selectedViewIds.toList(),
+                        visibleIn = modal.selectedViewIds.filter { it != GLOBAL_FALLBACK_ID },
+                        quantity = modal.quantity,
+                        isTemporary = if (modal.isTemporary) true else null,
                     ),
                 )
             } catch (e: CancellationException) {
@@ -304,7 +388,7 @@ class ListViewModel @Inject constructor(
     }
 
     fun onItemLongPressed(item: Item) {
-        val shops = orderViewsGlobalFirst(shopsRepository.shops.value)
+        val shops = modalAvailableViews(shopsRepository.shops.value)
         localState.update { state ->
             state.copy(
                 editItemModal = EditItemUiState(
@@ -314,6 +398,10 @@ class ListViewModel @Inject constructor(
                     availableViews = shops,
                     selectedViewIds = item.visibleIn.toSet(),
                     originalVisibleIn = item.visibleIn.toSet(),
+                    originalQuantity = item.quantity,
+                    quantity = item.quantity,
+                    originalIsTemporary = item.isTemporary,
+                    isTemporary = item.isTemporary,
                 ),
             )
         }
@@ -322,6 +410,20 @@ class ListViewModel @Inject constructor(
     fun onEditItemTitleChanged(name: String) {
         localState.update { state ->
             state.copy(editItemModal = state.editItemModal?.copy(name = name))
+        }
+    }
+
+    fun onEditItemQuantityChanged(quantity: Int) {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.copy(quantity = quantity))
+        }
+    }
+
+    fun onEditItemTemporaryToggled() {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.let { modal ->
+                modal.copy(isTemporary = !modal.isTemporary)
+            })
         }
     }
 
@@ -365,8 +467,14 @@ class ListViewModel @Inject constructor(
                 itemsRepository.updateDetails(
                     itemId = modal.itemId,
                     request = UpdateItemRequest(
-                        name = modal.name.trim(),
-                        visibleIn = modal.selectedViewIds.toList(),
+                        name = if (modal.name.trim() != modal.originalName.trim()) modal.name.trim() else null,
+                        visibleIn = if (modal.selectedViewIds != modal.originalVisibleIn) {
+                            modal.selectedViewIds.filter { it != GLOBAL_FALLBACK_ID }
+                        } else {
+                            null
+                        },
+                        quantity = if (modal.quantity != modal.originalQuantity) modal.quantity else null,
+                        isTemporary = if (modal.isTemporary != modal.originalIsTemporary) modal.isTemporary else null,
                     ),
                 )
                 localState.update { it.copy(editItemModal = null, errorMessage = null) }
@@ -569,7 +677,7 @@ class ListViewModel @Inject constructor(
         }
 
     private fun openAddItemModal(prefilledTitle: String) {
-        val shops = orderViewsGlobalFirst(shopsRepository.shops.value)
+        val shops = modalAvailableViews(shopsRepository.shops.value)
         localState.update { state ->
             state.copy(
                 addItemModal = AddItemUiState(
@@ -586,7 +694,10 @@ class ListViewModel @Inject constructor(
         shops: List<Shop>,
         undoEntries: List<eu.pascariu.shoppinglist.data.undo.UndoEntry>,
         local: LocalUiState,
+        nowMillis: Long,
     ): ListUiState {
+        val now = java.time.Instant.ofEpochMilli(nowMillis)
+        val liveItems = items.filterNot { it.isExpiredAt(now) }
         val globalShop = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }
         val globalShopId = globalShop?.id
         val activeShop = shops.firstOrNull { it.id == local.activeViewId }
@@ -596,9 +707,9 @@ class ListViewModel @Inject constructor(
             else -> null
         }
         val viewItems = if (activeViewId == null) {
-            items
+            liveItems
         } else {
-            items.filter { activeViewId in it.visibleIn || it.visibleIn.isEmpty() }
+            liveItems.filter { activeViewId in it.visibleIn || it.visibleIn.isEmpty() }
         }
         val sorted = orderItems(items = viewItems, viewId = activeViewId, order = local.sortOrder)
         val query = local.searchQuery.trim()
@@ -618,7 +729,7 @@ class ListViewModel @Inject constructor(
             globalShop != null -> globalShop.name
             else -> GLOBAL_VIEW_NAME
         }
-        val uncheckedCounts = deriveUncheckedCountByShop(items, shops)
+        val uncheckedCounts = deriveUncheckedCountByShop(liveItems, shops)
         val drawerShops = buildDrawerShops(
             shops = shops,
             globalShopId = globalShopId,
@@ -727,5 +838,7 @@ class ListViewModel @Inject constructor(
 
     companion object {
         internal const val GLOBAL_PLACEHOLDER_ID = -1L
+        internal const val TOAST_AUTO_DISMISS_MS = 3_500L
+        internal const val MAX_PENDING_TOASTS = 5
     }
 }

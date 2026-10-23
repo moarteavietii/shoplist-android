@@ -1,6 +1,7 @@
 package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
+import eu.pascariu.shoppinglist.data.config.FeatureConfig
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
@@ -32,7 +33,9 @@ class ItemsRepository @Inject constructor(
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
         val created = itemsApi.createItem(listId, request)
         if (listId == cachedListId.value) {
-            cache.update { it + created }
+            cache.update { current ->
+                if (current.any { it.id == created.id }) current else current + created
+            }
         }
         return created
     }
@@ -54,9 +57,18 @@ class ItemsRepository @Inject constructor(
     suspend fun updateDetails(itemId: Long, request: UpdateItemRequest): Item {
         val previous = cache.value.firstOrNull { it.id == itemId }
             ?: throw IllegalArgumentException("item $itemId not cached")
+        val isTemporary = request.isTemporary ?: previous.isTemporary
+        val optimisticExpiry = when {
+            request.isTemporary == false -> null
+            request.isTemporary == true && previous.isChecked -> stampExpiry()
+            else -> previous.expiresAt
+        }
         val optimistic = previous.copy(
             name = request.name ?: previous.name,
             visibleIn = request.visibleIn ?: previous.visibleIn,
+            quantity = request.quantity ?: previous.quantity,
+            isTemporary = isTemporary,
+            expiresAt = optimisticExpiry,
         )
         cache.update { current -> current.map { if (it.id == itemId) optimistic else it } }
         try {
@@ -68,7 +80,17 @@ class ItemsRepository @Inject constructor(
         } catch (error: Exception) {
             cache.update { current ->
                 current.map { item ->
-                    if (item.id == itemId && item == optimistic) previous else item
+                    if (item.id == itemId && item == optimistic) {
+                        item.copy(
+                            name = previous.name,
+                            visibleIn = previous.visibleIn,
+                            quantity = previous.quantity,
+                            isTemporary = previous.isTemporary,
+                            expiresAt = previous.expiresAt,
+                        )
+                    } else {
+                        item
+                    }
                 }
             }
             throw error
@@ -84,7 +106,12 @@ class ItemsRepository @Inject constructor(
     suspend fun setChecked(itemId: Long, isChecked: Boolean, isUndo: Boolean = false): Item {
         val previous = cache.value.firstOrNull { it.id == itemId }
             ?: throw IllegalArgumentException("item $itemId not cached")
-        cache.update { current -> current.map { if (it.id == itemId) it.copy(isChecked = isChecked) else it } }
+        val optimisticExpiry = when {
+            isChecked && previous.isTemporary -> stampExpiry()
+            else -> null
+        }
+        val optimistic = previous.copy(isChecked = isChecked, expiresAt = optimisticExpiry)
+        cache.update { current -> current.map { if (it.id == itemId) optimistic else it } }
         try {
             val updated = itemsApi.updateItem(itemId, UpdateItemRequest(isChecked = isChecked, isUndo = if (isUndo) true else null))
             cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
@@ -92,10 +119,23 @@ class ItemsRepository @Inject constructor(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            cache.update { current -> current.map { if (it.id == itemId) it.copy(isChecked = previous.isChecked) else it } }
+            cache.update { current ->
+                current.map { item ->
+                    if (item.id == itemId) {
+                        item.copy(isChecked = previous.isChecked, expiresAt = previous.expiresAt)
+                    } else {
+                        item
+                    }
+                }
+            }
             throw error
         }
     }
+
+    private fun stampExpiry(): String =
+        java.time.Instant.ofEpochMilli(System.currentTimeMillis())
+            .plus(FeatureConfig.TEMPORARY_ITEM_TTL)
+            .toString()
 
     suspend fun reorder(itemId: Long, viewId: Long, newKey: String): Item {
         val viewKey = viewId.toString()

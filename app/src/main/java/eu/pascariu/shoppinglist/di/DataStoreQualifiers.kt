@@ -11,3 +11,7 @@ annotation class UndoHistoryDataStore
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class ListPreferencesDataStore
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ExpiryTicker

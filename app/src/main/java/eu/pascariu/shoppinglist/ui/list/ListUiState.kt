@@ -3,6 +3,7 @@ package eu.pascariu.shoppinglist.ui.list
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
+import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
 import eu.pascariu.shoppinglist.ui.drawer.DrawerShop
 
 data class ListUiState(
@@ -37,9 +38,13 @@ data class AddItemUiState(
     val title: String,
     val availableViews: List<Shop>,
     val selectedViewIds: Set<Long>,
+    val quantity: Int = 1,
+    val isTemporary: Boolean = false,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
     val canSave: Boolean get() = title.isNotBlank()
+    val isUnchanged: Boolean get() = title.isBlank() && selectedViewIds == availableViews.mapTo(mutableSetOf()) { it.id }
+    val secondaryLabel: String get() = if (isUnchanged) "Close" else "Discard"
 }
 
 data class EditItemUiState(
@@ -49,10 +54,19 @@ data class EditItemUiState(
     val availableViews: List<Shop>,
     val selectedViewIds: Set<Long>,
     val originalVisibleIn: Set<Long> = selectedViewIds,
+    val originalQuantity: Int = 1,
+    val quantity: Int = originalQuantity,
+    val originalIsTemporary: Boolean = false,
+    val isTemporary: Boolean = originalIsTemporary,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
-    val isUnchanged: Boolean get() = name.trim() == originalName.trim() && selectedViewIds == originalVisibleIn
+    val isUnchanged: Boolean get() =
+        name.trim() == originalName.trim() &&
+            selectedViewIds.filter { it != GLOBAL_FALLBACK_ID } == originalVisibleIn.filter { it != GLOBAL_FALLBACK_ID } &&
+            quantity == originalQuantity &&
+            isTemporary == originalIsTemporary
     val canSave: Boolean get() = name.isNotBlank() && !isUnchanged
+    val secondaryLabel: String get() = if (isUnchanged) "Close" else "Discard"
 }
 
 data class ShopModalUiState(

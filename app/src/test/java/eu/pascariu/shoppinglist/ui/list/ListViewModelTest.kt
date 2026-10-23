@@ -6,14 +6,20 @@ import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
+import eu.pascariu.shoppinglist.data.realtime.ChangeToastLabel
+import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
+import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -39,6 +45,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -55,6 +62,8 @@ class ListViewModelTest {
     private lateinit var shopsRepository: ShopsRepository
     private lateinit var undoHistoryStore: UndoHistoryStore
     private lateinit var listPreferences: ListPreferencesDataSource
+    private lateinit var expiryTick: MutableStateFlow<Long>
+    private lateinit var fakeSyncManager: FakeRealtimeSyncManager
     private lateinit var viewModel: ListViewModel
 
     private val json = Json
@@ -89,7 +98,16 @@ class ListViewModelTest {
             storeScope = storeScope,
             ioDispatcher = testDispatcher,
         )
-        viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
+        expiryTick = MutableStateFlow(System.currentTimeMillis())
+        fakeSyncManager = FakeRealtimeSyncManager()
+        viewModel = ListViewModel(
+            itemsRepository = itemsRepository,
+            shopsRepository = shopsRepository,
+            undoHistoryStore = undoHistoryStore,
+            listPreferences = listPreferences,
+            realtimeSyncManager = fakeSyncManager,
+            expiryTicker = expiryTick,
+        )
     }
 
     @After
@@ -122,6 +140,9 @@ class ListViewModelTest {
         orderKey: String? = "a0",
         visibleIn: String = "[1]",
         checkCount: Int = 0,
+        quantity: Int = 1,
+        isTemporary: Boolean = false,
+        expiresAt: String? = null,
     ): String =
         """
         {
@@ -130,10 +151,10 @@ class ListViewModelTest {
           "name": "$name",
           "isChecked": $isChecked,
           "orderMap": ${if (orderKey == null) "{}" else "{\"1\": \"$orderKey\"}"},
-          "quantity": 1,
-          "isTemporary": false,
+          "quantity": $quantity,
+          "isTemporary": $isTemporary,
           "checkCount": $checkCount,
-          "expiresAt": null,
+          "expiresAt": ${if (expiresAt == null) "null" else "\"$expiresAt\""},
           "createdAt": "2026-10-22T09:00:00Z",
           "visibleIn": $visibleIn
         }
@@ -739,10 +760,64 @@ class ListViewModelTest {
         assertEquals("PATCH", recorded!!.method)
         assertEquals("/api/items/11", recorded.path)
         val body = recorded.body.readUtf8()
-        assertTrue(body.contains("\"name\":\"Bread\""))
+        assertFalse(body.contains("\"name\""))
         assertTrue(body.contains("\"visibleIn\":[1,2]"))
         awaitUntil { viewModel.uiState.value.editItemModal == null }
         assertEquals(listOf(1L, 2L), viewModel.uiState.value.items.first { it.id == 11L }.visibleIn)
+    }
+
+    @Test
+    fun `edit modal toggle all selects everything and deselects all but Global`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        assertEquals(setOf(1L), viewModel.uiState.value.editItemModal?.selectedViewIds)
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L, 2L) }
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L) }
+
+        assertEquals(setOf(1L), viewModel.uiState.value.editItemModal?.selectedViewIds)
+    }
+
+    @Test
+    fun `edit modal save strips fallback global sentinel from visibleIn`() = runTest(testDispatcher) {
+        enqueueItemList(itemJson(11, "Bread", orderKey = "a1"))
+        enqueueShopList(shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        assertEquals(
+            listOf("Global", "Auchan"),
+            viewModel.uiState.value.editItemModal?.availableViews?.map { it.name },
+        )
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(GLOBAL_FALLBACK_ID, 2L) }
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(GLOBAL_FALLBACK_ID) }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread", visibleIn = "[]")),
+        )
+
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(recorded)
+        val body = recorded!!.body.readUtf8()
+        assertTrue(body.contains("\"visibleIn\":[]"))
+        assertFalse(body.contains("-2"))
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
     }
 
     @Test
@@ -1010,6 +1085,40 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `remote item updated with changed visibleIn re-filters active view`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", visibleIn = "[1]"),
+            itemJson(11, "Bread", orderKey = "a1", visibleIn = "[1,2]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+        assertEquals(listOf("Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        itemsRepository.applyUpdated(
+            eu.pascariu.shoppinglist.data.model.Item(
+                id = 11L,
+                listId = 1L,
+                name = "Bread",
+                isChecked = false,
+                orderMap = mapOf("1" to "a1"),
+                quantity = 1,
+                isTemporary = false,
+                checkCount = 0,
+                expiresAt = null,
+                createdAt = "2026-10-22T09:00:00Z",
+                visibleIn = listOf(1L),
+            ),
+        )
+        awaitUntil { viewModel.uiState.value.filteredItems.isEmpty() }
+    }
+
+    @Test
     fun `selecting a view filters and sorts by that view`() = runTest(testDispatcher) {
         enqueueItemList(
             itemJson(10, "Milk", orderKey = "a0", visibleIn = "[1]"),
@@ -1254,7 +1363,14 @@ class ListViewModelTest {
     }
 
     private fun newViewModel(): ListViewModel {
-        val instance = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
+        val instance = ListViewModel(
+            itemsRepository = itemsRepository,
+            shopsRepository = shopsRepository,
+            undoHistoryStore = undoHistoryStore,
+            listPreferences = listPreferences,
+            realtimeSyncManager = fakeSyncManager,
+            expiryTicker = expiryTick,
+        )
         viewModel = instance
         return instance
     }
@@ -1781,5 +1897,244 @@ class ListViewModelTest {
 
         assertEquals("Couldn't move the item", viewModel.uiState.value.errorMessage)
         assertEquals("a0", viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"])
+    }
+
+    @Test
+    fun `add modal quantity and temporary intents update state`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onAddAffordanceTapped()
+        awaitUntil { viewModel.uiState.value.addItemModal != null }
+
+        viewModel.onAddItemQuantityChanged(3)
+        awaitUntil { viewModel.uiState.value.addItemModal?.quantity == 3 }
+
+        viewModel.onAddItemTemporaryToggled()
+        awaitUntil { viewModel.uiState.value.addItemModal?.isTemporary == true }
+
+        viewModel.onAddItemQuantityChanged(1)
+        viewModel.onAddItemTemporaryToggled()
+        awaitUntil { viewModel.uiState.value.addItemModal?.quantity == 1 }
+        assertFalse(viewModel.uiState.value.addItemModal?.isTemporary ?: true)
+    }
+
+    @Test
+    fun `add save sends quantity and temporary fields`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        viewModel.onAddItemQuantityChanged(3)
+        awaitUntil { viewModel.uiState.value.addItemModal?.quantity == 3 }
+        viewModel.onAddItemTemporaryToggled()
+        awaitUntil { viewModel.uiState.value.addItemModal?.isTemporary == true }
+        server.enqueue(
+            MockResponse().setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 12, name = "Eggs")),
+        )
+
+        viewModel.onAddItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        val body = recorded!!.body.readUtf8()
+        assertTrue(body.contains("\"quantity\":3"))
+        assertTrue(body.contains("\"isTemporary\":true"))
+    }
+
+    @Test
+    fun `edit modal quantity and temporary intents update state`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        viewModel.onEditItemQuantityChanged(4)
+        awaitUntil { viewModel.uiState.value.editItemModal?.quantity == 4 }
+
+        viewModel.onEditItemTemporaryToggled()
+        awaitUntil { viewModel.uiState.value.editItemModal?.isTemporary == true }
+
+        assertTrue(viewModel.uiState.value.editItemModal?.canSave ?: false)
+    }
+
+    @Test
+    fun `edit save patches quantity and temporary only when changed`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemQuantityChanged(4)
+        awaitUntil { viewModel.uiState.value.editItemModal?.quantity == 4 }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread")),
+        )
+
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        val body = recorded!!.body.readUtf8()
+        assertTrue(body.contains("\"quantity\":4"))
+        assertFalse(body.contains("\"isTemporary\""))
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+    }
+
+    @Test
+    fun `expired temporary item is hidden from the list`() = runTest(testDispatcher) {
+        val past = Instant.now().minusSeconds(60).toString()
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0"),
+            itemJson(11, "Yogurt", orderKey = "a1", isTemporary = true, isChecked = true, expiresAt = past),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { itemsRepository.items.value.isNotEmpty() }
+        advanceUntilIdle()
+
+        val names = viewModel.uiState.value.items.map { it.name }
+        assertEquals(listOf("Milk"), names)
+    }
+
+    @Test
+    fun `unexpired temporary item stays visible`() = runTest(testDispatcher) {
+        val future = Instant.now().plusSeconds(3600).toString()
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0"),
+            itemJson(11, "Yogurt", orderKey = "a1", isTemporary = true, isChecked = true, expiresAt = future),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { itemsRepository.items.value.isNotEmpty() }
+        advanceUntilIdle()
+
+        assertEquals(listOf("Milk", "Yogurt"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `permanent item with stale expiry stays visible`() = runTest(testDispatcher) {
+        val past = Instant.now().minusSeconds(60).toString()
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0"),
+            itemJson(11, "Yogurt", orderKey = "a1", isTemporary = false, expiresAt = past),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { itemsRepository.items.value.isNotEmpty() }
+        advanceUntilIdle()
+
+        assertEquals(listOf("Milk", "Yogurt"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `expiry tick hides an item whose expiry passes mid-session`() = runTest(testDispatcher) {
+        val soon = Instant.now().plusSeconds(60).toString()
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0"),
+            itemJson(11, "Yogurt", orderKey = "a1", isTemporary = true, isChecked = true, expiresAt = soon),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { itemsRepository.items.value.isNotEmpty() }
+        advanceUntilIdle()
+        assertEquals(listOf("Milk", "Yogurt"), viewModel.uiState.value.items.map { it.name })
+
+        expiryTick.value = Instant.now().plusSeconds(60).toEpochMilli()
+        advanceUntilIdle()
+
+        assertEquals(listOf("Milk"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `remote label batch shows first toast and queues the rest`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        fakeSyncManager.emit(listOf("checked: Milk", "Milk → Bread"))
+        runCurrent()
+
+        assertEquals("checked: Milk", viewModel.changeToast.value?.text)
+
+        viewModel.onToastSwipedDismissed(viewModel.changeToast.value?.id ?: -1L)
+        runCurrent()
+
+        assertEquals("Milk → Bread", viewModel.changeToast.value?.text)
+    }
+
+    @Test
+    fun `new batch queues behind the visible toast and shows after dismissal`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+        val firstToast = viewModel.changeToast.value
+        assertEquals("checked: Milk", firstToast?.text)
+
+        fakeSyncManager.emit(listOf("new item: Bread"))
+        runCurrent()
+
+        assertEquals("checked: Milk", viewModel.changeToast.value?.text)
+
+        viewModel.onToastSwipedDismissed(firstToast!!.id)
+        runCurrent()
+
+        val queuedToast = viewModel.changeToast.value
+        assertEquals("new item: Bread", queuedToast?.text)
+        assertTrue(queuedToast!!.id != firstToast.id)
+    }
+
+    @Test
+    fun `toast auto-dismisses after the timeout`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+        assertEquals("checked: Milk", viewModel.changeToast.value?.text)
+
+        testDispatcher.scheduler.advanceTimeBy(ListViewModel.TOAST_AUTO_DISMISS_MS)
+        runCurrent()
+
+        assertNull(viewModel.changeToast.value)
+    }
+
+    @Test
+    fun `disabled preference suppresses toast display`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        listPreferences.setChangeToastsEnabled(false)
+        advanceUntilIdle()
+
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+
+        assertNull(viewModel.changeToast.value)
+    }
+
+    @Test
+    fun `re-enabling the preference resumes toast display`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        listPreferences.setChangeToastsEnabled(false)
+        advanceUntilIdle()
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+        assertNull(viewModel.changeToast.value)
+
+        listPreferences.setChangeToastsEnabled(true)
+        advanceUntilIdle()
+        fakeSyncManager.emit(listOf("new item: Bread"))
+        runCurrent()
+
+        assertEquals("new item: Bread", viewModel.changeToast.value?.text)
+    }
+}
+
+private class FakeRealtimeSyncManager : RealtimeSyncManagerContract {
+    private val labels = MutableSharedFlow<List<ChangeToastLabel>>(extraBufferCapacity = 64)
+
+    override val changeToastLabels: SharedFlow<List<ChangeToastLabel>> = labels
+
+    suspend fun emit(batch: List<String>) {
+        labels.emit(batch.map { ChangeToastLabel(it) })
     }
 }

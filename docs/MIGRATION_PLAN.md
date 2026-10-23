@@ -102,7 +102,7 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `frontend-data-fetching` | Roadmap 2 + 3 — repositories + SSE merge | **done** — repositories in `data-layer-repositories`; SSE merge in `realtime-sync-sse` (both archived 2026-10-22); Android specs: `data-layer`, `realtime-sync` |
 | `frontend-list-styling` | Roadmap 4 — list screen MVP (design language) | **done** — `list-screen-mvp` (archived 2026-10-22); Android specs: `list-screen` |
 | `frontend-bottom-anchored-list` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `list-screen` |
-| `frontend-modal-design-language` | Roadmap 4+ — modals | partially — add-item overlay in `list-screen-mvp` (archived 2026-10-22); edit/delete modals remain (roadmap 6) |
+| `frontend-modal-design-language` | Roadmap 4+ — modals | **done** — add-item overlay in `list-screen-mvp` (archived 2026-10-22); edit/delete modals in `edit-delete-item-modal` (archived 2026-10-23); Android specs: `list-screen` (add-item), `item-edit-delete` |
 | `frontend-check-history-undo` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android specs: `check-undo`, `data-layer` (history store) |
 | `frontend-undo-snackbar` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `check-undo` |
 | `frontend-add-item-from-search` | Roadmap 4 — list screen MVP | **done** — `list-screen-mvp` (archived 2026-10-22); Android spec: `quick-add` |
@@ -118,12 +118,12 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `frontend-expandable-search` | Roadmap 5 — views + widget stack | **done** — `badges-search-restructure` (archived 2026-10-23); Android spec: `expandable-search` |
 | `frontend-fuzzy-search` | Roadmap 5 — views + widget stack | **done** — matcher reused from `list-screen-mvp`; restructure in `badges-search-restructure` (archived 2026-10-23); Android spec: `expandable-search` (fuzzy filtering) |
 | `frontend-drag-drop` | Roadmap 5 — views + widget stack | **done** — `sort-modes-drag-drop` (archived 2026-10-23); Android spec: `drag-drop-reorder` |
-| `frontend-view-visibility` | Roadmap 6 — feature parity | not started |
-| `frontend-item-deletion` | Roadmap 6 — feature parity | not started |
-| `frontend-item-quantity` | Roadmap 6 — feature parity | not started |
-| `frontend-temporary-items` | Roadmap 6 — feature parity | not started |
-| `item-expiry` | Roadmap 6 — feature parity | not started |
-| `frontend-change-toasts` | Roadmap 6 — feature parity | not started |
+| `frontend-view-visibility` | Roadmap 6 — feature parity | **done** — `multi-shop-visibility` (archived 2026-10-23); Android spec: `item-visibility` |
+| `frontend-item-deletion` | Roadmap 6 — feature parity | **done** — `edit-delete-item-modal` (archived 2026-10-23); Android spec: `item-edit-delete` |
+| `frontend-item-quantity` | Roadmap 6 — feature parity | **done** — `temporary-items-quantity` (archived 2026-10-23); Android spec: `item-quantity` |
+| `frontend-temporary-items` | Roadmap 6 — feature parity | **done** — `temporary-items-quantity` (archived 2026-10-23); Android spec: `temporary-items` |
+| `item-expiry` | Roadmap 6 — feature parity | **done** — server-owned expiry reused as-is; client-side hiding + optimistic cache mirroring in `temporary-items-quantity` (archived 2026-10-23); Android spec: `temporary-items` |
+| `frontend-change-toasts` | Roadmap 6 — feature parity | **done** — `change-toasts` (archived 2026-10-23); Android spec: `change-toasts` |
 | `frontend-view-persistence` | Roadmap 5 — views + widget stack | **done** — `widget-stack-persistence` (archived 2026-10-23); Android spec: `view-persistence` |
 | `frontend-theme-system` | Roadmap 7 — themes (curated set) | not started |
 | `frontend-settings-drawer` | Roadmap 7 — themes | not started |

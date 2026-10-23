@@ -79,6 +79,7 @@ fun ListScreen(
     viewModel: ListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val changeToast by viewModel.changeToast.collectAsStateWithLifecycle()
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
@@ -312,6 +313,12 @@ fun ListScreen(
             modifier = Modifier.matchParentSize(),
         )
 
+        ChangeToastOverlay(
+            toast = changeToast,
+            onDismissed = viewModel::onToastSwipedDismissed,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+
         if (state.addItemModal != null) {
             Box(
                 modifier = Modifier
@@ -348,6 +355,8 @@ fun ListScreen(
                 AddItemModal(
                     modal = modal,
                     onTitleChanged = viewModel::onAddItemTitleChanged,
+                    onQuantityChanged = viewModel::onAddItemQuantityChanged,
+                    onTemporaryToggled = viewModel::onAddItemTemporaryToggled,
                     onViewToggled = viewModel::onAddItemViewToggled,
                     onToggleAll = viewModel::onAddItemToggleAllTapped,
                     onSave = viewModel::onAddItemSave,
@@ -369,6 +378,8 @@ fun ListScreen(
                 EditItemModal(
                     modal = modal,
                     onNameChanged = viewModel::onEditItemTitleChanged,
+                    onQuantityChanged = viewModel::onEditItemQuantityChanged,
+                    onTemporaryToggled = viewModel::onEditItemTemporaryToggled,
                     onViewToggled = viewModel::onEditItemViewToggled,
                     onToggleAll = viewModel::onEditItemToggleAllTapped,
                     onSave = viewModel::onEditItemSave,

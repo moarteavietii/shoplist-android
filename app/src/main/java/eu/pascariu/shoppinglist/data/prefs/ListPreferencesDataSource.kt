@@ -45,6 +45,9 @@ class ListPreferencesDataSource(
     private val sortOrderFlow = MutableStateFlow(SortOrder.MANUAL)
     val sortOrder: StateFlow<SortOrder> = sortOrderFlow.asStateFlow()
 
+    private val changeToastsEnabledFlow = MutableStateFlow(true)
+    val changeToastsEnabled: StateFlow<Boolean> = changeToastsEnabledFlow.asStateFlow()
+
     private val ready = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = ready.asStateFlow()
 
@@ -62,6 +65,7 @@ class ListPreferencesDataSource(
             showCheckedFlow.value = prefs[KEY_SHOW_CHECKED] ?: true
             sortModeEnabledFlow.value = prefs[KEY_SORT_MODE_ENABLED] ?: true
             sortOrderFlow.value = prefs[KEY_SORT_ORDER]?.let(SortOrder::fromName) ?: SortOrder.MANUAL
+            changeToastsEnabledFlow.value = prefs[KEY_CHANGE_TOASTS_ENABLED] ?: true
             ready.value = true
         }
     }
@@ -106,6 +110,12 @@ class ListPreferencesDataSource(
         }
     }
 
+    suspend fun setChangeToastsEnabled(enabled: Boolean) {
+        update(changeToastsEnabledFlow, enabled) { prefs, value ->
+            prefs[KEY_CHANGE_TOASTS_ENABLED] = value
+        }
+    }
+
     private suspend fun <T> update(
         flow: MutableStateFlow<T>,
         newValue: T,
@@ -131,6 +141,7 @@ class ListPreferencesDataSource(
         val KEY_SHOW_CHECKED = booleanPreferencesKey("show_checked")
         val KEY_SORT_MODE_ENABLED = booleanPreferencesKey("sort_mode_enabled")
         val KEY_SORT_ORDER = stringPreferencesKey("sort_order")
+        val KEY_CHANGE_TOASTS_ENABLED = booleanPreferencesKey("change_toasts_enabled")
     }
 }
 

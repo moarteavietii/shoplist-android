@@ -1,5 +1,6 @@
 package eu.pascariu.shoppinglist.data.model
 
+import java.time.Instant
 import kotlinx.serialization.Serializable
 
 @JvmInline
@@ -23,6 +24,15 @@ data class Item(
     val createdAt: String,
     val visibleIn: VisibleIn,
 )
+
+fun Item.isExpiredAt(now: Instant): Boolean {
+    if (!isTemporary || expiresAt == null) return false
+    return try {
+        !Instant.parse(expiresAt).isAfter(now)
+    } catch (_: Exception) {
+        false
+    }
+}
 
 @Serializable
 data class Shop(

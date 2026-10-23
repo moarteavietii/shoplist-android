@@ -24,6 +24,8 @@ import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClientContract
+import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManager
+import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.di.ApplicationScope
@@ -145,4 +147,8 @@ object NetworkModule {
             baseUrl = baseUrl,
             listId = RealtimeClient.DEFAULT_LIST_ID,
         )
+
+    @Provides
+    @Singleton
+    fun provideRealtimeSyncManager(impl: RealtimeSyncManager): RealtimeSyncManagerContract = impl
 }
