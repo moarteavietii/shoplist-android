@@ -2,6 +2,7 @@ package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
+import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -53,6 +54,7 @@ class ItemsRepositoryMockWebServerTest {
         name: String = "Milk",
         isChecked: Boolean = false,
         checkCount: Int = 0,
+        orderMapJson: String = """{"a0": "a1"}""",
     ): String =
         """
         {
@@ -60,7 +62,7 @@ class ItemsRepositoryMockWebServerTest {
           "listId": $listId,
           "name": "$name",
           "isChecked": $isChecked,
-          "orderMap": {"a0": "a1"},
+          "orderMap": $orderMapJson,
           "quantity": 2,
           "isTemporary": false,
           "checkCount": $checkCount,
@@ -332,6 +334,52 @@ class ItemsRepositoryMockWebServerTest {
         assertTrue(thrown.exceptionOrNull() is HttpException)
         val rolledBack = repository.items.first().single()
         assertNull(rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
+    }
+
+    @Test
+    fun `failed reorder rollback only reverts the reordered view key keeping remote fields`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString<Item>(enqueueItemJson(id = 10, name = "Organic Milk")),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertEquals("Organic Milk", rolledBack.name)
+        assertNull(rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
+    }
+
+    @Test
+    fun `failed reorder rollback keeps concurrent orderMap change from another view`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString<Item>(enqueueItemJson(id = 10, orderMapJson = """{"a0": "a1", "2": "b0"}""")),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertNull(rolledBack.orderMap["1"])
+        assertEquals("b0", rolledBack.orderMap["2"])
         assertEquals("a1", rolledBack.orderMap["a0"])
     }
 }
