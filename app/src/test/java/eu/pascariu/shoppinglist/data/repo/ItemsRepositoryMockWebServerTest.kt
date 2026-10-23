@@ -10,8 +10,12 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -291,16 +295,26 @@ class ItemsRepositoryMockWebServerTest {
 
     @Test
     fun `reorder optimistically merges orderMap before PATCH settles`() = runTest {
-        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        val patchSettled = CountDownLatch(1)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                if (request.method == "PATCH") {
+                    patchSettled.await(5, TimeUnit.SECONDS)
+                    enqueueItemResponse(enqueueItemJson(id = 10))
+                } else {
+                    enqueueItemListJson(enqueueItemJson(id = 10))
+                }
+        }
+
         repository.refetch(listId = 1)
         server.takeRequest()
-        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10)))
 
         val deferred = async { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") }
 
         runCurrent()
         assertEquals("a5", repository.items.first().single().orderMap["1"])
 
+        patchSettled.countDown()
         deferred.join()
         assertEquals(10L, deferred.await().id)
     }
