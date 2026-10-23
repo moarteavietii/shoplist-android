@@ -62,9 +62,12 @@ private val ShoplistTypographyDefault = ShoplistTypography(
 )
 
 @Composable
-fun ShoplistTheme(content: @Composable () -> Unit) {
+fun ShoplistTheme(
+    themeId: ThemeId = ThemeId.DEFAULT,
+    content: @Composable () -> Unit,
+) {
     val tokens = ShoplistThemeTokens(
-        colors = ShoplistDarkColors,
+        colors = ShoplistThemePalettes.getValue(themeId),
         typography = ShoplistTypographyDefault,
         shapes = ShoplistShapesDefault,
     )

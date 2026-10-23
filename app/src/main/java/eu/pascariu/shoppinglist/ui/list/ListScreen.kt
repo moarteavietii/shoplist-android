@@ -67,6 +67,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
 import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
+import eu.pascariu.shoppinglist.ui.settings.SettingsDrawer
+import eu.pascariu.shoppinglist.ui.settings.SettingsViewModel
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -77,9 +79,12 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun ListScreen(
     viewModel: ListViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val changeToast by viewModel.changeToast.collectAsStateWithLifecycle()
+    val settingsTheme by settingsViewModel.theme.collectAsStateWithLifecycle()
+    val settingsChangeToasts by settingsViewModel.changeToastsEnabled.collectAsStateWithLifecycle()
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
@@ -310,6 +315,16 @@ fun ListScreen(
             onShopEdit = viewModel::onShopEditTapped,
             onAddShop = viewModel::onAddShopTapped,
             onDismiss = viewModel::onDrawerDismissed,
+            modifier = Modifier.matchParentSize(),
+        )
+
+        SettingsDrawer(
+            visible = state.settingsDrawerOpen,
+            activeThemeId = settingsTheme,
+            changeToastsEnabled = settingsChangeToasts,
+            onThemeSelected = settingsViewModel::onThemeSelected,
+            onChangeToastsToggled = settingsViewModel::onChangeToastsToggled,
+            onDismiss = viewModel::onSettingsDrawerDismissed,
             modifier = Modifier.matchParentSize(),
         )
 

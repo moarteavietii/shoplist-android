@@ -22,6 +22,7 @@ import eu.pascariu.shoppinglist.data.device.DeviceIdInterceptor
 import eu.pascariu.shoppinglist.data.device.DeviceIdStore
 import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClientContract
 import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManager
@@ -133,6 +134,15 @@ object NetworkModule {
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ): ListPreferencesDataSource =
         ListPreferencesDataSource(dataStore, storeScope, ioDispatcher)
+
+    @Provides
+    @Singleton
+    fun provideThemeRepository(
+        @ListPreferencesDataStore dataStore: DataStore<Preferences>,
+        @ApplicationScope storeScope: CoroutineScope,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ): ThemeRepository =
+        ThemeRepository(dataStore, storeScope, ioDispatcher)
 
     @Provides
     @Singleton
