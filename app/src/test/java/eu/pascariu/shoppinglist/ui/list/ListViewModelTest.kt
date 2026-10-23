@@ -820,6 +820,24 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `delete confirm closes dialog synchronously before request settles`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+        server.enqueue(MockResponse().setResponseCode(204).setBodyDelay(2, TimeUnit.SECONDS))
+
+        viewModel.onDeleteConfirmed()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+        awaitUntil { server.requestCount == 3 }
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+    }
+
+    @Test
     fun `delete failure restores item at its previous position and shows error`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 10L })
