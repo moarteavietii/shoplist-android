@@ -40,9 +40,10 @@ Replace the XML/AppCompat scaffold with the real foundation:
 
 ## 6. Feature parity
 
-- Edit/delete item modals, multi-shop visibility, quantities
-- Temporary items + 24 h expiry
-- Change toasts (remote changes, own-device suppression, toggleable)
+- Edit/delete item modals, quantities ✅ (done — `temporary-items-quantity` + `edit-delete-item-modal`, archived 2026-10-23)
+- Multi-shop visibility ✅ (done — `multi-shop-visibility`, archived 2026-10-23)
+- Temporary items + 24 h expiry ✅ (done — `temporary-items-quantity`, archived 2026-10-23)
+- Change toasts (remote changes, own-device suppression, toggleable) ✅ (done — `change-toasts`, archived 2026-10-23)
 - Pull-to-refresh: **dropped** — SSE + refetch-on-reconnect is the freshness mechanism; revisit only if realtime proves unreliable
 
 ## 7. Themes

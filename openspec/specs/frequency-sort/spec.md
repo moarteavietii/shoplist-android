@@ -1,10 +1,10 @@
-# frequency-sort Delta
+# frequency-sort Specification
 
 ## Purpose
 
 Order items by all-time check-off count so frequently checked items surface first, with counts that follow the backend contract.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Check counts follow the backend increment rules
 Each item's check count SHALL increment by 1 on an unchecked→checked transition, SHALL remain unchanged on a manual uncheck (including post-trip resets) and on no-op flips, SHALL decrement by 1 only via the device-local undo path (floor 0), and SHALL start at 0. Editing an item or changing shop visibility SHALL NOT reset the count.

@@ -1,10 +1,10 @@
-# sort-modes Delta
+# sort-modes Specification
 
 ## Purpose
 
 Let users toggle manual drag-and-drop reordering on/off and choose the list ordering: Manual, A→Z, or Frequency.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The sort mode control has two exclusive interactions
 The widget stack's Sort Mode control SHALL support two exclusive interactions: tapping it toggles manual drag-and-drop reordering on/off, and long-pressing it opens a sort-order selector anchored to the button. A long-press SHALL NOT also toggle the mode.

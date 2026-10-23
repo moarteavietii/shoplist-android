@@ -1,10 +1,10 @@
-# drag-drop-reorder Delta
+# drag-drop-reorder Specification
 
 ## Purpose
 
 Reorder items within the active view via handle-initiated drag-and-drop, persisting fractional-index order keys to the backend.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Drag initiates only from a dedicated row handle
 Reordering SHALL initiate only from a dedicated drag handle on the row; row-body touch SHALL never start a drag, and a long-press on the row body SHALL NOT drag. The handle SHALL render only when drag is enabled (sort mode ON and Manual order); when disabled, rows SHALL use the full width without a handle zone.
