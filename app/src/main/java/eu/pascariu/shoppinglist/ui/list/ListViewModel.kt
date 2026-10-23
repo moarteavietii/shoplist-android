@@ -53,6 +53,7 @@ class ListViewModel @Inject constructor(
     private val inFlightChecks = MutableStateFlow(0)
     private val undoMutex = Mutex()
     private var isCreateInFlight = false
+    private var isUpdateInFlight = false
     private var nextPostSaveSignalId = 0L
 
     init {
@@ -286,6 +287,7 @@ class ListViewModel @Inject constructor(
                 localState.update { it.copy(errorMessage = "Couldn't save the item") }
                 return@launch
             }
+            isCreateInFlight = false
             localState.update {
                 it.copy(
                     searchQuery = "",
@@ -354,7 +356,9 @@ class ListViewModel @Inject constructor(
     fun onEditItemSave() {
         val modal = localState.value.editItemModal ?: return
         if (!modal.canSave) return
+        if (isUpdateInFlight) return
         val snapshot = itemsRepository.items.value.firstOrNull { it.id == modal.itemId } ?: return
+        isUpdateInFlight = true
         viewModelScope.launch {
             try {
                 itemsRepository.update(
@@ -372,6 +376,8 @@ class ListViewModel @Inject constructor(
                         errorMessage = "Couldn't rename the item",
                     )
                 }
+            } finally {
+                isUpdateInFlight = false
             }
         }
     }
