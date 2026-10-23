@@ -44,7 +44,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
@@ -215,7 +216,7 @@ private fun SwitcherBadge(count: Int, modifier: Modifier = Modifier) {
         modifier = modifier
             .background(colors.ledOn, RoundedCornerShape(8.dp))
             .padding(horizontal = 4.dp, vertical = 1.dp)
-            .clearAndSetSemantics { },
+            .semantics { contentDescription = "$count unchecked items" },
     )
 }
 
