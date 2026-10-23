@@ -24,6 +24,8 @@ data class ListUiState(
     val showAddAffordance: Boolean = false,
     val showUndoBar: Boolean = false,
     val addItemModal: AddItemUiState? = null,
+    val editItemModal: EditItemUiState? = null,
+    val deleteConfirmItem: Item? = null,
     val shopModal: ShopModalUiState? = null,
     val postSaveSignal: PostSaveSignal? = null,
     val errorMessage: String? = null,
@@ -38,6 +40,18 @@ data class AddItemUiState(
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
     val canSave: Boolean get() = title.isNotBlank()
+}
+
+data class EditItemUiState(
+    val itemId: Long,
+    val originalName: String,
+    val name: String,
+    val availableViews: List<Shop>,
+    val selectedViewIds: Set<Long>,
+) {
+    val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
+    val isUnchanged: Boolean get() = name.trim() == originalName.trim()
+    val canSave: Boolean get() = name.isNotBlank() && !isUnchanged
 }
 
 data class ShopModalUiState(

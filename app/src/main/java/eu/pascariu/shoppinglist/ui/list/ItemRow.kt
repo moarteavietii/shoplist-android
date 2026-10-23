@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ fun ItemRow(
     dragEnabled: Boolean = false,
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
+    onLongPress: (() -> Unit)? = null,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
@@ -84,10 +86,10 @@ fun ItemRow(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .toggleable(
-                        value = item.isChecked,
+                    .combinedClickable(
+                        onClick = { onCheckToggled(item) },
+                        onLongClick = onLongPress,
                         role = Role.Checkbox,
-                        onValueChange = { onCheckToggled(item) },
                     )
                     .padding(horizontal = if (dragEnabled) 0.dp else 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,

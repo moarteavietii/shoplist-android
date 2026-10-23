@@ -34,6 +34,64 @@ fun AddItemModal(
     onDiscard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    ItemModalContent(
+        name = modal.title,
+        availableViews = modal.availableViews,
+        selectedViewIds = modal.selectedViewIds,
+        allViewsSelected = modal.allViewsSelected,
+        onNameChanged = onTitleChanged,
+        onViewToggled = onViewToggled,
+        onToggleAll = onToggleAll,
+        onDiscard = onDiscard,
+        canSave = modal.canSave,
+        onDelete = null,
+        onSave = onSave,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun EditItemModal(
+    modal: EditItemUiState,
+    onNameChanged: (String) -> Unit,
+    onViewToggled: (Long) -> Unit,
+    onToggleAll: () -> Unit,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ItemModalContent(
+        name = modal.name,
+        availableViews = modal.availableViews,
+        selectedViewIds = modal.selectedViewIds,
+        allViewsSelected = modal.allViewsSelected,
+        onNameChanged = onNameChanged,
+        onViewToggled = onViewToggled,
+        onToggleAll = onToggleAll,
+        onDiscard = onDiscard,
+        canSave = modal.canSave,
+        onDelete = onDelete,
+        onSave = onSave,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ItemModalContent(
+    name: String,
+    availableViews: List<eu.pascariu.shoppinglist.data.model.Shop>,
+    selectedViewIds: Set<Long>,
+    allViewsSelected: Boolean,
+    onNameChanged: (String) -> Unit,
+    onViewToggled: (Long) -> Unit,
+    onToggleAll: () -> Unit,
+    onDiscard: () -> Unit,
+    canSave: Boolean,
+    onDelete: (() -> Unit)?,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
@@ -46,8 +104,8 @@ fun AddItemModal(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         TextField(
-            value = modal.title,
-            onValueChange = onTitleChanged,
+            value = name,
+            onValueChange = onNameChanged,
             placeholder = {
                 Text(text = "Item name", style = typography.body, color = colors.contentMuted)
             },
@@ -76,7 +134,7 @@ fun AddItemModal(
                 color = colors.contentMuted,
             )
             Text(
-                text = if (modal.allViewsSelected) "Deselect all" else "Select all",
+                text = if (allViewsSelected) "Deselect all" else "Select all",
                 style = typography.label,
                 color = colors.ledOn,
                 modifier = Modifier
@@ -85,8 +143,8 @@ fun AddItemModal(
             )
         }
 
-        modal.availableViews.forEach { view ->
-            val selected = view.id in modal.selectedViewIds
+        availableViews.forEach { view ->
+            val selected = view.id in selectedViewIds
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -112,6 +170,16 @@ fun AddItemModal(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
         ) {
+            if (onDelete != null) {
+                Text(
+                    text = "Delete",
+                    style = typography.label,
+                    color = colors.danger,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) { onDelete() },
+                )
+            }
             Text(
                 text = "Discard",
                 style = typography.label,
@@ -123,12 +191,12 @@ fun AddItemModal(
             Text(
                 text = "Save",
                 style = typography.label,
-                color = if (modal.canSave) colors.ledOn else colors.ledOff,
+                color = if (canSave) colors.ledOn else colors.ledOff,
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .clickable(
                         role = Role.Button,
-                        enabled = modal.canSave,
+                        enabled = canSave,
                     ) { onSave() },
             )
         }

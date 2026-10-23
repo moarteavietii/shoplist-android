@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,11 +24,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
@@ -81,6 +85,10 @@ fun ListScreen(
     if (state.addItemModal != null) {
         lastAddItemModal = state.addItemModal
     }
+    var lastEditItemModal by remember { mutableStateOf<EditItemUiState?>(null) }
+    if (state.editItemModal != null) {
+        lastEditItemModal = state.editItemModal
+    }
     var lastShopModal by remember { mutableStateOf<ShopModalUiState?>(null) }
     if (state.shopModal != null) {
         lastShopModal = state.shopModal
@@ -115,6 +123,14 @@ fun ListScreen(
         viewModel.onAddItemDiscard()
     }
 
+    BackHandler(enabled = state.editItemModal != null) {
+        viewModel.onEditItemDiscard()
+    }
+
+    BackHandler(enabled = state.deleteConfirmItem != null) {
+        viewModel.onDeleteCancelled()
+    }
+
     BackHandler(enabled = state.shopModal != null) {
         viewModel.onShopDiscard()
     }
@@ -122,6 +138,8 @@ fun ListScreen(
     BackHandler(
         enabled = state.searchExpanded &&
             state.addItemModal == null &&
+            state.editItemModal == null &&
+            state.deleteConfirmItem == null &&
             state.shopModal == null,
     ) {
         viewModel.onSearchExpandedChanged(false)
@@ -181,6 +199,7 @@ fun ListScreen(
                                 hideChecked = state.hideChecked,
                                 dragEnabled = dragEnabled,
                                 isDragging = rowIsDragging,
+                                onLongPress = { viewModel.onItemLongPressed(item) },
                                 dragHandleModifier = Modifier.draggableHandle(
                                     onDragStarted = {
                                         draggingItemId = item.id
@@ -298,6 +317,15 @@ fun ListScreen(
             )
         }
 
+        if (state.editItemModal != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .pointerInput(Unit) { detectTapGestures { viewModel.onEditItemDiscard() } }
+                    .background(colors.background.copy(alpha = 0.6f)),
+            )
+        }
+
         AnimatedVisibility(
             visible = state.addItemModal != null,
             enter = fadeIn() + slideInVertically { it },
@@ -317,6 +345,36 @@ fun ListScreen(
                     modifier = Modifier.background(colors.surface, shapes.large),
                 )
             }
+        }
+
+        AnimatedVisibility(
+            visible = state.editItemModal != null,
+            enter = fadeIn() + slideInVertically { it },
+            exit = fadeOut() + slideOutVertically { it },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
+        ) {
+            lastEditItemModal?.let { modal ->
+                EditItemModal(
+                    modal = modal,
+                    onNameChanged = viewModel::onEditItemTitleChanged,
+                    onViewToggled = viewModel::onEditItemViewToggled,
+                    onToggleAll = viewModel::onEditItemToggleAllTapped,
+                    onSave = viewModel::onEditItemSave,
+                    onDiscard = viewModel::onEditItemDiscard,
+                    onDelete = viewModel::onEditItemDeleteTapped,
+                    modifier = Modifier.background(colors.surface, shapes.large),
+                )
+            }
+        }
+
+        if (state.deleteConfirmItem != null) {
+            DeleteItemConfirmDialog(
+                itemName = state.deleteConfirmItem?.name.orEmpty(),
+                onConfirm = viewModel::onDeleteConfirmed,
+                onCancel = viewModel::onDeleteCancelled,
+            )
         }
 
         if (state.shopModal != null || lastShopModal != null) {
@@ -409,3 +467,66 @@ private fun ExpandableSearchField(
 }
 
 private val SEARCH_DISMISS_THRESHOLD = 96.dp
+
+@Composable
+private fun DeleteItemConfirmDialog(
+    itemName: String,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val colors = LocalShoplistColors.current
+    val typography = LocalShoplistTypography.current
+    val shapes = LocalShoplistShapes.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background.copy(alpha = 0.6f))
+            .pointerInput(Unit) { detectTapGestures { onCancel() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 260.dp, max = 320.dp)
+                .verticalScroll(rememberScrollState())
+                .pointerInput(Unit) { detectTapGestures { } }
+                .background(colors.surface, shapes.medium)
+                .padding(20.dp),
+        ) {
+            Text(
+                text = "Delete \"$itemName\"?",
+                style = typography.title,
+                color = colors.content,
+            )
+            Text(
+                text = "This cannot be undone.",
+                style = typography.body,
+                color = colors.contentMuted,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Row(
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                Text(
+                    text = "Cancel",
+                    style = typography.label,
+                    color = colors.contentMuted,
+                    modifier = Modifier
+                        .clickable(role = Role.Button) { onCancel() }
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                )
+                Text(
+                    text = "Delete",
+                    style = typography.label,
+                    color = colors.danger,
+                    modifier = Modifier
+                        .clickable(role = Role.Button) { onConfirm() }
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                )
+            }
+        }
+    }
+}

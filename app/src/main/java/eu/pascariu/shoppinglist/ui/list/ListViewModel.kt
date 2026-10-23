@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
+import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
@@ -300,6 +301,113 @@ class ListViewModel @Inject constructor(
         localState.update { it.copy(addItemModal = null) }
     }
 
+    fun onItemLongPressed(item: Item) {
+        val shops = orderViewsGlobalFirst(shopsRepository.shops.value)
+        localState.update { state ->
+            state.copy(
+                editItemModal = EditItemUiState(
+                    itemId = item.id,
+                    originalName = item.name,
+                    name = item.name,
+                    availableViews = shops,
+                    selectedViewIds = item.visibleIn.toSet(),
+                ),
+            )
+        }
+    }
+
+    fun onEditItemTitleChanged(name: String) {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.copy(name = name))
+        }
+    }
+
+    fun onEditItemViewToggled(viewId: Long) {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.let { modal ->
+                val selected = modal.selectedViewIds.toMutableSet()
+                if (viewId in selected) selected.remove(viewId) else selected.add(viewId)
+                modal.copy(selectedViewIds = selected)
+            })
+        }
+    }
+
+    fun onEditItemToggleAllTapped() {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.let { modal ->
+                val selected = if (modal.allViewsSelected) {
+                    modal.availableViews.mapNotNull { view ->
+                        if (view.name == GLOBAL_VIEW_NAME) view.id else null
+                    }.toSet()
+                } else {
+                    modal.availableViews.map { it.id }.toSet()
+                }
+                modal.copy(selectedViewIds = selected)
+            })
+        }
+    }
+
+    fun onEditItemDiscard() {
+        localState.update { it.copy(editItemModal = null) }
+    }
+
+    fun onEditItemSave() {
+        val modal = localState.value.editItemModal ?: return
+        if (!modal.canSave) return
+        val snapshot = itemsRepository.items.value.firstOrNull { it.id == modal.itemId } ?: return
+        viewModelScope.launch {
+            try {
+                itemsRepository.update(
+                    itemId = modal.itemId,
+                    request = UpdateItemRequest(name = modal.name.trim()),
+                )
+                localState.update { it.copy(editItemModal = null, errorMessage = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                itemsRepository.applyUpdated(snapshot)
+                localState.update { state ->
+                    state.copy(
+                        editItemModal = null,
+                        errorMessage = "Couldn't rename the item",
+                    )
+                }
+            }
+        }
+    }
+
+    fun onEditItemDeleteTapped() {
+        val modal = localState.value.editItemModal ?: return
+        val item = itemsRepository.items.value.firstOrNull { it.id == modal.itemId } ?: return
+        localState.update { it.copy(editItemModal = null, deleteConfirmItem = item) }
+    }
+
+    fun onDeleteCancelled() {
+        localState.update { it.copy(deleteConfirmItem = null) }
+    }
+
+    fun onDeleteConfirmed() {
+        val item = localState.value.deleteConfirmItem ?: return
+        if (itemsRepository.items.value.none { it.id == item.id }) {
+            localState.update { it.copy(deleteConfirmItem = null) }
+            return
+        }
+        itemsRepository.applyDeleted(item.id)
+        viewModelScope.launch {
+            try {
+                itemsRepository.delete(item.id)
+                localState.update { it.copy(deleteConfirmItem = null, errorMessage = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                itemsRepository.applyCreated(item)
+                localState.update {
+                    it.copy(deleteConfirmItem = null, errorMessage = "Couldn't delete the item")
+                }
+            }
+        }
+    }
+
     fun consumePostSaveSignal() {
         localState.update { it.copy(postSaveSignal = null) }
     }
@@ -487,6 +595,7 @@ class ListViewModel @Inject constructor(
         val dragEnabled = local.sortModeEnabled &&
             local.sortOrder == SortOrder.MANUAL &&
             local.addItemModal == null &&
+            local.editItemModal == null &&
             local.shopModal == null &&
             local.searchQuery.isBlank()
         val activeName = when {
@@ -520,6 +629,8 @@ class ListViewModel @Inject constructor(
             showAddAffordance = query.isNotEmpty() && filtered.isEmpty(),
             showUndoBar = undoEntries.isNotEmpty(),
             addItemModal = local.addItemModal,
+            editItemModal = local.editItemModal,
+            deleteConfirmItem = local.deleteConfirmItem,
             shopModal = local.shopModal,
             postSaveSignal = local.postSaveSignal,
             errorMessage = local.errorMessage,
@@ -593,6 +704,8 @@ class ListViewModel @Inject constructor(
         val isWidgetStackExpanded: Boolean = false,
         val postSaveSignal: PostSaveSignal? = null,
         val addItemModal: AddItemUiState? = null,
+        val editItemModal: EditItemUiState? = null,
+        val deleteConfirmItem: Item? = null,
         val shopModal: ShopModalUiState? = null,
         val errorMessage: String? = null,
     )

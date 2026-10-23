@@ -569,6 +569,211 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `long press opens edit modal prefilled with item name and visibility`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        val modal = viewModel.uiState.value.editItemModal
+        assertNotNull(modal)
+        assertEquals(11L, modal?.itemId)
+        assertEquals("Bread", modal?.name)
+        assertEquals("Bread", modal?.originalName)
+        assertEquals(listOf("Global", "Auchan"), modal?.availableViews?.map { it.name })
+        assertEquals(setOf(1L), modal?.selectedViewIds)
+    }
+
+    @Test
+    fun `edit modal canSave is false for blank or unchanged name and true for changed name`() {
+        val base = EditItemUiState(
+            itemId = 11L,
+            originalName = "Bread",
+            name = "Bread",
+            availableViews = emptyList(),
+            selectedViewIds = setOf(1L),
+        )
+        assertFalse(base.canSave)
+        assertFalse(base.copy(name = "  ").canSave)
+        assertTrue(base.copy(name = "Toast").canSave)
+        assertTrue(base.isUnchanged)
+        assertFalse(base.copy(name = "Toast").isUnchanged)
+    }
+
+    @Test
+    fun `edit modal title change and view toggle update state`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        viewModel.onEditItemTitleChanged("Crackers")
+        awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
+
+        viewModel.onEditItemViewToggled(2L)
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L, 2L) }
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L) }
+
+        assertEquals("Crackers", viewModel.uiState.value.editItemModal?.name)
+        assertEquals(setOf(1L), viewModel.uiState.value.editItemModal?.selectedViewIds)
+    }
+
+    @Test
+    fun `edit modal discard closes without request`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        viewModel.onEditItemTitleChanged("Crackers")
+        awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
+
+        viewModel.onEditItemDiscard()
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+
+        assertEquals(2, server.requestCount)
+        assertEquals("Bread", viewModel.uiState.value.items.first { it.id == 11L }.name)
+    }
+
+    @Test
+    fun `edit modal save patches name and closes`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemTitleChanged("Crackers")
+        awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Crackers")),
+        )
+
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(recorded)
+        assertEquals("PATCH", recorded!!.method)
+        assertEquals("/api/items/11", recorded.path)
+        assertTrue(recorded.body.readUtf8().contains("\"name\":\"Crackers\""))
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+        assertEquals("Crackers", viewModel.uiState.value.items.first { it.id == 11L }.name)
+    }
+
+    @Test
+    fun `edit modal save with unchanged name does not patch`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        viewModel.onEditItemSave()
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+        assertNotNull(viewModel.uiState.value.editItemModal)
+    }
+
+    @Test
+    fun `edit modal save failure restores name and shows error`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemTitleChanged("Crackers")
+        awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+
+        assertEquals("Bread", viewModel.uiState.value.items.first { it.id == 11L }.name)
+        assertNotNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.uiState.value.editItemModal)
+    }
+
+    @Test
+    fun `drag disabled while edit modal open and restored after close`() = runTest(testDispatcher) {
+        loadFixtures()
+        awaitUntil { viewModel.uiState.value.dragEnabled }
+
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        assertFalse(viewModel.uiState.value.dragEnabled)
+
+        viewModel.onEditItemDiscard()
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+        assertTrue(viewModel.uiState.value.dragEnabled)
+    }
+
+    @Test
+    fun `delete tap closes edit modal and opens confirmation`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+
+        assertEquals(11L, viewModel.uiState.value.deleteConfirmItem?.id)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `delete confirm removes item optimistically and cancel makes no request`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+
+        server.enqueue(MockResponse().setResponseCode(204))
+        viewModel.onDeleteConfirmed()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem == null }
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(recorded)
+        assertEquals("DELETE", recorded!!.method)
+        assertEquals("/api/items/11", recorded.path)
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+    }
+
+    @Test
+    fun `delete cancel closes confirmation without request`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+
+        viewModel.onDeleteCancelled()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem == null }
+
+        assertEquals(2, server.requestCount)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `delete failure restores item and shows error`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        viewModel.onDeleteConfirmed()
+        awaitUntil { server.requestCount == 3 }
+        advanceUntilIdle()
+
+        assertEquals("Bread", viewModel.uiState.value.items.first { it.id == 11L }.name)
+        assertNotNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+    }
+
+    @Test
     fun `remote item updated event merges while optimistic check in flight`() = runTest(testDispatcher) {
         loadFixtures()
         server.enqueue(
