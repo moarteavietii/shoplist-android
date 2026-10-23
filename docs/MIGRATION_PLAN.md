@@ -110,14 +110,14 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `frontend-shops-management` | Roadmap 5 — views + widget stack | **done** — `views-shops-management` (archived 2026-10-22); Android spec: `shops-management` |
 | `shops-data-model` | Roadmap 2 — data layer | **done** — `data-layer-repositories` (archived 2026-10-22); Android spec: `data-layer` |
 | `frontend-widget-stack` | Roadmap 5 — views + widget stack | **done** — `widget-stack-persistence` (archived 2026-10-23); Android spec: `widget-stack` |
-| `frontend-sort-mode-toggle` | Roadmap 5 — views + widget stack | not started |
-| `frontend-sort-by-frequency` | Roadmap 5 — views + widget stack | not started |
-| `frontend-manual-sort-theme` | Roadmap 5 — views + widget stack | not started |
+| `frontend-sort-mode-toggle` | Roadmap 5 — views + widget stack | **done** — `sort-modes-drag-drop` (archived 2026-10-23); Android specs: `sort-modes`, `widget-stack` (Sort Mode control) |
+| `frontend-sort-by-frequency` | Roadmap 5 — views + widget stack | **done** — `sort-modes-drag-drop` (archived 2026-10-23); Android spec: `frequency-sort` |
+| `frontend-manual-sort-theme` | Roadmap 5 — views + widget stack | **done** — `sort-modes-drag-drop` (archived 2026-10-23); Android specs: `sort-modes`, `list-screen` (drag handle + ordering) |
 | `frontend-hide-checked-items` | Roadmap 5 — views + widget stack | **done** — `badges-search-restructure` (archived 2026-10-23); Android spec: `hide-checked-items` |
 | `frontend-shop-unchecked-indicator` | Roadmap 5 — views + widget stack | **done** — `badges-search-restructure` (archived 2026-10-23); Android spec: `shop-unchecked-indicator` |
 | `frontend-expandable-search` | Roadmap 5 — views + widget stack | **done** — `badges-search-restructure` (archived 2026-10-23); Android spec: `expandable-search` |
 | `frontend-fuzzy-search` | Roadmap 5 — views + widget stack | **done** — matcher reused from `list-screen-mvp`; restructure in `badges-search-restructure` (archived 2026-10-23); Android spec: `expandable-search` (fuzzy filtering) |
-| `frontend-drag-drop` | Roadmap 5 — views + widget stack | not started |
+| `frontend-drag-drop` | Roadmap 5 — views + widget stack | **done** — `sort-modes-drag-drop` (archived 2026-10-23); Android spec: `drag-drop-reorder` |
 | `frontend-view-visibility` | Roadmap 6 — feature parity | not started |
 | `frontend-item-deletion` | Roadmap 6 — feature parity | not started |
 | `frontend-item-quantity` | Roadmap 6 — feature parity | not started |
