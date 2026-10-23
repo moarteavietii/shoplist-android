@@ -16,6 +16,7 @@ import eu.pascariu.shoppinglist.data.undo.UndoEntry
 import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStackControl
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
+import eu.pascariu.shoppinglist.domain.search.GLOBAL_VIEW_NAME
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
 import eu.pascariu.shoppinglist.domain.order.dropKeyForIndex
 import eu.pascariu.shoppinglist.domain.order.manualOrderComparator
@@ -595,7 +596,6 @@ class ListViewModel @Inject constructor(
     )
 
     private companion object {
-        const val GLOBAL_VIEW_NAME = "Global"
         const val GLOBAL_PLACEHOLDER_ID = -1L
     }
 }
