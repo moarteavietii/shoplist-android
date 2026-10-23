@@ -89,6 +89,10 @@ fun ListScreen(
     if (state.editItemModal != null) {
         lastEditItemModal = state.editItemModal
     }
+    var lastDeleteConfirmItem by remember { mutableStateOf<Item?>(null) }
+    if (state.deleteConfirmItem != null) {
+        lastDeleteConfirmItem = state.deleteConfirmItem
+    }
     var lastShopModal by remember { mutableStateOf<ShopModalUiState?>(null) }
     if (state.shopModal != null) {
         lastShopModal = state.shopModal
@@ -317,13 +321,19 @@ fun ListScreen(
             )
         }
 
-        if (state.editItemModal != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .pointerInput(Unit) { detectTapGestures { viewModel.onEditItemDiscard() } }
-                    .background(colors.background.copy(alpha = 0.6f)),
-            )
+        if (state.editItemModal != null || lastEditItemModal != null) {
+            AnimatedVisibility(
+                visible = state.editItemModal != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .pointerInput(Unit) { detectTapGestures { viewModel.onEditItemDiscard() } }
+                        .background(colors.background.copy(alpha = 0.6f)),
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -369,12 +379,20 @@ fun ListScreen(
             }
         }
 
-        if (state.deleteConfirmItem != null) {
-            DeleteItemConfirmDialog(
-                itemName = state.deleteConfirmItem?.name.orEmpty(),
-                onConfirm = viewModel::onDeleteConfirmed,
-                onCancel = viewModel::onDeleteCancelled,
-            )
+        if (state.deleteConfirmItem != null || lastDeleteConfirmItem != null) {
+            AnimatedVisibility(
+                visible = state.deleteConfirmItem != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                lastDeleteConfirmItem?.let { item ->
+                    DeleteItemConfirmDialog(
+                        itemName = item.name,
+                        onConfirm = viewModel::onDeleteConfirmed,
+                        onCancel = viewModel::onDeleteCancelled,
+                    )
+                }
+            }
         }
 
         if (state.shopModal != null || lastShopModal != null) {
