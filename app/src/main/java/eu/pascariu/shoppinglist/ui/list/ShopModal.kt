@@ -1,11 +1,6 @@
 package eu.pascariu.shoppinglist.ui.list
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -57,61 +52,55 @@ fun ShopModal(
             .pointerInput(Unit) { detectTapGestures { onDiscard() } },
         contentAlignment = Alignment.Center,
     ) {
-        AnimatedVisibility(
-            visible = true,
-            enter = scaleIn(initialScale = 0.92f) + fadeIn(),
-            exit = scaleOut(targetScale = 0.92f) + fadeOut(),
+        Column(
+            modifier = modifier
+                .widthIn(min = 280.dp, max = 360.dp)
+                .verticalScroll(rememberScrollState())
+                .pointerInput(Unit) { detectTapGestures { } }
+                .background(colors.surface, shapes.large)
+                .padding(24.dp),
         ) {
-            Column(
-                modifier = modifier
-                    .widthIn(min = 280.dp, max = 360.dp)
-                    .verticalScroll(rememberScrollState())
-                    .pointerInput(Unit) { detectTapGestures { } }
-                    .background(colors.surface, shapes.large)
-                    .padding(24.dp),
-            ) {
-                UnderlinedNameInput(
-                    name = modal.name,
-                    onNameChanged = onNameChanged,
-                    enabled = !modal.saving,
+            UnderlinedNameInput(
+                name = modal.name,
+                onNameChanged = onNameChanged,
+                enabled = !modal.saving,
+            )
+
+            modal.error?.let { error ->
+                Text(
+                    text = error,
+                    style = typography.label,
+                    color = colors.danger,
+                    modifier = Modifier.padding(top = 12.dp),
                 )
+            }
 
-                modal.error?.let { error ->
-                    Text(
-                        text = error,
-                        style = typography.label,
+            Row(
+                modifier = Modifier
+                    .padding(top = 24.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                if (modal.mode == ShopModalMode.EDIT) {
+                    ModalAction(
+                        label = "Delete",
                         color = colors.danger,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .padding(top = 24.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    if (modal.mode == ShopModalMode.EDIT) {
-                        ModalAction(
-                            label = "Delete",
-                            color = colors.danger,
-                            enabled = !modal.saving,
-                            onClick = onDeleteTapped,
-                        )
-                    }
-                    ModalAction(
-                        label = modal.secondaryLabel,
-                        color = colors.contentMuted,
                         enabled = !modal.saving,
-                        onClick = onDiscard,
-                    )
-                    ModalAction(
-                        label = "Save",
-                        color = colors.ledOn,
-                        enabled = modal.canSave,
-                        onClick = onSave,
+                        onClick = onDeleteTapped,
                     )
                 }
+                ModalAction(
+                    label = modal.secondaryLabel,
+                    color = colors.contentMuted,
+                    enabled = !modal.saving,
+                    onClick = onDiscard,
+                )
+                ModalAction(
+                    label = "Save",
+                    color = colors.ledOn,
+                    enabled = modal.canSave,
+                    onClick = onSave,
+                )
             }
         }
     }
