@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -82,7 +83,7 @@ fun EditItemModal(
 @Composable
 private fun ItemModalContent(
     name: String,
-    availableViews: List<eu.pascariu.shoppinglist.data.model.Shop>,
+    availableViews: List<Shop>,
     selectedViewIds: Set<Long>,
     allViewsSelected: Boolean,
     onNameChanged: (String) -> Unit,
