@@ -39,6 +39,7 @@ class ListPreferencesDataSourceTest {
             dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
                 File(tmpFolder.root, "list_prefs_test.preferences_pb")
             },
+            storeScope = storeScope,
             ioDispatcher = storeDispatcher,
         )
     }
@@ -200,12 +201,12 @@ class ListPreferencesDataSourceTest {
 
             storeScope.cancel()
 
+            val restartedScope = CoroutineScope(StandardTestDispatcher(testDispatcher.scheduler) + Job())
             val restarted = ListPreferencesDataSource(
-                dataStore = PreferenceDataStoreFactory.create(
-                    scope = CoroutineScope(StandardTestDispatcher(testDispatcher.scheduler) + Job())
-                ) {
+                dataStore = PreferenceDataStoreFactory.create(scope = restartedScope) {
                     File(tmpFolder.root, "list_prefs_test.preferences_pb")
                 },
+                storeScope = restartedScope,
                 ioDispatcher = StandardTestDispatcher(testDispatcher.scheduler),
             )
             advanceUntilIdle()
@@ -226,6 +227,7 @@ class ListPreferencesDataSourceTest {
             val failingScope = CoroutineScope(StandardTestDispatcher(testDispatcher.scheduler) + Job())
             val failing = ListPreferencesDataSource(
                 dataStore = PreferenceDataStoreFactory.create(scope = failingScope) { unreadableFile },
+                storeScope = failingScope,
                 ioDispatcher = StandardTestDispatcher(testDispatcher.scheduler),
             )
             advanceUntilIdle()
