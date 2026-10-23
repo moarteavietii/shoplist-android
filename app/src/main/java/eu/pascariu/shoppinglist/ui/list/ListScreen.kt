@@ -56,8 +56,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
@@ -88,10 +92,6 @@ fun ListScreen(
     var lastEditItemModal by remember { mutableStateOf<EditItemUiState?>(null) }
     if (state.editItemModal != null) {
         lastEditItemModal = state.editItemModal
-    }
-    var lastDeleteConfirmItem by remember { mutableStateOf<Item?>(null) }
-    if (state.deleteConfirmItem != null) {
-        lastDeleteConfirmItem = state.deleteConfirmItem
     }
     var lastShopModal by remember { mutableStateOf<ShopModalUiState?>(null) }
     if (state.shopModal != null) {
@@ -379,20 +379,12 @@ fun ListScreen(
             }
         }
 
-        if (state.deleteConfirmItem != null || lastDeleteConfirmItem != null) {
-            AnimatedVisibility(
-                visible = state.deleteConfirmItem != null,
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                lastDeleteConfirmItem?.let { item ->
-                    DeleteItemConfirmDialog(
-                        itemName = item.name,
-                        onConfirm = viewModel::onDeleteConfirmed,
-                        onCancel = viewModel::onDeleteCancelled,
-                    )
-                }
-            }
+        state.deleteConfirmItem?.let { item ->
+            DeleteItemConfirmDialog(
+                itemName = item.name,
+                onConfirm = viewModel::onDeleteConfirmed,
+                onCancel = viewModel::onDeleteCancelled,
+            )
         }
 
         if (state.shopModal != null || lastShopModal != null) {
@@ -496,54 +488,63 @@ private fun DeleteItemConfirmDialog(
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background.copy(alpha = 0.6f))
-            .pointerInput(Unit) { detectTapGestures { onCancel() } },
-        contentAlignment = Alignment.Center,
+    Dialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .widthIn(min = 260.dp, max = 320.dp)
-                .verticalScroll(rememberScrollState())
-                .pointerInput(Unit) { detectTapGestures { } }
-                .background(colors.surface, shapes.medium)
-                .padding(20.dp),
+                .fillMaxSize()
+                .background(colors.background.copy(alpha = 0.6f))
+                .pointerInput(Unit) { detectTapGestures { onCancel() } },
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "Delete \"$itemName\"?",
-                style = typography.title,
-                color = colors.content,
-            )
-            Text(
-                text = "This cannot be undone.",
-                style = typography.body,
-                color = colors.contentMuted,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Row(
+            Column(
                 modifier = Modifier
-                    .padding(top = 20.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .widthIn(min = 260.dp, max = 320.dp)
+                    .verticalScroll(rememberScrollState())
+                    .pointerInput(Unit) { detectTapGestures { } }
+                    .background(colors.surface, shapes.medium)
+                    .padding(20.dp)
+                    .semantics { paneTitle = "Delete item confirmation" },
             ) {
                 Text(
-                    text = "Cancel",
-                    style = typography.label,
-                    color = colors.contentMuted,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clickable(role = Role.Button) { onCancel() },
+                    text = "Delete \"$itemName\"?",
+                    style = typography.title,
+                    color = colors.content,
                 )
                 Text(
-                    text = "Delete",
-                    style = typography.label,
-                    color = colors.danger,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clickable(role = Role.Button) { onConfirm() },
+                    text = "This cannot be undone.",
+                    style = typography.body,
+                    color = colors.contentMuted,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
+                Row(
+                    modifier = Modifier
+                        .padding(top = 20.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    Text(
+                        text = "Cancel",
+                        style = typography.label,
+                        color = colors.contentMuted,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clickable(role = Role.Button) { onCancel() },
+                    )
+                    Text(
+                        text = "Delete",
+                        style = typography.label,
+                        color = colors.danger,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .clickable(role = Role.Button) { onConfirm() },
+                    )
+                }
             }
         }
     }
