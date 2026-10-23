@@ -17,6 +17,7 @@ data class ListUiState(
     val uncheckedCountByShop: Map<Long, Int> = emptyMap(),
     val drawerShops: List<DrawerShop> = emptyList(),
     val drawerOpen: Boolean = false,
+    val settingsDrawerOpen: Boolean = false,
     val searchQuery: String = "",
     val searchExpanded: Boolean = false,
     val showChecked: Boolean = true,

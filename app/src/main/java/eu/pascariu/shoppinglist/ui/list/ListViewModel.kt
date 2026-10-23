@@ -9,6 +9,7 @@ import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import eu.pascariu.shoppinglist.data.model.isExpiredAt
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
 import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
@@ -51,6 +52,7 @@ class ListViewModel @Inject constructor(
     private val shopsRepository: ShopsRepository,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
+    private val themeRepository: ThemeRepository,
     private val realtimeSyncManager: RealtimeSyncManagerContract,
     @ExpiryTicker expiryTicker: StateFlow<Long>,
 ) : ViewModel() {
@@ -105,7 +107,7 @@ class ListViewModel @Inject constructor(
         }
         viewModelScope.launch {
             realtimeSyncManager.changeToastLabels.collect { labelBatch ->
-                val enabled = listPreferences.changeToastsEnabled.value
+                val enabled = themeRepository.changeToastsEnabled.value
                 if (!enabled) {
                     pendingToastTexts.clear()
                     return@collect
@@ -569,11 +571,19 @@ class ListViewModel @Inject constructor(
     fun onWidgetStackControlTapped(control: WidgetStackControl) {
         when (control) {
             WidgetStackControl.VIEW_SWITCHER -> onDrawerToggled()
-            WidgetStackControl.SETTINGS -> Unit
+            WidgetStackControl.SETTINGS -> onSettingsDrawerToggled()
             WidgetStackControl.SORT_MODE -> onSortModeToggled()
             WidgetStackControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
             WidgetStackControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
         }
+    }
+
+    fun onSettingsDrawerToggled() {
+        localState.update { it.copy(settingsDrawerOpen = !it.settingsDrawerOpen) }
+    }
+
+    fun onSettingsDrawerDismissed() {
+        localState.update { it.copy(settingsDrawerOpen = false) }
     }
 
     fun onDrawerToggled() {
@@ -747,6 +757,7 @@ class ListViewModel @Inject constructor(
             uncheckedCountByShop = uncheckedCounts,
             drawerShops = drawerShops,
             drawerOpen = local.drawerOpen,
+            settingsDrawerOpen = local.settingsDrawerOpen,
             searchQuery = local.searchQuery,
             searchExpanded = local.searchExpanded,
             showChecked = local.showChecked,
@@ -827,6 +838,7 @@ class ListViewModel @Inject constructor(
         val sortOrder: SortOrder = SortOrder.MANUAL,
         val activeViewId: Long? = null,
         val drawerOpen: Boolean = false,
+        val settingsDrawerOpen: Boolean = false,
         val isWidgetStackExpanded: Boolean = false,
         val postSaveSignal: PostSaveSignal? = null,
         val addItemModal: AddItemUiState? = null,

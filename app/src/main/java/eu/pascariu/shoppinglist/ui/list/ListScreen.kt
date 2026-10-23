@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -67,6 +65,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
 import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
+import eu.pascariu.shoppinglist.ui.settings.SettingsDrawer
+import eu.pascariu.shoppinglist.ui.settings.SettingsViewModel
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -77,9 +77,12 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun ListScreen(
     viewModel: ListViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val changeToast by viewModel.changeToast.collectAsStateWithLifecycle()
+    val settingsTheme by settingsViewModel.theme.collectAsStateWithLifecycle()
+    val settingsChangeToasts by settingsViewModel.changeToastsEnabled.collectAsStateWithLifecycle()
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
@@ -313,6 +316,16 @@ fun ListScreen(
             modifier = Modifier.matchParentSize(),
         )
 
+        SettingsDrawer(
+            visible = state.settingsDrawerOpen,
+            activeThemeId = settingsTheme,
+            changeToastsEnabled = settingsChangeToasts,
+            onThemeSelected = settingsViewModel::onThemeSelected,
+            onChangeToastsToggled = settingsViewModel::onChangeToastsToggled,
+            onDismiss = viewModel::onSettingsDrawerDismissed,
+            modifier = Modifier.matchParentSize(),
+        )
+
         ChangeToastOverlay(
             toast = changeToast,
             onDismissed = viewModel::onToastSwipedDismissed,
@@ -347,9 +360,7 @@ fun ListScreen(
             visible = state.addItemModal != null,
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             lastAddItemModal?.let { modal ->
                 AddItemModal(
@@ -370,9 +381,7 @@ fun ListScreen(
             visible = state.editItemModal != null,
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             lastEditItemModal?.let { modal ->
                 EditItemModal(
@@ -471,7 +480,6 @@ private fun ExpandableSearchField(
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
-            .imePadding()
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { dragTotal = 0f },

@@ -1,10 +1,13 @@
 package eu.pascariu.shoppinglist.ui.list
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.ChangeToastLabel
 import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
@@ -62,6 +65,8 @@ class ListViewModelTest {
     private lateinit var shopsRepository: ShopsRepository
     private lateinit var undoHistoryStore: UndoHistoryStore
     private lateinit var listPreferences: ListPreferencesDataSource
+    private lateinit var listPreferencesDataStore: DataStore<Preferences>
+    private lateinit var themeRepository: ThemeRepository
     private lateinit var expiryTick: MutableStateFlow<Long>
     private lateinit var fakeSyncManager: FakeRealtimeSyncManager
     private lateinit var viewModel: ListViewModel
@@ -91,10 +96,16 @@ class ListViewModelTest {
             pruneInterval = java.time.Duration.ofHours(1),
             clock = System::currentTimeMillis,
         )
+        listPreferencesDataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
+            java.io.File(tmpFolder.root, "list_prefs_viewmodel_test.preferences_pb")
+        }
         listPreferences = ListPreferencesDataSource(
-            dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
-                java.io.File(tmpFolder.root, "list_prefs_viewmodel_test.preferences_pb")
-            },
+            dataStore = listPreferencesDataStore,
+            storeScope = storeScope,
+            ioDispatcher = testDispatcher,
+        )
+        themeRepository = ThemeRepository(
+            dataStore = listPreferencesDataStore,
             storeScope = storeScope,
             ioDispatcher = testDispatcher,
         )
@@ -105,6 +116,7 @@ class ListViewModelTest {
             shopsRepository = shopsRepository,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
+            themeRepository = themeRepository,
             realtimeSyncManager = fakeSyncManager,
             expiryTicker = expiryTick,
         )
@@ -1368,6 +1380,7 @@ class ListViewModelTest {
             shopsRepository = shopsRepository,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
+            themeRepository = themeRepository,
             realtimeSyncManager = fakeSyncManager,
             expiryTicker = expiryTick,
         )
@@ -2101,7 +2114,7 @@ class ListViewModelTest {
     fun `disabled preference suppresses toast display`() = runTest(testDispatcher) {
         loadFixtures()
 
-        listPreferences.setChangeToastsEnabled(false)
+        themeRepository.setChangeToastsEnabled(false)
         advanceUntilIdle()
 
         fakeSyncManager.emit(listOf("checked: Milk"))
@@ -2114,13 +2127,13 @@ class ListViewModelTest {
     fun `re-enabling the preference resumes toast display`() = runTest(testDispatcher) {
         loadFixtures()
 
-        listPreferences.setChangeToastsEnabled(false)
+        themeRepository.setChangeToastsEnabled(false)
         advanceUntilIdle()
         fakeSyncManager.emit(listOf("checked: Milk"))
         runCurrent()
         assertNull(viewModel.changeToast.value)
 
-        listPreferences.setChangeToastsEnabled(true)
+        themeRepository.setChangeToastsEnabled(true)
         advanceUntilIdle()
         fakeSyncManager.emit(listOf("new item: Bread"))
         runCurrent()
