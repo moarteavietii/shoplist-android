@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -70,6 +71,6 @@ class SettingsViewModelTest {
         viewModel.onChangeToastsToggled(false)
         advanceUntilIdle()
 
-        assertEquals(false, viewModel.changeToastsEnabled.value)
+        assertFalse(viewModel.changeToastsEnabled.value)
     }
 }

@@ -13,7 +13,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.TestScope
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -51,35 +50,31 @@ class ThemeRepositoryTest {
         storeScope.cancel()
     }
 
-    private suspend fun TestScope.settle() {
-        advanceUntilIdle()
-    }
-
     @Test
     fun `theme defaults to DEFAULT`() = runTest(testDispatcher) {
-        settle()
+        advanceUntilIdle()
 
         assertEquals(ThemeId.DEFAULT, repository.theme.value)
     }
 
     @Test
     fun `selection persists through storage`() = runTest(testDispatcher) {
-        settle()
+        advanceUntilIdle()
 
         repository.setTheme(ThemeId.MINT)
-        settle()
+        advanceUntilIdle()
 
         assertEquals(ThemeId.MINT, repository.theme.value)
     }
 
     @Test
     fun `selection can be reset to DEFAULT`() = runTest(testDispatcher) {
-        settle()
+        advanceUntilIdle()
 
         repository.setTheme(ThemeId.OCEAN)
-        settle()
+        advanceUntilIdle()
         repository.setTheme(ThemeId.DEFAULT)
-        settle()
+        advanceUntilIdle()
 
         assertEquals(ThemeId.DEFAULT, repository.theme.value)
     }
@@ -92,7 +87,7 @@ class ThemeRepositoryTest {
             storeScope = storeScope,
             ioDispatcher = StandardTestDispatcher(testDispatcher.scheduler),
         )
-        settle()
+        advanceUntilIdle()
 
         assertEquals(ThemeId.DEFAULT, lateRepository.theme.value)
     }
