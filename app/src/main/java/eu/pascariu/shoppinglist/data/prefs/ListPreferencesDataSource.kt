@@ -9,9 +9,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import eu.pascariu.shoppinglist.di.IoDispatcher
+import eu.pascariu.shoppinglist.di.ApplicationScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,10 +21,8 @@ import kotlinx.coroutines.flow.onEach
 
 class ListPreferencesDataSource(
     private val dataStore: DataStore<Preferences>,
-    ioDispatcher: CoroutineDispatcher,
+    @ApplicationScope private val externalScope: CoroutineScope,
 ) {
-
-    private val scope = kotlinx.coroutines.CoroutineScope(ioDispatcher + kotlinx.coroutines.SupervisorJob())
 
     private val expanded = MutableStateFlow(false)
     val widgetStackExpanded: StateFlow<Boolean> = expanded.asStateFlow()
@@ -62,7 +60,7 @@ class ListPreferencesDataSource(
                 sortOrderFlow.value = prefs[KEY_SORT_ORDER]?.let(SortOrder::fromName) ?: SortOrder.MANUAL
                 ready.value = true
             }
-            .launchIn(scope)
+            .launchIn(externalScope)
     }
 
     suspend fun setWidgetStackExpanded(isExpanded: Boolean) {
