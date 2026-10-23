@@ -29,28 +29,28 @@ The shopping list UI SHALL render a view-switcher icon in the widget stack that 
 - **WHEN** the drawer is open
 - **THEN** the view-switcher icon in the widget stack is rendered in an active color
 
-### Requirement: The drawer lists all available shops
-The view drawer SHALL list every shop returned by `GET /api/shops`, ordered with the Global shop first and all other shops in alphabetical order. Each shop row SHALL additionally render a small, partially transparent hollow-circle indicator when the shop has at least one unchecked item visible in it (the shop's id is in the item's `visibleIn` set), and SHALL NOT render the indicator when the shop's visible items are all checked or the shop has no items. The Global shop SHALL participate in the indicator like any other shop.
+### Requirement: The drawer lists all available shops with unchecked-count badges
+The view drawer SHALL list every shop returned by `GET /api/shops`, ordered with the Global shop first and all other shops in alphabetical order. Each shop row SHALL render a trailing count badge: an accent pill with the count of unchecked items visible in that shop (the shop's id is in the item's `visibleIn` set), or a muted non-accent "0" with no pill when the shop's visible items are all checked or the shop has no items. The Global shop SHALL count all items. This replaces the previous hollow-circle indicator.
 
-#### Scenario: Drawer shows all shops
+#### Scenario: Drawer shows all shops with counts
 - **WHEN** the drawer opens and the backend returns shops named "Carrefour", "Auchan", and "Global"
-- **THEN** the drawer shows "Global", "Auchan", and "Carrefour" in that order
+- **THEN** the drawer shows "Global", "Auchan", and "Carrefour" in that order, each with its trailing unchecked count
 
 #### Scenario: Global is included even if absent from fetched shops
 - **WHEN** the drawer opens and the backend does not return a Global shop
 - **THEN** "Global" is still shown as the first option and is treated as a placeholder until the real Global shop loads
 
-#### Scenario: Shop with unchecked items shows the indicator
-- **WHEN** the drawer renders and "Carrefour" has at least one item in its `visibleIn` set with `isChecked` false
-- **THEN** a hollow-circle indicator appears next to the "Carrefour" row
+#### Scenario: Shop with unchecked items shows its count
+- **WHEN** the drawer renders and "Carrefour" has 3 unchecked items in its `visibleIn` set
+- **THEN** the Carrefour row shows an accent pill badge reading "3"
 
-#### Scenario: Fully checked shop shows no indicator
-- **WHEN** the drawer renders and every item visible in "Carrefour" has `isChecked` true
-- **THEN** the "Carrefour" row shows no indicator
+#### Scenario: Fully checked shop shows muted zero
+- **WHEN** every item visible in "Carrefour" has `isChecked` true
+- **THEN** the "Carrefour" row shows a muted non-accent "0" with no pill
 
-#### Scenario: Empty shop shows no indicator
-- **WHEN** the drawer renders and no item includes "Lidl" in its `visibleIn` set
-- **THEN** the "Lidl" row shows no indicator
+#### Scenario: Empty shop shows muted zero
+- **WHEN** no item includes "Lidl" in its `visibleIn` set
+- **THEN** the "Lidl" row shows a muted non-accent "0" with no pill
 
 ### Requirement: Selecting a shop changes the active shop and closes the drawer
 The view drawer SHALL keep shop selection and management gestures distinct. Tapping the shop name or row body SHALL set it as the active shop and close the drawer. Tapping the row's edit icon SHALL open the shop edit modal without changing the active shop or closing the drawer.
