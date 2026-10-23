@@ -84,7 +84,7 @@ class ListViewModelTest {
             dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
                 java.io.File(tmpFolder.root, "list_prefs_viewmodel_test.preferences_pb")
             },
-            ioDispatcher = testDispatcher,
+            externalScope = storeScope,
         )
         viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
     }
