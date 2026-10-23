@@ -185,7 +185,7 @@ fun ListScreen(
                                 dragHandleModifier = Modifier.draggableHandle(
                                     onDragStarted = {
                                         draggingItemId = item.id
-                                        dragOrder = state.filteredItems
+                                        dragOrder = state.items
                                     },
                                     onDragStopped = {
                                         val dropIndex = dragOrder.indexOfFirst { it.id == item.id }
