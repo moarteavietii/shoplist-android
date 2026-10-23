@@ -313,6 +313,7 @@ class ListViewModel @Inject constructor(
                     name = item.name,
                     availableViews = shops,
                     selectedViewIds = item.visibleIn.toSet(),
+                    originalVisibleIn = item.visibleIn.toSet(),
                 ),
             )
         }
@@ -363,7 +364,10 @@ class ListViewModel @Inject constructor(
             try {
                 itemsRepository.update(
                     itemId = modal.itemId,
-                    request = UpdateItemRequest(name = modal.name.trim()),
+                    request = UpdateItemRequest(
+                        name = modal.name.trim(),
+                        visibleIn = modal.selectedViewIds.toList(),
+                    ),
                 )
                 localState.update { it.copy(editItemModal = null, errorMessage = null) }
             } catch (e: CancellationException) {
@@ -373,7 +377,7 @@ class ListViewModel @Inject constructor(
                 localState.update { state ->
                     state.copy(
                         editItemModal = null,
-                        errorMessage = "Couldn't rename the item",
+                        errorMessage = "Couldn't save the item",
                     )
                 }
             } finally {

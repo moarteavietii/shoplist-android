@@ -48,9 +48,10 @@ data class EditItemUiState(
     val name: String,
     val availableViews: List<Shop>,
     val selectedViewIds: Set<Long>,
+    val originalVisibleIn: Set<Long> = selectedViewIds,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
-    val isUnchanged: Boolean get() = name.trim() == originalName.trim()
+    val isUnchanged: Boolean get() = name.trim() == originalName.trim() && selectedViewIds == originalVisibleIn
     val canSave: Boolean get() = name.isNotBlank() && !isUnchanged
 }
 

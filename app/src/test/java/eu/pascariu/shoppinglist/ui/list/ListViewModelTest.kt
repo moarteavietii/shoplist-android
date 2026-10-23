@@ -634,6 +634,9 @@ class ListViewModelTest {
         assertFalse(base.copy(name = "Toast").isUnchanged)
         assertTrue(base.allViewsSelected)
         assertTrue(base.copy(selectedViewIds = emptySet()).allViewsSelected)
+        assertTrue(base.copy(selectedViewIds = setOf(1L, 2L)).canSave)
+        assertFalse(base.copy(selectedViewIds = setOf(1L, 2L)).isUnchanged)
+        assertFalse(base.copy(selectedViewIds = setOf(1L, 2L), originalVisibleIn = setOf(1L, 2L)).canSave)
     }
 
     @Test
@@ -713,6 +716,33 @@ class ListViewModelTest {
 
         assertEquals(2, server.requestCount)
         assertNotNull(viewModel.uiState.value.editItemModal)
+    }
+
+    @Test
+    fun `edit modal save with only visibility change patches visibleIn and closes`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemViewToggled(2L)
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L, 2L) }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread", visibleIn = "[1, 2]")),
+        )
+
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(recorded)
+        assertEquals("PATCH", recorded!!.method)
+        assertEquals("/api/items/11", recorded.path)
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"name\":\"Bread\""))
+        assertTrue(body.contains("\"visibleIn\":[1,2]"))
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+        assertEquals(listOf(1L, 2L), viewModel.uiState.value.items.first { it.id == 11L }.visibleIn)
     }
 
     @Test
