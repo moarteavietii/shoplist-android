@@ -51,6 +51,30 @@ class ItemsRepository @Inject constructor(
         return updated
     }
 
+    suspend fun updateDetails(itemId: Long, request: UpdateItemRequest): Item {
+        val previous = cache.value.firstOrNull { it.id == itemId }
+            ?: throw IllegalArgumentException("item $itemId not cached")
+        val optimistic = previous.copy(
+            name = request.name ?: previous.name,
+            visibleIn = request.visibleIn ?: previous.visibleIn,
+        )
+        cache.update { current -> current.map { if (it.id == itemId) optimistic else it } }
+        try {
+            val updated = itemsApi.updateItem(itemId, request)
+            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            return updated
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            cache.update { current ->
+                current.map { item ->
+                    if (item.id == itemId && item == optimistic) previous else item
+                }
+            }
+            throw error
+        }
+    }
+
     suspend fun delete(itemId: Long) {
         val response = itemsApi.deleteItem(itemId)
         if (!response.isSuccessful) throw HttpException(response)
@@ -116,6 +140,18 @@ class ItemsRepository @Inject constructor(
         if (item.listId != cachedListId.value) return
         cache.update { current ->
             if (current.any { it.id == item.id }) current else current + item
+        }
+    }
+
+    fun applyRestored(item: Item, previousIndex: Int) {
+        if (item.listId != cachedListId.value) return
+        cache.update { current ->
+            if (current.any { it.id == item.id }) {
+                current
+            } else {
+                val index = previousIndex.coerceIn(0, current.size)
+                current.toMutableList().apply { add(index, item) }
+            }
         }
     }
 

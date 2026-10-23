@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import eu.pascariu.shoppinglist.data.model.Item
@@ -46,6 +50,7 @@ fun ItemRow(
     dragEnabled: Boolean = false,
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
+    onLongPress: (() -> Unit)? = null,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
@@ -84,10 +89,14 @@ fun ItemRow(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .toggleable(
-                        value = item.isChecked,
+                    .semantics {
+                        toggleableState =
+                            if (item.isChecked) ToggleableState.On else ToggleableState.Off
+                    }
+                    .combinedClickable(
+                        onClick = { onCheckToggled(item) },
+                        onLongClick = onLongPress,
                         role = Role.Checkbox,
-                        onValueChange = { onCheckToggled(item) },
                     )
                     .padding(horizontal = if (dragEnabled) 0.dp else 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,

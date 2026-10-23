@@ -23,7 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -184,39 +188,48 @@ private fun DeleteShopConfirmDialog(
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background.copy(alpha = 0.6f))
-            .pointerInput(Unit) { detectTapGestures { onCancel() } },
-        contentAlignment = Alignment.Center,
+    Dialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .widthIn(min = 260.dp, max = 320.dp)
-                .pointerInput(Unit) { detectTapGestures { } }
-                .background(colors.surface, shapes.medium)
-                .padding(20.dp),
+                .fillMaxSize()
+                .background(colors.background.copy(alpha = 0.6f))
+                .pointerInput(Unit) { detectTapGestures { onCancel() } },
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "Delete \"$shopName\"?",
-                style = typography.title,
-                color = colors.content,
-            )
-            Text(
-                text = "This cannot be undone.",
-                style = typography.body,
-                color = colors.contentMuted,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Row(
+            Column(
                 modifier = Modifier
-                    .padding(top = 20.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .widthIn(min = 260.dp, max = 320.dp)
+                    .pointerInput(Unit) { detectTapGestures { } }
+                    .background(colors.surface, shapes.medium)
+                    .padding(20.dp)
+                    .semantics { paneTitle = "Delete shop confirmation" },
             ) {
-                ModalAction(label = "Cancel", color = colors.contentMuted, enabled = true, onClick = onCancel)
-                ModalAction(label = "Delete", color = colors.danger, enabled = true, onClick = onConfirm)
+                Text(
+                    text = "Delete \"$shopName\"?",
+                    style = typography.title,
+                    color = colors.content,
+                )
+                Text(
+                    text = "This cannot be undone.",
+                    style = typography.body,
+                    color = colors.contentMuted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .padding(top = 20.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    ModalAction(label = "Cancel", color = colors.contentMuted, enabled = true, onClick = onCancel)
+                    ModalAction(label = "Delete", color = colors.danger, enabled = true, onClick = onConfirm)
+                }
             }
         }
     }
