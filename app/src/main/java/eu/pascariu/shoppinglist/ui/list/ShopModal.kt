@@ -66,7 +66,7 @@ fun ShopModal(
                 modifier = modifier
                     .widthIn(min = 280.dp, max = 360.dp)
                     .verticalScroll(rememberScrollState())
-                    .clickable(enabled = false) {}
+                    .pointerInput(Unit) { detectTapGestures { } }
                     .background(colors.surface, shapes.large)
                     .padding(24.dp),
             ) {
@@ -204,6 +204,7 @@ private fun DeleteShopConfirmDialog(
         Column(
             modifier = Modifier
                 .widthIn(min = 260.dp, max = 320.dp)
+                .pointerInput(Unit) { detectTapGestures { } }
                 .background(colors.surface, shapes.medium)
                 .padding(20.dp),
         ) {
