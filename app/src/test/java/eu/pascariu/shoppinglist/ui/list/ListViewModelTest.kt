@@ -720,7 +720,7 @@ class ListViewModelTest {
     }
 
     @Test
-    fun `delete confirm removes item optimistically and cancel makes no request`() = runTest(testDispatcher) {
+    fun `delete confirm removes item optimistically`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
         awaitUntil { viewModel.uiState.value.editItemModal != null }
