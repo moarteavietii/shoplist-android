@@ -329,8 +329,9 @@ class ListViewModel @Inject constructor(
     }
 
     private suspend fun restoreActiveView() {
-        val persistedId = listPreferences.activeShopId.value ?: return
+        if (listPreferences.activeShopId.value == null) return
         shopsRepository.shops.first { it.isNotEmpty() }
+        val persistedId = listPreferences.activeShopId.value ?: return
         val shopExists = shopsRepository.shops.value.any { it.id == persistedId }
         if (shopExists) {
             localState.update { it.copy(activeViewId = persistedId) }
