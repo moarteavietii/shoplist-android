@@ -43,7 +43,8 @@ fun ShopModal(
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
 
-    BackHandler { onDiscard() }
+    BackHandler(enabled = !modal.deleteConfirmOpen) { onDiscard() }
+    BackHandler(enabled = modal.deleteConfirmOpen) { onDeleteCancelled() }
 
     Box(
         modifier = Modifier
