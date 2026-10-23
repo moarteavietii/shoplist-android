@@ -69,27 +69,20 @@ class ListViewModel @Inject constructor(
         viewModelScope.launch {
             listPreferences.isReady.first { it }
             restoreActiveView()
-        }
-        viewModelScope.launch {
-            listPreferences.isReady.first { it }
-            val expanded = listPreferences.widgetStackExpanded.value
-            localState.update { it.copy(isWidgetStackExpanded = expanded) }
-        }
-        viewModelScope.launch {
-            listPreferences.isReady.first { it }
-            val expanded = listPreferences.searchExpanded.value
-            localState.update { it.copy(searchExpanded = expanded) }
-        }
-        viewModelScope.launch {
-            listPreferences.isReady.first { it }
-            val show = listPreferences.showChecked.value
-            localState.update { it.copy(showChecked = show) }
-        }
-        viewModelScope.launch {
-            listPreferences.isReady.first { it }
-            val enabled = listPreferences.sortModeEnabled.value
-            val order = listPreferences.sortOrder.value
-            localState.update { it.copy(sortModeEnabled = enabled, sortOrder = order) }
+            val widgetStackExpanded = listPreferences.widgetStackExpanded.value
+            val searchExpanded = listPreferences.searchExpanded.value
+            val showChecked = listPreferences.showChecked.value
+            val sortModeEnabled = listPreferences.sortModeEnabled.value
+            val sortOrder = listPreferences.sortOrder.value
+            localState.update {
+                it.copy(
+                    isWidgetStackExpanded = widgetStackExpanded,
+                    searchExpanded = searchExpanded,
+                    showChecked = showChecked,
+                    sortModeEnabled = sortModeEnabled,
+                    sortOrder = sortOrder,
+                )
+            }
         }
     }
 
