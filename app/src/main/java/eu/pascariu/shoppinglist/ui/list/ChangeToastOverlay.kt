@@ -11,7 +11,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
+import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 import kotlin.math.abs
 import kotlinx.coroutines.launch
@@ -37,12 +38,14 @@ private val TOAST_SWIPE_DISMISS_THRESHOLD = 72.dp
 @Composable
 fun ChangeToastOverlay(
     toast: ChangeToast?,
-    onDismissed: () -> Unit,
+    onDismissed: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var lastToast by remember { mutableStateOf<ChangeToast?>(null) }
-    if (toast != null) {
-        lastToast = toast
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            lastToast = toast
+        }
     }
 
     AnimatedVisibility(
@@ -63,14 +66,15 @@ fun ChangeToastOverlay(
 @Composable
 private fun ToastContent(
     toast: ChangeToast,
-    onDismissed: () -> Unit,
+    onDismissed: (Long) -> Unit,
 ) {
     val colors = LocalShoplistColors.current
+    val shapes = LocalShoplistShapes.current
     val typography = LocalShoplistTypography.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val dismissThresholdPx = with(density) { TOAST_SWIPE_DISMISS_THRESHOLD.toPx() }
-
+    val currentOnDismissed by rememberUpdatedState(onDismissed)
     val dragOffsetX = remember { Animatable(0f) }
 
     LaunchedEffect(toast.id) {
@@ -90,8 +94,8 @@ private fun ToastContent(
                     alpha = 1f - (abs(dragOffsetX.value) / (dismissThresholdPx * 2f))
                         .coerceIn(0f, 0.6f)
                 }
-                .background(colors.surface, RoundedCornerShape(12.dp))
-                .pointerInput(Unit) {
+                .background(colors.surface, shapes.medium)
+                .pointerInput(toast.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             val offset = dragOffsetX.value
@@ -101,7 +105,7 @@ private fun ToastContent(
                                         targetValue = if (offset > 0f) 2000f else -2000f,
                                         animationSpec = tween(durationMillis = 180),
                                     )
-                                    onDismissed()
+                                    currentOnDismissed(toast.id)
                                 }
                                 offset != 0f -> scope.launch { dragOffsetX.animateTo(0f) }
                             }

@@ -16,7 +16,7 @@ fun deriveChangeToasts(
     return when (event.type) {
         "item:created" -> deriveCreated(event.item, previousItem)
         "item:updated" -> deriveUpdated(event.item, previousItem, shops)
-        "item:deleted" -> deriveDeleted(previousItem, shops)
+        "item:deleted" -> deriveDeleted(previousItem)
         else -> emptyList()
     }
 }
@@ -27,7 +27,7 @@ private fun deriveCreated(item: Item?, previousItem: Item?): List<ChangeToastLab
     return listOf(ChangeToastLabel("new item: ${item.name}"))
 }
 
-private fun deriveDeleted(previousItem: Item?, shops: List<Shop>): List<ChangeToastLabel> {
+private fun deriveDeleted(previousItem: Item?): List<ChangeToastLabel> {
     previousItem ?: return emptyList()
     return listOf(ChangeToastLabel("deleted: ${previousItem.name}"))
 }

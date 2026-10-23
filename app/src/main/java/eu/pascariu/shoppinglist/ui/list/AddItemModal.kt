@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
@@ -58,7 +60,7 @@ fun AddItemModal(
         canSave = modal.canSave,
         onDelete = null,
         onSave = onSave,
-        secondaryLabel = "Discard",
+        secondaryLabel = modal.secondaryLabel,
         modifier = modifier,
     )
 }
@@ -167,12 +169,16 @@ private fun ItemModalContent(
                         .clickable(
                             role = Role.Button,
                             enabled = quantity > MIN_QUANTITY,
-                        ) { onQuantityChanged(quantity - 1) },
+                        ) { onQuantityChanged(quantity - 1) }
+                        .semantics { contentDescription = "Decrease quantity" },
                 )
                 Text(
                     text = quantity.toString(),
                     style = typography.body,
                     color = colors.content,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Quantity: $quantity"
+                    },
                 )
                 Text(
                     text = "+",
@@ -183,7 +189,8 @@ private fun ItemModalContent(
                         .clickable(
                             role = Role.Button,
                             enabled = quantity < MAX_QUANTITY,
-                        ) { onQuantityChanged(quantity + 1) },
+                        ) { onQuantityChanged(quantity + 1) }
+                        .semantics { contentDescription = "Increase quantity" },
                 )
             }
             Row(

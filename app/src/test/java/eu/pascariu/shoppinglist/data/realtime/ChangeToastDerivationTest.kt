@@ -64,6 +64,28 @@ class ChangeToastDerivationTest {
     }
 
     @Test
+    fun `updated event without item payload produces no label`() {
+        val labels = deriveChangeToasts(
+            event = ItemEvent(type = "item:updated", listId = 1, item = null),
+            previousItem = sampleItem(),
+            shops = sampleShops(),
+        )
+
+        assertEquals(emptyList<String>(), labels.map { it.text })
+    }
+
+    @Test
+    fun `updated event for uncached item produces no label`() {
+        val labels = deriveChangeToasts(
+            event = ItemEvent(type = "item:updated", listId = 1, item = sampleItem()),
+            previousItem = null,
+            shops = sampleShops(),
+        )
+
+        assertEquals(emptyList<String>(), labels.map { it.text })
+    }
+
+    @Test
     fun `renamed event produces transition label`() {
         val labels = deriveChangeToasts(
             event = ItemEvent(type = "item:updated", listId = 1, item = sampleItem().copy(name = "Bread rolls")),

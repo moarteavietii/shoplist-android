@@ -19,6 +19,7 @@ object ExpiryTickerModule {
 
     @Provides
     @Singleton
+    @ExpiryTicker
     fun provideExpiryTicker(@ApplicationScope scope: CoroutineScope): StateFlow<Long> {
         val ticker = MutableStateFlow(System.currentTimeMillis())
         scope.launch {

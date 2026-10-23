@@ -2,6 +2,7 @@ package eu.pascariu.shoppinglist.data.realtime
 
 import android.util.Log
 import eu.pascariu.shoppinglist.data.device.DeviceIdStore
+import eu.pascariu.shoppinglist.di.IoDispatcher
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.ItemEvent
 import eu.pascariu.shoppinglist.data.model.ShopEvent
@@ -9,13 +10,16 @@ import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 interface RealtimeClientContract {
     val connectSignals: kotlinx.coroutines.flow.SharedFlow<RealtimeClient.Stream>
@@ -35,6 +39,7 @@ class RealtimeSyncManager @Inject constructor(
     private val itemsRepository: ItemsRepository,
     private val shopsRepository: ShopsRepository,
     private val deviceIdStore: DeviceIdStore,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : RealtimeSyncManagerContract {
     private var job: Job? = null
     private var ownDeviceId: String? = null
@@ -82,6 +87,7 @@ class RealtimeSyncManager @Inject constructor(
             "item:updated" -> event.item?.let { itemsRepository.applyUpdated(it) }
             "item:deleted" -> event.itemId?.let { itemsRepository.applyDeleted(it) }
         }
+        if (event.listId != RealtimeClient.DEFAULT_LIST_ID) return
         emitChangeToasts(event, previousItem)
     }
 
@@ -93,9 +99,11 @@ class RealtimeSyncManager @Inject constructor(
         }
     }
 
-    private fun isOwnDevice(originDeviceId: String?): Boolean {
+    private suspend fun isOwnDevice(originDeviceId: String?): Boolean {
         if (originDeviceId == null) return false
-        val own = ownDeviceId ?: deviceIdStore.getOrCreate().also { ownDeviceId = it }
+        val own = ownDeviceId ?: withContext(ioDispatcher) {
+            deviceIdStore.getOrCreate()
+        }.also { ownDeviceId = it }
         return originDeviceId == own
     }
 

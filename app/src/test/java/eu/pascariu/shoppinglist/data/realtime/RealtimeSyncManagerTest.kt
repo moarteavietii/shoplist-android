@@ -14,6 +14,7 @@ import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -31,7 +32,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = listOf(sampleItem()))
         val shopsApi = FakeShopsApi(shopsForFetch = listOf(sampleShop()))
         val client = FakeRealtimeClient()
-        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(shopsApi), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(shopsApi), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -49,7 +50,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -67,7 +68,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -85,7 +86,7 @@ class RealtimeSyncManagerTest {
         val shopsApi = FakeShopsApi(shopsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ShopsRepository(shopsApi)
-        val manager = RealtimeSyncManager(client, ItemsRepository(FakeItemsApi(emptyList())), repository, FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, ItemsRepository(FakeItemsApi(emptyList())), repository, FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -102,7 +103,7 @@ class RealtimeSyncManagerTest {
         val shopsApi = FakeShopsApi(shopsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ShopsRepository(shopsApi)
-        val manager = RealtimeSyncManager(client, ItemsRepository(FakeItemsApi(emptyList())), repository, FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, ItemsRepository(FakeItemsApi(emptyList())), repository, FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -120,7 +121,7 @@ class RealtimeSyncManagerTest {
         }
         val shopsApi = FakeShopsApi(shopsForFetch = listOf(sampleShop()))
         val client = FakeRealtimeClient()
-        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(shopsApi), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(shopsApi), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -144,7 +145,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -163,7 +164,7 @@ class RealtimeSyncManagerTest {
     fun `restart after stop reconnects the client`() = runTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
-        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, ItemsRepository(itemsApi), ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -181,7 +182,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -205,7 +206,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore("device-A"))
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore("device-A"), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -225,11 +226,59 @@ class RealtimeSyncManagerTest {
     }
 
     @Test
+    fun `event without origin device emits change toast labels`() = runTest {
+        val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
+        val client = FakeRealtimeClient()
+        val repository = ItemsRepository(itemsApi)
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore("device-A"), ioDispatcher = Dispatchers.Unconfined)
+
+        manager.start(this)
+        advanceUntilIdle()
+        client.connectSignals.emit(RealtimeClient.Stream.ITEMS)
+        advanceUntilIdle()
+
+        val labels = mutableListOf<List<ChangeToastLabel>>()
+        val collector = launch { manager.changeToastLabels.collect { labels += it } }
+        advanceUntilIdle()
+
+        client.itemEvents.emit(ItemEvent(type = "item:created", listId = 1, item = sampleItem(), originDeviceId = null))
+        advanceUntilIdle()
+
+        assertEquals(listOf(listOf("new item: Milk")), labels.map { batch -> batch.map { it.text } })
+        collector.cancel()
+        manager.stop()
+    }
+
+    @Test
+    fun `event for another list does not emit change toast labels`() = runTest {
+        val itemsApi = FakeItemsApi(itemsForFetch = emptyList())
+        val client = FakeRealtimeClient()
+        val repository = ItemsRepository(itemsApi)
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
+
+        manager.start(this)
+        advanceUntilIdle()
+        client.connectSignals.emit(RealtimeClient.Stream.ITEMS)
+        advanceUntilIdle()
+
+        val labels = mutableListOf<List<ChangeToastLabel>>()
+        val collector = launch { manager.changeToastLabels.collect { labels += it } }
+        advanceUntilIdle()
+
+        client.itemEvents.emit(ItemEvent(type = "item:created", listId = 999, item = sampleItem(), originDeviceId = "other-device"))
+        advanceUntilIdle()
+
+        assertEquals(0, labels.size)
+        collector.cancel()
+        manager.stop()
+    }
+
+    @Test
     fun `no-op update emits no change toast labels`() = runTest {
         val itemsApi = FakeItemsApi(itemsForFetch = listOf(sampleItem()))
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()
@@ -253,7 +302,7 @@ class RealtimeSyncManagerTest {
         val itemsApi = FakeItemsApi(itemsForFetch = listOf(sampleItem()))
         val client = FakeRealtimeClient()
         val repository = ItemsRepository(itemsApi)
-        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore())
+        val manager = RealtimeSyncManager(client, repository, ShopsRepository(FakeShopsApi(emptyList())), FakeDeviceIdStore(), ioDispatcher = Dispatchers.Unconfined)
 
         manager.start(this)
         advanceUntilIdle()

@@ -2029,7 +2029,7 @@ class ListViewModelTest {
 
     @Test
     fun `expiry tick hides an item whose expiry passes mid-session`() = runTest(testDispatcher) {
-        val soon = Instant.now().plusSeconds(2).toString()
+        val soon = Instant.now().plusSeconds(60).toString()
         enqueueItemList(
             itemJson(10, "Milk", orderKey = "a0"),
             itemJson(11, "Yogurt", orderKey = "a1", isTemporary = true, isChecked = true, expiresAt = soon),
@@ -2055,14 +2055,14 @@ class ListViewModelTest {
 
         assertEquals("checked: Milk", viewModel.changeToast.value?.text)
 
-        viewModel.onToastSwipedDismissed()
+        viewModel.onToastSwipedDismissed(viewModel.changeToast.value?.id ?: -1L)
         runCurrent()
 
         assertEquals("Milk → Bread", viewModel.changeToast.value?.text)
     }
 
     @Test
-    fun `new batch replaces the visible toast and restarts the timer`() = runTest(testDispatcher) {
+    fun `new batch queues behind the visible toast and shows after dismissal`() = runTest(testDispatcher) {
         loadFixtures()
 
         fakeSyncManager.emit(listOf("checked: Milk"))
@@ -2073,9 +2073,14 @@ class ListViewModelTest {
         fakeSyncManager.emit(listOf("new item: Bread"))
         runCurrent()
 
-        val replacedToast = viewModel.changeToast.value
-        assertEquals("new item: Bread", replacedToast?.text)
-        assertTrue(replacedToast!!.id != firstToast!!.id)
+        assertEquals("checked: Milk", viewModel.changeToast.value?.text)
+
+        viewModel.onToastSwipedDismissed(firstToast!!.id)
+        runCurrent()
+
+        val queuedToast = viewModel.changeToast.value
+        assertEquals("new item: Bread", queuedToast?.text)
+        assertTrue(queuedToast!!.id != firstToast.id)
     }
 
     @Test

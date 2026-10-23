@@ -20,6 +20,7 @@ import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStackControl
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
+import eu.pascariu.shoppinglist.di.ExpiryTicker
 import eu.pascariu.shoppinglist.domain.search.GLOBAL_VIEW_NAME
 import eu.pascariu.shoppinglist.domain.search.modalAvailableViews
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
@@ -51,7 +52,7 @@ class ListViewModel @Inject constructor(
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
     private val realtimeSyncManager: RealtimeSyncManagerContract,
-    expiryTicker: StateFlow<Long>,
+    @ExpiryTicker expiryTicker: StateFlow<Long>,
 ) : ViewModel() {
 
     private val localState = MutableStateFlow(LocalUiState())
@@ -105,7 +106,10 @@ class ListViewModel @Inject constructor(
         viewModelScope.launch {
             realtimeSyncManager.changeToastLabels.collect { labelBatch ->
                 val enabled = listPreferences.changeToastsEnabled.value
-                if (!enabled) return@collect
+                if (!enabled) {
+                    pendingToastTexts.clear()
+                    return@collect
+                }
                 showChangeToasts(labelBatch.map { it.text })
             }
         }
@@ -113,9 +117,18 @@ class ListViewModel @Inject constructor(
 
     private fun showChangeToasts(texts: List<String>) {
         if (texts.isEmpty()) return
-        displayToast(texts.first())
-        for (index in 1 until texts.size) {
-            pendingToastTexts.addLast(texts[index])
+        if (_changeToast.value != null) {
+            pendingToastTexts.addAll(texts)
+        } else {
+            displayToast(texts.first())
+            pendingToastTexts.addAll(texts.drop(1))
+        }
+        trimPendingToasts()
+    }
+
+    private fun trimPendingToasts() {
+        while (pendingToastTexts.size > MAX_PENDING_TOASTS) {
+            pendingToastTexts.removeFirst()
         }
     }
 
@@ -128,8 +141,10 @@ class ListViewModel @Inject constructor(
         }
     }
 
-    fun onToastSwipedDismissed() {
-        dismissChangeToast()
+    fun onToastSwipedDismissed(toastId: Long) {
+        if (_changeToast.value?.id == toastId) {
+            dismissChangeToast()
+        }
     }
 
     private fun dismissChangeToast() {
@@ -714,7 +729,7 @@ class ListViewModel @Inject constructor(
             globalShop != null -> globalShop.name
             else -> GLOBAL_VIEW_NAME
         }
-        val uncheckedCounts = deriveUncheckedCountByShop(items, shops)
+        val uncheckedCounts = deriveUncheckedCountByShop(liveItems, shops)
         val drawerShops = buildDrawerShops(
             shops = shops,
             globalShopId = globalShopId,
@@ -824,5 +839,6 @@ class ListViewModel @Inject constructor(
     companion object {
         internal const val GLOBAL_PLACEHOLDER_ID = -1L
         internal const val TOAST_AUTO_DISMISS_MS = 3_500L
+        internal const val MAX_PENDING_TOASTS = 5
     }
 }

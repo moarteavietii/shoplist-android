@@ -80,7 +80,7 @@ class ItemsRepository @Inject constructor(
         } catch (error: Exception) {
             cache.update { current ->
                 current.map { item ->
-                    if (item.id == itemId) {
+                    if (item.id == itemId && item == optimistic) {
                         item.copy(
                             name = previous.name,
                             visibleIn = previous.visibleIn,
