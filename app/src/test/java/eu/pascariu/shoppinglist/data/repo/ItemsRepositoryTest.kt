@@ -70,6 +70,20 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `create is idempotent when SSE event already added the item`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        val created = sampleItems().first()
+
+        api.createdItem = created
+        repository.applyCreated(created)
+        repository.create(listId = 1, CreateItemRequest(name = created.name))
+
+        assertEquals(1, repository.items.first().count { it.id == created.id })
+    }
+
+    @Test
     fun `update replaces cached entry with server state`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
         val repository = ItemsRepository(api)

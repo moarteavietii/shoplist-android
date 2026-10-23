@@ -33,7 +33,9 @@ class ItemsRepository @Inject constructor(
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
         val created = itemsApi.createItem(listId, request)
         if (listId == cachedListId.value) {
-            cache.update { it + created }
+            cache.update { current ->
+                if (current.any { it.id == created.id }) current else current + created
+            }
         }
         return created
     }
