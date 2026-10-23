@@ -111,9 +111,12 @@ fun WidgetStack(
     )
 
     val collapseOnSwipeUp = Modifier.pointerInput(Unit) {
+        var collapsedDuringGesture = false
         detectVerticalDragGestures(
+            onDragStart = { collapsedDuringGesture = false },
             onVerticalDrag = { change, _ ->
-                if (change.positionChange().y < -SWIPE_COLLAPSE_THRESHOLD_PX) {
+                if (!collapsedDuringGesture && change.positionChange().y < -SWIPE_COLLAPSE_THRESHOLD_PX) {
+                    collapsedDuringGesture = true
                     onExpandedChanged(false)
                 }
             },
