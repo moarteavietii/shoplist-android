@@ -905,6 +905,25 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `view selected while shops load is not overwritten by restore`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(2L)
+        advanceUntilIdle()
+
+        newViewModel()
+        viewModel.onViewSelected(1L)
+        advanceUntilIdle()
+
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+        advanceUntilIdle()
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
     fun `invalid persisted shop id falls back to Global`() = runTest(testDispatcher) {
         listPreferences.setActiveShopId(999L)
         advanceUntilIdle()
