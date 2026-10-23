@@ -764,9 +764,9 @@ class ListViewModelTest {
     }
 
     @Test
-    fun `delete failure restores item and shows error`() = runTest(testDispatcher) {
+    fun `delete failure restores item at its previous position and shows error`() = runTest(testDispatcher) {
         loadFixtures()
-        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 10L })
         awaitUntil { viewModel.uiState.value.editItemModal != null }
         viewModel.onEditItemDeleteTapped()
         awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
@@ -776,7 +776,7 @@ class ListViewModelTest {
         awaitUntil { server.requestCount == 3 }
         advanceUntilIdle()
 
-        assertEquals("Bread", viewModel.uiState.value.items.first { it.id == 11L }.name)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
         assertNotNull(viewModel.uiState.value.errorMessage)
         assertNull(viewModel.uiState.value.deleteConfirmItem)
     }
