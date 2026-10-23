@@ -125,8 +125,8 @@ Web capability specs (`/Users/cosmin.pascariu/projects/shoppinglist/openspec/spe
 | `item-expiry` | Roadmap 6 — feature parity | **done** — server-owned expiry reused as-is; client-side hiding + optimistic cache mirroring in `temporary-items-quantity` (archived 2026-10-23); Android spec: `temporary-items` |
 | `frontend-change-toasts` | Roadmap 6 — feature parity | **done** — `change-toasts` (archived 2026-10-23); Android spec: `change-toasts` |
 | `frontend-view-persistence` | Roadmap 5 — views + widget stack | **done** — `widget-stack-persistence` (archived 2026-10-23); Android spec: `view-persistence` |
-| `frontend-theme-system` | Roadmap 7 — themes (curated set) | not started |
-| `frontend-settings-drawer` | Roadmap 7 — themes | not started |
+| `frontend-theme-system` | Roadmap 7 — themes (curated set) | **done** — `theme-system` (archived 2026-10-23); Android spec: `theme-system` |
+| `frontend-settings-drawer` | Roadmap 7 — themes | **done** — `theme-system` (archived 2026-10-23); Android spec: `settings-drawer` |
 | `frontend-pull-to-refresh` | **dropped** — SSE + refetch-on-reconnect | dropped |
 | `frontend-pwa-install` | **dropped** — PWA-specific, natively irrelevant | dropped |
 | `database-schema`, `backend-scaffold`, `db-migration-scripts`, `dev-environment-setup`, `local-docker-dev`, `compose-watch-dev-loop`, `monorepo-workspaces`, `prod-deploy-script` | **N/A** — backend reused as-is; never propose backend changes in this repo | n/a |
