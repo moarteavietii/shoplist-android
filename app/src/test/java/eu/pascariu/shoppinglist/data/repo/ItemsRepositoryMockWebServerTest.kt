@@ -285,4 +285,50 @@ class ItemsRepositoryMockWebServerTest {
         assertEquals(false, rolledBack.isChecked)
         assertEquals("Organic Milk", rolledBack.name)
     }
+
+    @Test
+    fun `reorder optimistically merges orderMap before PATCH settles`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10)))
+
+        val deferred = async { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") }
+
+        runCurrent()
+        assertEquals("a5", repository.items.first().single().orderMap["1"])
+
+        deferred.join()
+        assertEquals(10L, deferred.await().id)
+    }
+
+    @Test
+    fun `reorder sends PATCH with merged orderMap`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10)))
+
+        repository.reorder(itemId = 10, viewId = 1, newKey = "a5")
+
+        val recorded = server.takeRequest()
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"orderMap\""))
+        assertTrue(body.contains("\"1\":\"a5\""))
+    }
+
+    @Test
+    fun `failed reorder rolls cache back and rethrows`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val thrown = runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals("a1", repository.items.first().single().orderMap["a0"])
+    }
 }

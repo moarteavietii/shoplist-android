@@ -7,6 +7,7 @@ import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
@@ -16,6 +17,8 @@ import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStackControl
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
+import eu.pascariu.shoppinglist.domain.order.dropKeyForIndex
+import eu.pascariu.shoppinglist.domain.order.orderItems
 import eu.pascariu.shoppinglist.ui.drawer.DrawerShop
 import javax.inject.Inject
 import retrofit2.HttpException
@@ -81,6 +84,12 @@ class ListViewModel @Inject constructor(
             val show = listPreferences.showChecked.value
             localState.update { it.copy(showChecked = show) }
         }
+        viewModelScope.launch {
+            listPreferences.isReady.first { it }
+            val enabled = listPreferences.sortModeEnabled.value
+            val order = listPreferences.sortOrder.value
+            localState.update { it.copy(sortModeEnabled = enabled, sortOrder = order) }
+        }
     }
 
     fun refresh() {
@@ -122,6 +131,50 @@ class ListViewModel @Inject constructor(
 
     fun onManualSortEngaged(engaged: Boolean) {
         localState.update { it.copy(isManualSortEngaged = engaged) }
+    }
+
+    fun onSortModeToggled() {
+        val enabled = !localState.value.sortModeEnabled
+        localState.update { it.copy(sortModeEnabled = enabled) }
+        viewModelScope.launch {
+            listPreferences.setSortModeEnabled(enabled)
+        }
+    }
+
+    fun onSortOrderChanged(order: SortOrder) {
+        localState.update { it.copy(sortOrder = order) }
+        viewModelScope.launch {
+            listPreferences.setSortOrder(order)
+        }
+    }
+
+    fun isDragEnabled(): Boolean {
+        val local = localState.value
+        val overlaysOpen = local.addItemModal != null || local.shopModal != null
+        return local.sortModeEnabled &&
+            local.sortOrder == SortOrder.MANUAL &&
+            !overlaysOpen
+    }
+
+    fun onItemDropped(item: Item, dropIndex: Int) {
+        if (!isDragEnabled()) return
+        val state = uiState.value
+        val viewId = state.activeViewId ?: return
+        val orderedKeys = state.items
+            .sortedWith(compareBy { it.orderMap[viewId.toString()] ?: "\uFFFF" })
+            .filter { it.id != item.id }
+            .mapNotNull { it.orderMap[viewId.toString()] }
+        val newKey = dropKeyForIndex(orderedKeys = orderedKeys, dropIndex = dropIndex)
+        viewModelScope.launch {
+            try {
+                itemsRepository.reorder(itemId = item.id, viewId = viewId, newKey = newKey)
+                localState.update { it.copy(errorMessage = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                localState.update { it.copy(errorMessage = "Couldn't move the item") }
+            }
+        }
     }
 
     fun onCheckToggled(item: Item) {
@@ -296,7 +349,7 @@ class ListViewModel @Inject constructor(
         when (control) {
             WidgetStackControl.VIEW_SWITCHER -> onDrawerToggled()
             WidgetStackControl.SETTINGS -> Unit
-            WidgetStackControl.SORT_MODE -> Unit
+            WidgetStackControl.SORT_MODE -> onSortModeToggled()
             WidgetStackControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
             WidgetStackControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
         }
@@ -427,7 +480,7 @@ class ListViewModel @Inject constructor(
         } else {
             items.filter { activeViewId in it.visibleIn || it.visibleIn.isEmpty() }
         }
-        val sorted = sortManual(items = viewItems, viewId = activeViewId)
+        val sorted = orderItems(items = viewItems, viewId = activeViewId, order = local.sortOrder)
         val query = local.searchQuery.trim()
         val queryActive = query.isNotEmpty()
         val filtered = if (queryActive) sorted.filter { fuzzyMatch(query, it.name) } else sorted
@@ -450,6 +503,8 @@ class ListViewModel @Inject constructor(
             watermarkName = activeName,
             activeViewId = activeViewId,
             isWidgetStackExpanded = local.isWidgetStackExpanded,
+            sortModeEnabled = local.sortModeEnabled,
+            sortOrder = local.sortOrder,
             hasUncheckedItems = hasUnchecked,
             uncheckedCountByShop = uncheckedCounts,
             drawerShops = drawerShops,
@@ -529,14 +584,6 @@ class ListViewModel @Inject constructor(
         return shops.associate { shop -> shop.id to (uncheckedByShop[shop.id] == true) }
     }
 
-    private fun sortManual(items: List<Item>, viewId: Long?): List<Item> {
-        if (viewId == null) return items
-        return items.sortedWith(
-            compareBy<Item> { it.orderMap[viewId.toString()] ?: "\uFFFF" }
-                .thenBy { it.id },
-        )
-    }
-
     private suspend fun waitForInFlightChecks(): Boolean {
         return try {
             withTimeout(UndoConfig.INFLIGHT_WAIT.toMillis()) {
@@ -553,6 +600,8 @@ class ListViewModel @Inject constructor(
         val searchExpanded: Boolean = false,
         val showChecked: Boolean = true,
         val isManualSortEngaged: Boolean = false,
+        val sortModeEnabled: Boolean = true,
+        val sortOrder: SortOrder = SortOrder.MANUAL,
         val activeViewId: Long? = null,
         val drawerOpen: Boolean = false,
         val isWidgetStackExpanded: Boolean = false,

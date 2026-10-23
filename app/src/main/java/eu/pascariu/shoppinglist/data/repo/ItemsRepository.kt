@@ -69,6 +69,23 @@ class ItemsRepository @Inject constructor(
         }
     }
 
+    suspend fun reorder(itemId: Long, viewId: Long, newKey: String): Item {
+        val previous = cache.value.firstOrNull { it.id == itemId }
+            ?: throw IllegalArgumentException("item $itemId not cached")
+        val mergedOrderMap = previous.orderMap + (viewId.toString() to newKey)
+        cache.update { current ->
+            current.map { if (it.id == itemId) it.copy(orderMap = mergedOrderMap) else it }
+        }
+        try {
+            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedOrderMap))
+            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            return updated
+        } catch (error: Exception) {
+            cache.update { current -> current.map { if (it.id == itemId) it.copy(orderMap = previous.orderMap) else it } }
+            throw error
+        }
+    }
+
     fun applyCreated(item: Item) {
         if (item.listId != cachedListId.value) return
         cache.update { current ->

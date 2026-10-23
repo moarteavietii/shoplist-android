@@ -5,6 +5,7 @@ import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
@@ -117,6 +118,7 @@ class ListViewModelTest {
         isChecked: Boolean = false,
         orderKey: String = "a0",
         visibleIn: String = "[1]",
+        checkCount: Int = 0,
     ): String =
         """
         {
@@ -127,7 +129,7 @@ class ListViewModelTest {
           "orderMap": {"1": "$orderKey"},
           "quantity": 1,
           "isTemporary": false,
-          "checkCount": 0,
+          "checkCount": $checkCount,
           "expiresAt": null,
           "createdAt": "2026-10-22T09:00:00Z",
           "visibleIn": $visibleIn
@@ -1148,5 +1150,129 @@ class ListViewModelTest {
         viewModel.onManualSortEngaged(false)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.hideChecked)
+    }
+
+    @Test
+    fun `alphabetical order re-orders items case-insensitively`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        advanceUntilIdle()
+
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `frequency order re-orders live when a check count changes`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", checkCount = 5),
+            itemJson(11, "Bread", orderKey = "a1", checkCount = 2),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onSortOrderChanged(SortOrder.FREQUENCY)
+        advanceUntilIdle()
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread", isChecked = true, checkCount = 7)),
+        )
+
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.items.first { it.id == 11L }.checkCount == 7 }
+
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `switching back to manual restores the exact stored order`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", checkCount = 5),
+            itemJson(11, "Bread", orderKey = "a1", checkCount = 2),
+            itemJson(12, "Eggs", orderKey = "a2", checkCount = 9),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onSortOrderChanged(SortOrder.FREQUENCY)
+        advanceUntilIdle()
+        assertEquals(listOf("Eggs", "Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
+
+        viewModel.onSortOrderChanged(SortOrder.MANUAL)
+        advanceUntilIdle()
+        assertEquals(listOf("Milk", "Bread", "Eggs"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `sort mode and order persist across restart`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSortModeToggled()
+        viewModel.onSortOrderChanged(SortOrder.FREQUENCY)
+        advanceUntilIdle()
+
+        assertFalse(listPreferences.sortModeEnabled.value)
+        assertEquals(SortOrder.FREQUENCY, listPreferences.sortOrder.value)
+    }
+
+    @Test
+    fun `drag gating matrix - enabled only in manual mode with sort on and no overlays`() =
+        runTest(testDispatcher) {
+            loadFixtures()
+
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onSortModeToggled()
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onSortModeToggled()
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onSortOrderChanged(SortOrder.MANUAL)
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onAddAffordanceTapped()
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onAddItemDiscard()
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onAddShopTapped()
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onShopDiscard()
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+        }
+
+    @Test
+    fun `drop in non-manual order does not reorder`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        advanceUntilIdle()
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
     }
 }

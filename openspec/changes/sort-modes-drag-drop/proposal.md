@@ -32,5 +32,5 @@ The list currently supports only manual fractional-index ordering with no way to
 - `ui/widgetstack/WidgetStack.kt` — Sort Mode control becomes real (tap + long-press + anchored selector)
 - `data/repo/ItemsRepository.kt` — reorder mutation (merged `orderMap` PATCH); `checkCount` already in the item model (verify)
 - `data/prefs/ListPreferencesDataSource` — sort mode + order keys (from batch 1's foundation)
-- New dependency likely: a Compose drag-and-drop approach (custom handle-based drag detection preferred over a library — KISS)
+- New dependency: `sh.calvin.reorderable` 3.1.0 (Compose reorderable-list standard; adopted during implementation after custom drag produced row-swap jumps)
 - No backend changes; fractional-index key format already ported with unit tests

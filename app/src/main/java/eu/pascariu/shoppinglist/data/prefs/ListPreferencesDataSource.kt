@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import eu.pascariu.shoppinglist.di.IoDispatcher
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -36,6 +37,12 @@ class ListPreferencesDataSource(
     private val showCheckedFlow = MutableStateFlow(true)
     val showChecked: StateFlow<Boolean> = showCheckedFlow.asStateFlow()
 
+    private val sortModeEnabledFlow = MutableStateFlow(true)
+    val sortModeEnabled: StateFlow<Boolean> = sortModeEnabledFlow.asStateFlow()
+
+    private val sortOrderFlow = MutableStateFlow(SortOrder.MANUAL)
+    val sortOrder: StateFlow<SortOrder> = sortOrderFlow.asStateFlow()
+
     private val ready = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = ready.asStateFlow()
 
@@ -49,6 +56,8 @@ class ListPreferencesDataSource(
                 activeShop.value = prefs[KEY_ACTIVE_SHOP_ID]
                 searchExpandedFlow.value = prefs[KEY_SEARCH_EXPANDED] ?: false
                 showCheckedFlow.value = prefs[KEY_SHOW_CHECKED] ?: true
+                sortModeEnabledFlow.value = prefs[KEY_SORT_MODE_ENABLED] ?: true
+                sortOrderFlow.value = prefs[KEY_SORT_ORDER]?.let(SortOrder::fromName) ?: SortOrder.MANUAL
                 ready.value = true
             }
             .launchIn(scope)
@@ -86,10 +95,36 @@ class ListPreferencesDataSource(
         }
     }
 
+    suspend fun setSortModeEnabled(enabled: Boolean) {
+        sortModeEnabledFlow.value = enabled
+        dataStore.edit { prefs ->
+            prefs[KEY_SORT_MODE_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setSortOrder(order: SortOrder) {
+        sortOrderFlow.value = order
+        dataStore.edit { prefs ->
+            prefs[KEY_SORT_ORDER] = order.name
+        }
+    }
+
     private companion object {
         val KEY_WIDGET_STACK_EXPANDED = booleanPreferencesKey("widget_stack_expanded")
         val KEY_ACTIVE_SHOP_ID = longPreferencesKey("active_shop_id")
         val KEY_SEARCH_EXPANDED = booleanPreferencesKey("search_expanded")
         val KEY_SHOW_CHECKED = booleanPreferencesKey("show_checked")
+        val KEY_SORT_MODE_ENABLED = booleanPreferencesKey("sort_mode_enabled")
+        val KEY_SORT_ORDER = stringPreferencesKey("sort_order")
+    }
+}
+
+enum class SortOrder {
+    MANUAL,
+    ALPHABETICAL,
+    FREQUENCY;
+
+    companion object {
+        fun fromName(name: String): SortOrder? = entries.firstOrNull { it.name == name }
     }
 }

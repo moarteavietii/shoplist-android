@@ -133,6 +133,40 @@ class ListPreferencesDataSourceTest {
     }
 
     @Test
+    fun `sort mode enabled defaults to true`() = runTest(testDispatcher) {
+        settle()
+
+        assertTrue(dataSource.sortModeEnabled.value)
+    }
+
+    @Test
+    fun `sort mode enabled round-trips through storage`() = runTest(testDispatcher) {
+        settle()
+
+        dataSource.setSortModeEnabled(false)
+        settle()
+
+        assertFalse(dataSource.sortModeEnabled.value)
+    }
+
+    @Test
+    fun `sort order defaults to manual`() = runTest(testDispatcher) {
+        settle()
+
+        assertEquals(SortOrder.MANUAL, dataSource.sortOrder.value)
+    }
+
+    @Test
+    fun `sort order round-trips through storage`() = runTest(testDispatcher) {
+        settle()
+
+        dataSource.setSortOrder(SortOrder.FREQUENCY)
+        settle()
+
+        assertEquals(SortOrder.FREQUENCY, dataSource.sortOrder.value)
+    }
+
+    @Test
     fun `keys are isolated - writing one does not affect the other`() = runTest(testDispatcher) {
         settle()
 
@@ -160,6 +194,8 @@ class ListPreferencesDataSourceTest {
             dataSource.setActiveShopId(9L)
             dataSource.setSearchExpanded(true)
             dataSource.setShowChecked(false)
+            dataSource.setSortModeEnabled(false)
+            dataSource.setSortOrder(SortOrder.ALPHABETICAL)
             settle()
 
             storeScope.cancel()
@@ -178,5 +214,7 @@ class ListPreferencesDataSourceTest {
             assertEquals(9L, restarted.activeShopId.value)
             assertTrue(restarted.searchExpanded.value)
             assertFalse(restarted.showChecked.value)
+            assertFalse(restarted.sortModeEnabled.value)
+            assertEquals(SortOrder.ALPHABETICAL, restarted.sortOrder.value)
         }
 }

@@ -2,6 +2,7 @@ package eu.pascariu.shoppinglist.ui.list
 
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
+import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.ui.drawer.DrawerShop
 
 data class ListUiState(
@@ -9,6 +10,8 @@ data class ListUiState(
     val watermarkName: String = "Global",
     val activeViewId: Long? = null,
     val isWidgetStackExpanded: Boolean = false,
+    val sortModeEnabled: Boolean = true,
+    val sortOrder: SortOrder = SortOrder.MANUAL,
     val hasUncheckedItems: Map<Long, Boolean> = emptyMap(),
     val uncheckedCountByShop: Map<Long, Int> = emptyMap(),
     val drawerShops: List<DrawerShop> = emptyList(),

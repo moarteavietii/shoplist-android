@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -55,12 +56,16 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
 import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStack
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ListScreen(
@@ -81,6 +86,12 @@ fun ListScreen(
     if (state.shopModal != null) {
         lastShopModal = state.shopModal
     }
+    var draggingItemId by remember { mutableStateOf<Long?>(null) }
+    var dragOrder by remember { mutableStateOf<List<Item>>(emptyList()) }
+    val dragEnabled = state.sortModeEnabled &&
+        state.sortOrder == SortOrder.MANUAL &&
+        state.addItemModal == null &&
+        state.shopModal == null
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -88,7 +99,9 @@ fun ListScreen(
 
     LaunchedEffect(state.postSaveSignal) {
         if (state.postSaveSignal != null) {
-            listState.scrollToItem(0)
+            if (state.filteredItems.isNotEmpty()) {
+                listState.scrollToItem(state.filteredItems.lastIndex)
+            }
             searchFocusRequester.requestFocus()
             keyboard?.show()
             viewModel.consumePostSaveSignal()
@@ -138,9 +151,15 @@ fun ListScreen(
                         .graphicsLayer(alpha = 0.07f),
                 )
 
+                val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+                    val mutable = dragOrder.toMutableList()
+                    val moved = mutable.removeAt(from.index)
+                    mutable.add(to.index, moved)
+                    dragOrder = mutable
+                }
                 LazyColumn(
                     state = listState,
-                    reverseLayout = true,
+                    verticalArrangement = Arrangement.Bottom,
                     modifier = Modifier
                         .fillMaxSize()
                         .leftEdgeSwipeToOpen(
@@ -148,13 +167,37 @@ fun ListScreen(
                             onOpen = viewModel::onDrawerToggled,
                         ),
                 ) {
-                    items(state.filteredItems, key = { it.id }) { item ->
-                        ItemRow(
-                            item = item,
-                            onCheckToggled = viewModel::onCheckToggled,
-                            hideChecked = state.hideChecked,
-                            modifier = Modifier.animateItem(),
-                        )
+                    val visibleItems = if (draggingItemId != null) dragOrder else state.filteredItems
+                    items(visibleItems, key = { it.id }) { item ->
+                        ReorderableItem(
+                            state = reorderableState,
+                            key = item.id,
+                            enabled = dragEnabled,
+                        ) { isDragging ->
+                            val rowIsDragging = isDragging && draggingItemId == item.id
+                            ItemRow(
+                                item = item,
+                                onCheckToggled = viewModel::onCheckToggled,
+                                hideChecked = state.hideChecked,
+                                dragEnabled = dragEnabled,
+                                isDragging = rowIsDragging,
+                                dragHandleModifier = Modifier.draggableHandle(
+                                    onDragStarted = {
+                                        draggingItemId = item.id
+                                        dragOrder = state.filteredItems
+                                    },
+                                    onDragStopped = {
+                                        val dropIndex = dragOrder.indexOfFirst { it.id == item.id }
+                                        if (dropIndex >= 0) {
+                                            viewModel.onItemDropped(item, dropIndex)
+                                        }
+                                        draggingItemId = null
+                                        dragOrder = emptyList()
+                                    },
+                                ),
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
                     }
                 }
 
@@ -163,8 +206,11 @@ fun ListScreen(
                     isExpanded = state.isWidgetStackExpanded,
                     isSearchExpanded = state.searchExpanded,
                     isShowingCheckedItems = state.showChecked,
+                    isSortModeEnabled = state.sortModeEnabled,
+                    sortOrder = state.sortOrder,
                     globalUncheckedCount = state.drawerShops.firstOrNull { it.isGlobal }?.uncheckedCount ?: 0,
                     onControlTapped = viewModel::onWidgetStackControlTapped,
+                    onSortOrderSelected = viewModel::onSortOrderChanged,
                     onExpandedChanged = viewModel::onWidgetStackExpandedChanged,
                     modifier = Modifier.align(Alignment.TopEnd),
                 )
