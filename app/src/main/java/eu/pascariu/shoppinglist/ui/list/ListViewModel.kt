@@ -399,16 +399,17 @@ class ListViewModel @Inject constructor(
             return
         }
         itemsRepository.applyDeleted(item.id)
+        localState.update { it.copy(deleteConfirmItem = null) }
         viewModelScope.launch {
             try {
                 itemsRepository.delete(item.id)
-                localState.update { it.copy(deleteConfirmItem = null, errorMessage = null) }
+                localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 itemsRepository.applyCreated(item)
                 localState.update {
-                    it.copy(deleteConfirmItem = null, errorMessage = "Couldn't delete the item")
+                    it.copy(errorMessage = "Couldn't delete the item")
                 }
             }
         }
