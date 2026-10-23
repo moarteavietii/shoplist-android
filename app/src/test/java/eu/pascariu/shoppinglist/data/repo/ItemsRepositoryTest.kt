@@ -84,6 +84,65 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `updateDetails applies name and visibility to cache before the patch settles`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: List<Item>? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value }
+        val updated = sampleItems().first().copy(name = "Crackers", visibleIn = listOf(1L, 2L))
+
+        api.updatedItem = updated
+        repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers", visibleIn = listOf(1L, 2L)))
+
+        assertEquals("Crackers", cacheDuringPatch?.single()?.name)
+        assertEquals(listOf(1L, 2L), cacheDuringPatch?.single()?.visibleIn)
+        assertEquals(updated, repository.items.first().single())
+    }
+
+    @Test
+    fun `updateDetails failure restores the previous cached item`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.updateError = httpException(500)
+
+        val thrown = runCatching { repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers")) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(sampleItems(), repository.items.first())
+    }
+
+    @Test
+    fun `updateDetails failure does not clobber a newer remote state that arrived mid-flight`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.onUpdate = {
+            repository.applyUpdated(sampleItems().first().copy(isChecked = true))
+        }
+        api.updateError = httpException(500)
+
+        runCatching { repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers")) }
+
+        val cached = repository.items.first().single()
+        assertTrue(cached.isChecked)
+        assertEquals("Milk", cached.name)
+    }
+
+    @Test
+    fun `updateDetails of an item absent from cache fails without a patch`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+
+        val thrown = runCatching { repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers")) }
+
+        assertTrue(thrown.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(null, api.lastUpdateItemId)
+    }
+
+    @Test
     fun `create for a different list leaves cache untouched`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
         val repository = ItemsRepository(api)
@@ -291,6 +350,7 @@ private class FakeItemsApi(
     var lastUpdateItemId: Long? = null
     var lastUpdateRequest: UpdateItemRequest? = null
     var lastDeleteItemId: Long? = null
+    var onUpdate: (() -> Unit)? = null
 
     override suspend fun listItems(listId: Long): List<Item> {
         listCalls++
@@ -308,6 +368,7 @@ private class FakeItemsApi(
     override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item {
         lastUpdateItemId = itemId
         lastUpdateRequest = body
+        onUpdate?.invoke()
         updateError?.let { throw it }
         return requireNotNull(updatedItem)
     }

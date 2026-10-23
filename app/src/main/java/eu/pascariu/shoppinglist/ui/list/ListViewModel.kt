@@ -358,11 +358,11 @@ class ListViewModel @Inject constructor(
         val modal = localState.value.editItemModal ?: return
         if (!modal.canSave) return
         if (isUpdateInFlight) return
-        val snapshot = itemsRepository.items.value.firstOrNull { it.id == modal.itemId } ?: return
+        if (itemsRepository.items.value.none { it.id == modal.itemId }) return
         isUpdateInFlight = true
         viewModelScope.launch {
             try {
-                itemsRepository.update(
+                itemsRepository.updateDetails(
                     itemId = modal.itemId,
                     request = UpdateItemRequest(
                         name = modal.name.trim(),
@@ -373,7 +373,6 @@ class ListViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                itemsRepository.applyUpdated(snapshot)
                 localState.update { state ->
                     state.copy(
                         editItemModal = null,
