@@ -12,12 +12,12 @@ fun orderItems(items: List<Item>, viewId: Long?, order: SortOrder): List<Item> =
     )
 }
 
+fun manualOrderComparator(viewId: Long): Comparator<Item> =
+    compareBy({ it.orderMap[viewId.toString()] ?: "\uFFFF" }, { it.id })
+
 private fun sortManual(items: List<Item>, viewId: Long?): List<Item> {
     if (viewId == null) return items
-    return items.sortedWith(
-        compareBy<Item> { it.orderMap[viewId.toString()] ?: "\uFFFF" }
-            .thenBy { it.id },
-    )
+    return items.sortedWith(manualOrderComparator(viewId))
 }
 
 fun dropKeyForIndex(orderedKeys: List<String>, dropIndex: Int): String {

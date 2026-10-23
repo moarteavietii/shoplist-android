@@ -18,6 +18,7 @@ import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.orderViewsGlobalFirst
 import eu.pascariu.shoppinglist.domain.order.dropKeyForIndex
+import eu.pascariu.shoppinglist.domain.order.manualOrderComparator
 import eu.pascariu.shoppinglist.domain.order.orderItems
 import eu.pascariu.shoppinglist.ui.drawer.DrawerShop
 import javax.inject.Inject
@@ -159,7 +160,7 @@ class ListViewModel @Inject constructor(
         val state = uiState.value
         val viewId = state.activeViewId ?: return
         val orderedKeys = state.items
-            .sortedWith(compareBy { it.orderMap[viewId.toString()] ?: "\uFFFF" })
+            .sortedWith(manualOrderComparator(viewId))
             .filter { it.id != item.id }
             .mapNotNull { it.orderMap[viewId.toString()] }
         viewModelScope.launch {
