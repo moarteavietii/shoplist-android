@@ -74,11 +74,15 @@ fun Modifier.swipeUpFromBottomToClose(
     pointerInput(isEnabled) {
         if (!isEnabled) return@pointerInput
         detectVerticalDragGestures(
-            onDragStart = { drag.total = 0f },
-            onVerticalDrag = { change, dragAmount ->
-                if (change.previousPosition.y >= size.height - bottomSlopPx) {
+            onDragStart = { startOffset ->
+                drag.startedAtEdge = startOffset.y >= size.height - bottomSlopPx
+                drag.total = 0f
+            },
+            onVerticalDrag = { _, dragAmount ->
+                if (drag.startedAtEdge) {
                     drag.total += dragAmount
                     if (drag.total <= -closeThresholdPx) {
+                        drag.startedAtEdge = false
                         drag.total = 0f
                         onClose()
                     }
