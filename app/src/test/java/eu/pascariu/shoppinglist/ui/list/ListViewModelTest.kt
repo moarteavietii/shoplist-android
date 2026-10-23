@@ -629,6 +629,8 @@ class ListViewModelTest {
         assertFalse(base.copy(name = "  ").canSave)
         assertTrue(base.copy(name = "Toast").canSave)
         assertTrue(base.isUnchanged)
+        assertTrue(base.copy(name = " Bread ").isUnchanged)
+        assertFalse(base.copy(name = " Bread ").canSave)
         assertFalse(base.copy(name = "Toast").isUnchanged)
         assertTrue(base.allViewsSelected)
         assertTrue(base.copy(selectedViewIds = emptySet()).allViewsSelected)
