@@ -774,6 +774,53 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `edit modal save with item removed from cache does not patch`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemTitleChanged("Crackers")
+        awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
+
+        itemsRepository.applyDeleted(11L)
+        viewModel.onEditItemSave()
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+        assertNotNull(viewModel.uiState.value.editItemModal)
+    }
+
+    @Test
+    fun `delete tap with item removed from cache does not open confirmation`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+
+        itemsRepository.applyDeleted(11L)
+        viewModel.onEditItemDeleteTapped()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.editItemModal)
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `delete confirm with item vanished closes confirmation without request`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemDeleteTapped()
+        awaitUntil { viewModel.uiState.value.deleteConfirmItem != null }
+
+        itemsRepository.applyDeleted(11L)
+        viewModel.onDeleteConfirmed()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.deleteConfirmItem)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
     fun `remote item updated event merges while optimistic check in flight`() = runTest(testDispatcher) {
         loadFixtures()
         server.enqueue(
