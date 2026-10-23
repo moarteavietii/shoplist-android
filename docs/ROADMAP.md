@@ -48,9 +48,9 @@ Replace the XML/AppCompat scaffold with the real foundation:
 
 ## 7. Themes
 
-- Rethink the web app's 14 themes: pick a small curated set (several are too similar to be worth keeping)
-- Port palettes as Compose color schemes; WCAG AA contrast as unit tests
-- Exact selection to be discussed when this item starts
+- Curated 9-theme set (user-confirmed): Default, Pastel, Mint, Lavender, Dark Slate, Ocean, Sunset, High Contrast, Christmas (new light red/green festive theme); web near-duplicates dropped ✅ (done — `theme-system`, archived 2026-10-23)
+- Palettes ported as Compose color schemes, hex-faithful to the web CSS; WCAG AA contrast enforced by unit tests ✅
+- Settings drawer hosting the theme picker + change-toasts toggle ✅ (done — `theme-system`; Android spec: `settings-drawer`)
 
 ## 8. Offline support
 
