@@ -27,10 +27,15 @@ import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 
+private const val MIN_QUANTITY = 1
+private const val MAX_QUANTITY = 99
+
 @Composable
 fun AddItemModal(
     modal: AddItemUiState,
     onTitleChanged: (String) -> Unit,
+    onQuantityChanged: (Int) -> Unit,
+    onTemporaryToggled: () -> Unit,
     onViewToggled: (Long) -> Unit,
     onToggleAll: () -> Unit,
     onSave: () -> Unit,
@@ -42,7 +47,11 @@ fun AddItemModal(
         availableViews = modal.availableViews,
         selectedViewIds = modal.selectedViewIds,
         allViewsSelected = modal.allViewsSelected,
+        quantity = modal.quantity,
+        isTemporary = modal.isTemporary,
         onNameChanged = onTitleChanged,
+        onQuantityChanged = onQuantityChanged,
+        onTemporaryToggled = onTemporaryToggled,
         onViewToggled = onViewToggled,
         onToggleAll = onToggleAll,
         onDiscard = onDiscard,
@@ -57,6 +66,8 @@ fun AddItemModal(
 fun EditItemModal(
     modal: EditItemUiState,
     onNameChanged: (String) -> Unit,
+    onQuantityChanged: (Int) -> Unit,
+    onTemporaryToggled: () -> Unit,
     onViewToggled: (Long) -> Unit,
     onToggleAll: () -> Unit,
     onSave: () -> Unit,
@@ -69,7 +80,11 @@ fun EditItemModal(
         availableViews = modal.availableViews,
         selectedViewIds = modal.selectedViewIds,
         allViewsSelected = modal.allViewsSelected,
+        quantity = modal.quantity,
+        isTemporary = modal.isTemporary,
         onNameChanged = onNameChanged,
+        onQuantityChanged = onQuantityChanged,
+        onTemporaryToggled = onTemporaryToggled,
         onViewToggled = onViewToggled,
         onToggleAll = onToggleAll,
         onDiscard = onDiscard,
@@ -86,7 +101,11 @@ private fun ItemModalContent(
     availableViews: List<Shop>,
     selectedViewIds: Set<Long>,
     allViewsSelected: Boolean,
+    quantity: Int,
+    isTemporary: Boolean,
     onNameChanged: (String) -> Unit,
+    onQuantityChanged: (Int) -> Unit,
+    onTemporaryToggled: () -> Unit,
     onViewToggled: (Long) -> Unit,
     onToggleAll: () -> Unit,
     onDiscard: () -> Unit,
@@ -126,6 +145,61 @@ private fun ItemModalContent(
             ),
             modifier = Modifier.fillMaxWidth(),
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "−",
+                    style = typography.body,
+                    color = if (quantity > MIN_QUANTITY) colors.ledOn else colors.ledOff,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(
+                            role = Role.Button,
+                            enabled = quantity > MIN_QUANTITY,
+                        ) { onQuantityChanged(quantity - 1) },
+                )
+                Text(
+                    text = quantity.toString(),
+                    style = typography.body,
+                    color = colors.content,
+                )
+                Text(
+                    text = "+",
+                    style = typography.body,
+                    color = if (quantity < MAX_QUANTITY) colors.ledOn else colors.ledOff,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(
+                            role = Role.Button,
+                            enabled = quantity < MAX_QUANTITY,
+                        ) { onQuantityChanged(quantity + 1) },
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.toggleable(
+                    value = isTemporary,
+                    role = Role.Switch,
+                    onValueChange = { onTemporaryToggled() },
+                ),
+            ) {
+                Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                    Canvas(modifier = Modifier.size(10.dp)) {
+                        drawCircle(color = if (isTemporary) colors.ledOn else colors.ledOff)
+                    }
+                }
+                Text(text = "Temporary", style = typography.label, color = colors.content)
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),

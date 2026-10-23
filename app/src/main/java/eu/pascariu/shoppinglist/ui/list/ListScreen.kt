@@ -348,6 +348,8 @@ fun ListScreen(
                 AddItemModal(
                     modal = modal,
                     onTitleChanged = viewModel::onAddItemTitleChanged,
+                    onQuantityChanged = viewModel::onAddItemQuantityChanged,
+                    onTemporaryToggled = viewModel::onAddItemTemporaryToggled,
                     onViewToggled = viewModel::onAddItemViewToggled,
                     onToggleAll = viewModel::onAddItemToggleAllTapped,
                     onSave = viewModel::onAddItemSave,
@@ -369,6 +371,8 @@ fun ListScreen(
                 EditItemModal(
                     modal = modal,
                     onNameChanged = viewModel::onEditItemTitleChanged,
+                    onQuantityChanged = viewModel::onEditItemQuantityChanged,
+                    onTemporaryToggled = viewModel::onEditItemTemporaryToggled,
                     onViewToggled = viewModel::onEditItemViewToggled,
                     onToggleAll = viewModel::onEditItemToggleAllTapped,
                     onSave = viewModel::onEditItemSave,

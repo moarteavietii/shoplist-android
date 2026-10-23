@@ -7,6 +7,7 @@ import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import eu.pascariu.shoppinglist.data.model.isExpiredAt
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
@@ -44,6 +45,7 @@ class ListViewModel @Inject constructor(
     private val shopsRepository: ShopsRepository,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
+    expiryTicker: StateFlow<Long>,
 ) : ViewModel() {
 
     private val localState = MutableStateFlow(LocalUiState())
@@ -63,8 +65,9 @@ class ListViewModel @Inject constructor(
                 shopsRepository.shops,
                 undoHistoryStore.entries,
                 localState,
-            ) { items, shops, undoEntries, local ->
-                buildUiState(items, shops, undoEntries, local)
+                expiryTicker,
+            ) { items, shops, undoEntries, local, nowMillis ->
+                buildUiState(items, shops, undoEntries, local, nowMillis)
             }.collect { newState ->
                 _uiState.value = newState
             }
@@ -241,6 +244,20 @@ class ListViewModel @Inject constructor(
         }
     }
 
+    fun onAddItemQuantityChanged(quantity: Int) {
+        localState.update { state ->
+            state.copy(addItemModal = state.addItemModal?.copy(quantity = quantity))
+        }
+    }
+
+    fun onAddItemTemporaryToggled() {
+        localState.update { state ->
+            state.copy(addItemModal = state.addItemModal?.let { modal ->
+                modal.copy(isTemporary = !modal.isTemporary)
+            })
+        }
+    }
+
     fun onAddItemViewToggled(viewId: Long) {
         localState.update { state ->
             state.copy(addItemModal = state.addItemModal?.let { modal ->
@@ -278,6 +295,8 @@ class ListViewModel @Inject constructor(
                     request = CreateItemRequest(
                         name = modal.title.trim(),
                         visibleIn = modal.selectedViewIds.toList(),
+                        quantity = modal.quantity,
+                        isTemporary = if (modal.isTemporary) true else null,
                     ),
                 )
             } catch (e: CancellationException) {
@@ -314,6 +333,10 @@ class ListViewModel @Inject constructor(
                     availableViews = shops,
                     selectedViewIds = item.visibleIn.toSet(),
                     originalVisibleIn = item.visibleIn.toSet(),
+                    originalQuantity = item.quantity,
+                    quantity = item.quantity,
+                    originalIsTemporary = item.isTemporary,
+                    isTemporary = item.isTemporary,
                 ),
             )
         }
@@ -322,6 +345,20 @@ class ListViewModel @Inject constructor(
     fun onEditItemTitleChanged(name: String) {
         localState.update { state ->
             state.copy(editItemModal = state.editItemModal?.copy(name = name))
+        }
+    }
+
+    fun onEditItemQuantityChanged(quantity: Int) {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.copy(quantity = quantity))
+        }
+    }
+
+    fun onEditItemTemporaryToggled() {
+        localState.update { state ->
+            state.copy(editItemModal = state.editItemModal?.let { modal ->
+                modal.copy(isTemporary = !modal.isTemporary)
+            })
         }
     }
 
@@ -365,8 +402,10 @@ class ListViewModel @Inject constructor(
                 itemsRepository.updateDetails(
                     itemId = modal.itemId,
                     request = UpdateItemRequest(
-                        name = modal.name.trim(),
-                        visibleIn = modal.selectedViewIds.toList(),
+                        name = if (modal.name.trim() != modal.originalName.trim()) modal.name.trim() else null,
+                        visibleIn = if (modal.selectedViewIds != modal.originalVisibleIn) modal.selectedViewIds.toList() else null,
+                        quantity = if (modal.quantity != modal.originalQuantity) modal.quantity else null,
+                        isTemporary = if (modal.isTemporary != modal.originalIsTemporary) modal.isTemporary else null,
                     ),
                 )
                 localState.update { it.copy(editItemModal = null, errorMessage = null) }
@@ -586,7 +625,10 @@ class ListViewModel @Inject constructor(
         shops: List<Shop>,
         undoEntries: List<eu.pascariu.shoppinglist.data.undo.UndoEntry>,
         local: LocalUiState,
+        nowMillis: Long,
     ): ListUiState {
+        val now = java.time.Instant.ofEpochMilli(nowMillis)
+        val liveItems = items.filterNot { it.isExpiredAt(now) }
         val globalShop = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }
         val globalShopId = globalShop?.id
         val activeShop = shops.firstOrNull { it.id == local.activeViewId }
@@ -596,9 +638,9 @@ class ListViewModel @Inject constructor(
             else -> null
         }
         val viewItems = if (activeViewId == null) {
-            items
+            liveItems
         } else {
-            items.filter { activeViewId in it.visibleIn || it.visibleIn.isEmpty() }
+            liveItems.filter { activeViewId in it.visibleIn || it.visibleIn.isEmpty() }
         }
         val sorted = orderItems(items = viewItems, viewId = activeViewId, order = local.sortOrder)
         val query = local.searchQuery.trim()

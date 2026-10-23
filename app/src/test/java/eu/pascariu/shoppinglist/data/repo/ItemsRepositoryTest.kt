@@ -1,9 +1,11 @@
 package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
+import eu.pascariu.shoppinglist.data.config.FeatureConfig
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -140,6 +142,183 @@ class ItemsRepositoryTest {
 
         assertTrue(thrown.exceptionOrNull() is IllegalArgumentException)
         assertEquals(null, api.lastUpdateItemId)
+    }
+
+    @Test
+    fun `checking a temporary item stamps an optimistic expiry`() = runTest {
+        val temporaryItem = sampleItems().first().copy(isTemporary = true, expiresAt = null)
+        val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val checked = temporaryItem.copy(isChecked = true, expiresAt = "2026-10-23T10:00:00Z")
+        api.updatedItem = checked
+
+        repository.setChecked(itemId = 42L, isChecked = true)
+
+        assertTrue(cacheDuringPatch?.isChecked == true)
+        val stamped = Instant.parse(requireNotNull(cacheDuringPatch?.expiresAt))
+        val expectedFloor = Instant.now().plus(FeatureConfig.TEMPORARY_ITEM_TTL).minusSeconds(5)
+        assertTrue(stamped.isAfter(expectedFloor))
+        assertEquals(checked, repository.items.first().single())
+    }
+
+    @Test
+    fun `unchecking a temporary item clears the cached expiry optimistically`() = runTest {
+        val temporaryItem = sampleItems().first().copy(
+            isTemporary = true,
+            isChecked = true,
+            expiresAt = "2026-10-23T10:00:00Z",
+        )
+        val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val unchecked = temporaryItem.copy(isChecked = false, expiresAt = null)
+        api.updatedItem = unchecked
+
+        repository.setChecked(itemId = 42L, isChecked = false)
+
+        assertEquals(false, cacheDuringPatch?.isChecked)
+        assertEquals(null, cacheDuringPatch?.expiresAt)
+        assertEquals(unchecked, repository.items.first().single())
+    }
+
+    @Test
+    fun `failed check of a temporary item restores the previous expiry`() = runTest {
+        val temporaryItem = sampleItems().first().copy(
+            isTemporary = true,
+            isChecked = true,
+            expiresAt = "2026-10-23T10:00:00Z",
+        )
+        val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.updateError = httpException(500)
+
+        val thrown = runCatching { repository.setChecked(itemId = 42L, isChecked = false) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(temporaryItem, repository.items.first().single())
+    }
+
+    @Test
+    fun `checking a permanent item leaves expiry untouched`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val checked = sampleItems().first().copy(isChecked = true)
+        api.updatedItem = checked
+
+        repository.setChecked(itemId = 42L, isChecked = true)
+
+        assertEquals(null, cacheDuringPatch?.expiresAt)
+        assertEquals(checked, repository.items.first().single())
+    }
+
+    @Test
+    fun `updateDetails temporary off clears the cached expiry optimistically`() = runTest {
+        val temporaryItem = sampleItems().first().copy(
+            isTemporary = true,
+            isChecked = true,
+            expiresAt = "2026-10-23T10:00:00Z",
+        )
+        val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val permanent = temporaryItem.copy(isTemporary = false, expiresAt = null)
+        api.updatedItem = permanent
+
+        repository.updateDetails(itemId = 42L, UpdateItemRequest(isTemporary = false))
+
+        assertEquals(false, cacheDuringPatch?.isTemporary)
+        assertEquals(null, cacheDuringPatch?.expiresAt)
+        assertEquals(permanent, repository.items.first().single())
+    }
+
+    @Test
+    fun `updateDetails temporary on while checked stamps an optimistic expiry`() = runTest {
+        val checkedItem = sampleItems().first().copy(isChecked = true)
+        val api = FakeItemsApi(itemsForFetch = listOf(checkedItem))
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val temporary = checkedItem.copy(
+            isTemporary = true,
+            expiresAt = "2026-10-24T10:00:00Z",
+        )
+        api.updatedItem = temporary
+
+        repository.updateDetails(itemId = 42L, UpdateItemRequest(isTemporary = true))
+
+        assertTrue(cacheDuringPatch?.isTemporary == true)
+        val stamped = Instant.parse(requireNotNull(cacheDuringPatch?.expiresAt))
+        val expectedFloor = Instant.now().plus(FeatureConfig.TEMPORARY_ITEM_TTL).minusSeconds(5)
+        assertTrue(stamped.isAfter(expectedFloor))
+        assertEquals(temporary, repository.items.first().single())
+    }
+
+    @Test
+    fun `updateDetails temporary on while unchecked does not stamp an expiry`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val temporary = sampleItems().first().copy(isTemporary = true)
+        api.updatedItem = temporary
+
+        repository.updateDetails(itemId = 42L, UpdateItemRequest(isTemporary = true))
+
+        assertEquals(null, cacheDuringPatch?.expiresAt)
+        assertEquals(temporary, repository.items.first().single())
+    }
+
+    @Test
+    fun `updateDetails folds quantity into the optimistic copy`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        var cacheDuringPatch: Item? = null
+        api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
+        val updated = sampleItems().first().copy(quantity = 3)
+        api.updatedItem = updated
+
+        repository.updateDetails(itemId = 42L, UpdateItemRequest(quantity = 3))
+
+        assertEquals(3, cacheDuringPatch?.quantity)
+        assertEquals(updated, repository.items.first().single())
+    }
+
+    @Test
+    fun `updateDetails failure restores quantity and expiry`() = runTest {
+        val temporaryItem = sampleItems().first().copy(
+            isTemporary = true,
+            isChecked = true,
+            quantity = 2,
+            expiresAt = "2026-10-23T10:00:00Z",
+        )
+        val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
+        val repository = ItemsRepository(api)
+        repository.refetch(listId = 1)
+        api.updateError = httpException(500)
+
+        val thrown = runCatching {
+            repository.updateDetails(
+                itemId = 42L,
+                UpdateItemRequest(name = "Crackers", quantity = 5, isTemporary = false),
+            )
+        }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(temporaryItem, repository.items.first().single())
     }
 
     @Test

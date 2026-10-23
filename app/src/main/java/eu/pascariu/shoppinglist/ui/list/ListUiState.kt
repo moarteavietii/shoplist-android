@@ -37,6 +37,8 @@ data class AddItemUiState(
     val title: String,
     val availableViews: List<Shop>,
     val selectedViewIds: Set<Long>,
+    val quantity: Int = 1,
+    val isTemporary: Boolean = false,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
     val canSave: Boolean get() = title.isNotBlank()
@@ -49,9 +51,17 @@ data class EditItemUiState(
     val availableViews: List<Shop>,
     val selectedViewIds: Set<Long>,
     val originalVisibleIn: Set<Long> = selectedViewIds,
+    val originalQuantity: Int = 1,
+    val quantity: Int = originalQuantity,
+    val originalIsTemporary: Boolean = false,
+    val isTemporary: Boolean = originalIsTemporary,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
-    val isUnchanged: Boolean get() = name.trim() == originalName.trim() && selectedViewIds == originalVisibleIn
+    val isUnchanged: Boolean get() =
+        name.trim() == originalName.trim() &&
+            selectedViewIds == originalVisibleIn &&
+            quantity == originalQuantity &&
+            isTemporary == originalIsTemporary
     val canSave: Boolean get() = name.isNotBlank() && !isUnchanged
 }
 
