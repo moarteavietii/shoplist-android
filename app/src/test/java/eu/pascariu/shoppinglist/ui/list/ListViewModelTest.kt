@@ -22,6 +22,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -1275,4 +1277,41 @@ class ListViewModelTest {
 
         assertEquals(2, server.requestCount)
     }
+
+    @Test
+    fun `drop index is resolved against the full view list even with an active search query`() =
+        runTest(testDispatcher) {
+            enqueueItemList(
+                itemJson(10, "Milk", orderKey = "a0"),
+                itemJson(11, "Bread", orderKey = "a1"),
+                itemJson(12, "Eggs", orderKey = "a2"),
+            )
+            enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+            viewModel.refresh()
+            awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+            server.takeRequest(5, TimeUnit.SECONDS)
+            server.takeRequest(5, TimeUnit.SECONDS)
+
+            viewModel.onSearchQueryChanged("eggs")
+            advanceUntilIdle()
+            assertEquals(listOf("Eggs"), viewModel.uiState.value.filteredItems.map { it.name })
+
+            server.enqueue(
+                MockResponse().setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(itemJson(12, "Eggs", orderKey = "a15")),
+            )
+
+            viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 12L }, dropIndex = 0)
+            advanceUntilIdle()
+
+            val reorderRequest = server.takeRequest(5, TimeUnit.SECONDS)
+                ?: throw AssertionError("expected a reorder PATCH")
+            assertEquals("PATCH", reorderRequest.method)
+            val sentKey = Json.parseToJsonElement(reorderRequest.body.readUtf8())
+                .jsonObject["orderMap"]!!
+                .jsonObject["1"]!!
+                .jsonPrimitive.content
+            assertEquals("Zz", sentKey)
+        }
 }
