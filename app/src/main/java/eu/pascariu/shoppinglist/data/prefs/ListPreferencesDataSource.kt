@@ -1,6 +1,8 @@
 package eu.pascariu.shoppinglist.data.prefs
 
+import android.util.Log
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -8,7 +10,6 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import eu.pascariu.shoppinglist.di.IoDispatcher
-import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +50,8 @@ class ListPreferencesDataSource(
     init {
         dataStore.data
             .catch { failure ->
-                if (failure is IOException) emit(emptyPreferences()) else throw failure
+                Log.w(TAG, "List preferences load failed; using defaults", failure)
+                emit(emptyPreferences())
             }
             .onEach { prefs ->
                 expanded.value = prefs[KEY_WIDGET_STACK_EXPANDED] ?: false
@@ -65,14 +67,14 @@ class ListPreferencesDataSource(
 
     suspend fun setWidgetStackExpanded(isExpanded: Boolean) {
         expanded.value = isExpanded
-        dataStore.edit { prefs ->
+        persist { prefs ->
             prefs[KEY_WIDGET_STACK_EXPANDED] = isExpanded
         }
     }
 
     suspend fun setActiveShopId(shopId: Long?) {
         activeShop.value = shopId
-        dataStore.edit { prefs ->
+        persist { prefs ->
             if (shopId == null) {
                 prefs.remove(KEY_ACTIVE_SHOP_ID)
             } else {
@@ -83,33 +85,44 @@ class ListPreferencesDataSource(
 
     suspend fun setSearchExpanded(isExpanded: Boolean) {
         searchExpandedFlow.value = isExpanded
-        dataStore.edit { prefs ->
+        persist { prefs ->
             prefs[KEY_SEARCH_EXPANDED] = isExpanded
         }
     }
 
     suspend fun setShowChecked(show: Boolean) {
         showCheckedFlow.value = show
-        dataStore.edit { prefs ->
+        persist { prefs ->
             prefs[KEY_SHOW_CHECKED] = show
         }
     }
 
     suspend fun setSortModeEnabled(enabled: Boolean) {
         sortModeEnabledFlow.value = enabled
-        dataStore.edit { prefs ->
+        persist { prefs ->
             prefs[KEY_SORT_MODE_ENABLED] = enabled
         }
     }
 
     suspend fun setSortOrder(order: SortOrder) {
         sortOrderFlow.value = order
-        dataStore.edit { prefs ->
+        persist { prefs ->
             prefs[KEY_SORT_ORDER] = order.name
         }
     }
 
+    private suspend fun persist(transform: (MutablePreferences) -> Unit) {
+        try {
+            dataStore.edit(transform)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.w(TAG, "List preferences write failed", error)
+        }
+    }
+
     private companion object {
+        const val TAG = "ListPreferences"
         val KEY_WIDGET_STACK_EXPANDED = booleanPreferencesKey("widget_stack_expanded")
         val KEY_ACTIVE_SHOP_ID = longPreferencesKey("active_shop_id")
         val KEY_SEARCH_EXPANDED = booleanPreferencesKey("search_expanded")

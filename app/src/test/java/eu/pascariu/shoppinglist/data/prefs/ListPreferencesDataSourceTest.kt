@@ -217,4 +217,25 @@ class ListPreferencesDataSourceTest {
             assertFalse(restarted.sortModeEnabled.value)
             assertEquals(SortOrder.ALPHABETICAL, restarted.sortOrder.value)
         }
+
+    @Test
+    fun `setter keeps in-memory state and does not throw when persistence fails`() =
+        runTest(testDispatcher) {
+            val unreadableFile = File(tmpFolder.root, "unreadable.preferences_pb")
+            unreadableFile.mkdirs()
+            val failingScope = CoroutineScope(StandardTestDispatcher(testDispatcher.scheduler) + Job())
+            val failing = ListPreferencesDataSource(
+                dataStore = PreferenceDataStoreFactory.create(scope = failingScope) { unreadableFile },
+                ioDispatcher = StandardTestDispatcher(testDispatcher.scheduler),
+            )
+            advanceUntilIdle()
+
+            failing.setWidgetStackExpanded(true)
+            failing.setActiveShopId(3L)
+
+            assertTrue(failing.widgetStackExpanded.value)
+            assertEquals(3L, failing.activeShopId.value)
+
+            failingScope.cancel()
+        }
 }
