@@ -1265,6 +1265,34 @@ class ListViewModelTest {
         }
 
     @Test
+    fun `drag disabled while search query is active`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isDragEnabled())
+
+        viewModel.onSearchQueryChanged("")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.isDragEnabled())
+    }
+
+    @Test
+    fun `drop with active search query does not reorder`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 0)
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
     fun `drop in non-manual order does not reorder`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)

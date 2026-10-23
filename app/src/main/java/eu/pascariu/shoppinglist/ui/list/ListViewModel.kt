@@ -151,9 +151,11 @@ class ListViewModel @Inject constructor(
     fun isDragEnabled(): Boolean {
         val local = localState.value
         val overlaysOpen = local.addItemModal != null || local.shopModal != null
+        val queryActive = local.searchQuery.isNotBlank()
         return local.sortModeEnabled &&
             local.sortOrder == SortOrder.MANUAL &&
-            !overlaysOpen
+            !overlaysOpen &&
+            !queryActive
     }
 
     fun onItemDropped(item: Item, dropIndex: Int) {

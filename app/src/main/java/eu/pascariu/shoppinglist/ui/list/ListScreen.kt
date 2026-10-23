@@ -91,7 +91,8 @@ fun ListScreen(
     val dragEnabled = state.sortModeEnabled &&
         state.sortOrder == SortOrder.MANUAL &&
         state.addItemModal == null &&
-        state.shopModal == null
+        state.shopModal == null &&
+        state.searchQuery.isBlank()
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
