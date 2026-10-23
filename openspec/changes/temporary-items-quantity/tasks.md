@@ -24,4 +24,4 @@
 ## 6. Verification
 
 - [x] 6.1 Run `./gradlew test` and `./gradlew lint`; fix any issues
-- [ ] 6.2 Device smoke test: add temporary item → check it → verify it disappears after expiry (short TTL via second client or manual `expiresAt`); edit quantity → suffix updates; uncheck clears expiry (row stays); remote expiry deletion via second client
+- [x] 6.2 Device smoke test: add temporary item → check it → verify it disappears after expiry (short TTL via second client or manual `expiresAt`); edit quantity → suffix updates; uncheck clears expiry (row stays); remote expiry deletion via second client
