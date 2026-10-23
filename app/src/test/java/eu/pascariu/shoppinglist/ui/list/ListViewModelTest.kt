@@ -119,7 +119,7 @@ class ListViewModelTest {
         id: Long,
         name: String,
         isChecked: Boolean = false,
-        orderKey: String = "a0",
+        orderKey: String? = "a0",
         visibleIn: String = "[1]",
         checkCount: Int = 0,
     ): String =
@@ -129,7 +129,7 @@ class ListViewModelTest {
           "listId": 1,
           "name": "$name",
           "isChecked": $isChecked,
-          "orderMap": {"1": "$orderKey"},
+          "orderMap": ${if (orderKey == null) "{}" else "{\"1\": \"$orderKey\"}"},
           "quantity": 1,
           "isTemporary": false,
           "checkCount": $checkCount,
@@ -1320,5 +1320,67 @@ class ListViewModelTest {
         advanceUntilIdle()
 
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `valid manual drop sends reorder with fractional key and updates cache`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", orderKey = "a2")),
+        )
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)!!
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"orderMap\""))
+        assertTrue(body.contains("\"1\":\"a2\""))
+        awaitUntil { viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"] == "a2" }
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `drop past keyed tail clamps to end of keyed list`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0"),
+            itemJson(11, "Bread", orderKey = "a1"),
+            itemJson(12, "Eggs", orderKey = null),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", orderKey = "a2")),
+        )
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 2)
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)!!
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"1\":\"a2\""))
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `failed reorder shows error message`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
+        awaitUntil { viewModel.uiState.value.errorMessage != null }
+
+        assertEquals("Couldn't move the item", viewModel.uiState.value.errorMessage)
+        assertEquals("a0", viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"])
     }
 }

@@ -149,9 +149,10 @@ class ListViewModel @Inject constructor(
             .sortedWith(manualOrderComparator(viewId))
             .filter { it.id != item.id }
             .mapNotNull { it.orderMap[viewId.toString()] }
+        val clampedDropIndex = dropIndex.coerceIn(0, orderedKeys.size)
         viewModelScope.launch {
             try {
-                val newKey = dropKeyForIndex(orderedKeys = orderedKeys, dropIndex = dropIndex)
+                val newKey = dropKeyForIndex(orderedKeys = orderedKeys, dropIndex = clampedDropIndex)
                 itemsRepository.reorder(itemId = item.id, viewId = viewId, newKey = newKey)
                 localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
