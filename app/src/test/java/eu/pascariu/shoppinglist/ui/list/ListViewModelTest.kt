@@ -445,6 +445,38 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `second add after successful save is not blocked by stale guard`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSearchQueryChanged("Eggs")
+        advanceUntilIdle()
+        viewModel.onAddAffordanceTapped()
+        advanceUntilIdle()
+        server.enqueue(
+            MockResponse().setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 12, name = "Eggs")),
+        )
+
+        viewModel.onAddItemSave()
+        awaitUntil { viewModel.uiState.value.addItemModal == null }
+
+        viewModel.onAddAffordanceTapped()
+        awaitUntil { viewModel.uiState.value.addItemModal != null }
+        viewModel.onAddItemTitleChanged("Butter")
+        awaitUntil { viewModel.uiState.value.addItemModal?.title == "Butter" }
+        server.enqueue(
+            MockResponse().setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 13, name = "Butter")),
+        )
+
+        viewModel.onAddItemSave()
+        awaitUntil { viewModel.uiState.value.addItemModal == null }
+
+        assertEquals(4, server.requestCount)
+    }
+
+    @Test
     fun `failed save surfaces error and keeps modal open`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onSearchQueryChanged("Eggs")
@@ -689,6 +721,28 @@ class ListViewModelTest {
         assertEquals("Bread", viewModel.uiState.value.items.first { it.id == 11L }.name)
         assertNotNull(viewModel.uiState.value.errorMessage)
         assertNull(viewModel.uiState.value.editItemModal)
+    }
+
+    @Test
+    fun `edit modal save ignores duplicate taps while patch in flight`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        viewModel.onEditItemTitleChanged("Crackers")
+        awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
+
+        viewModel.onEditItemSave()
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Crackers")),
+        )
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+
+        assertEquals(3, server.requestCount)
     }
 
     @Test
