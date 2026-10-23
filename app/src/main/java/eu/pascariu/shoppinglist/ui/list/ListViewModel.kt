@@ -495,7 +495,6 @@ class ListViewModel @Inject constructor(
             globalShop != null -> globalShop.name
             else -> GLOBAL_VIEW_NAME
         }
-        val hasUnchecked = deriveHasUncheckedItems(items, shops)
         val uncheckedCounts = deriveUncheckedCountByShop(items, shops)
         val drawerShops = buildDrawerShops(
             shops = shops,
@@ -510,7 +509,6 @@ class ListViewModel @Inject constructor(
             isWidgetStackExpanded = local.isWidgetStackExpanded,
             sortModeEnabled = local.sortModeEnabled,
             sortOrder = local.sortOrder,
-            hasUncheckedItems = hasUnchecked,
             uncheckedCountByShop = uncheckedCounts,
             drawerShops = drawerShops,
             drawerOpen = local.drawerOpen,
@@ -571,22 +569,6 @@ class ListViewModel @Inject constructor(
             }
         }
         return shops.associate { shop -> shop.id to (counts[shop.id] ?: 0) }
-    }
-
-    private fun deriveHasUncheckedItems(items: List<Item>, shops: List<Shop>): Map<Long, Boolean> {
-        val globalShopId = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }?.id
-        val uncheckedByShop = mutableMapOf<Long, Boolean>()
-        for (item in items) {
-            if (item.isChecked) continue
-            if (item.visibleIn.isEmpty()) {
-                if (globalShopId != null) uncheckedByShop[globalShopId] = true
-            } else {
-                for (shopId in item.visibleIn) {
-                    uncheckedByShop[shopId] = true
-                }
-            }
-        }
-        return shops.associate { shop -> shop.id to (uncheckedByShop[shop.id] == true) }
     }
 
     private suspend fun waitForInFlightChecks(): Boolean {

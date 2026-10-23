@@ -646,57 +646,6 @@ class ListViewModelTest {
     }
 
     @Test
-    fun `hasUncheckedItems covers shops and Global participation`() = runTest(testDispatcher) {
-        enqueueItemList(
-            itemJson(10, "Milk", isChecked = false, visibleIn = "[1,2]"),
-            itemJson(11, "Bread", isChecked = true, visibleIn = "[2]"),
-            itemJson(12, "Chips", isChecked = false, visibleIn = "[]"),
-        )
-        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
-        viewModel.refresh()
-        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
-        server.takeRequest(5, TimeUnit.SECONDS)
-        server.takeRequest(5, TimeUnit.SECONDS)
-
-        val indicators = viewModel.uiState.value.hasUncheckedItems
-        assertEquals(true, indicators[1L])
-        assertEquals(true, indicators[2L])
-    }
-
-    @Test
-    fun `fully checked shop has no indicator`() = runTest(testDispatcher) {
-        enqueueItemList(
-            itemJson(11, "Bread", isChecked = true, visibleIn = "[2]"),
-            itemJson(12, "Chips", isChecked = true, visibleIn = "[]"),
-        )
-        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
-        viewModel.refresh()
-        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
-        server.takeRequest(5, TimeUnit.SECONDS)
-        server.takeRequest(5, TimeUnit.SECONDS)
-
-        val indicators = viewModel.uiState.value.hasUncheckedItems
-        assertEquals(false, indicators[1L])
-        assertEquals(false, indicators[2L])
-    }
-
-    @Test
-    fun `empty visibleIn counts toward Global only`() = runTest(testDispatcher) {
-        enqueueItemList(
-            itemJson(12, "Chips", isChecked = false, visibleIn = "[]"),
-        )
-        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
-        viewModel.refresh()
-        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
-        server.takeRequest(5, TimeUnit.SECONDS)
-        server.takeRequest(5, TimeUnit.SECONDS)
-
-        val indicators = viewModel.uiState.value.hasUncheckedItems
-        assertEquals(true, indicators[1L])
-        assertEquals(false, indicators[2L])
-    }
-
-    @Test
     fun `remote item deleted event drops row while undo bar visible`() = runTest(testDispatcher) {
         loadFixtures()
         server.enqueue(

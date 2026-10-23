@@ -12,7 +12,6 @@ data class ListUiState(
     val isWidgetStackExpanded: Boolean = false,
     val sortModeEnabled: Boolean = true,
     val sortOrder: SortOrder = SortOrder.MANUAL,
-    val hasUncheckedItems: Map<Long, Boolean> = emptyMap(),
     val uncheckedCountByShop: Map<Long, Int> = emptyMap(),
     val drawerShops: List<DrawerShop> = emptyList(),
     val drawerOpen: Boolean = false,
