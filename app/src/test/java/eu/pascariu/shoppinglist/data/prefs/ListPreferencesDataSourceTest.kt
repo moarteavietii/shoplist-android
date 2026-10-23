@@ -99,6 +99,40 @@ class ListPreferencesDataSourceTest {
     }
 
     @Test
+    fun `search expanded defaults to false`() = runTest(testDispatcher) {
+        settle()
+
+        assertFalse(dataSource.searchExpanded.value)
+    }
+
+    @Test
+    fun `search expanded round-trips through storage`() = runTest(testDispatcher) {
+        settle()
+
+        dataSource.setSearchExpanded(true)
+        settle()
+
+        assertTrue(dataSource.searchExpanded.value)
+    }
+
+    @Test
+    fun `show checked defaults to true`() = runTest(testDispatcher) {
+        settle()
+
+        assertTrue(dataSource.showChecked.value)
+    }
+
+    @Test
+    fun `show checked round-trips through storage`() = runTest(testDispatcher) {
+        settle()
+
+        dataSource.setShowChecked(false)
+        settle()
+
+        assertFalse(dataSource.showChecked.value)
+    }
+
+    @Test
     fun `keys are isolated - writing one does not affect the other`() = runTest(testDispatcher) {
         settle()
 
@@ -124,6 +158,8 @@ class ListPreferencesDataSourceTest {
 
             dataSource.setWidgetStackExpanded(true)
             dataSource.setActiveShopId(9L)
+            dataSource.setSearchExpanded(true)
+            dataSource.setShowChecked(false)
             settle()
 
             storeScope.cancel()
@@ -140,5 +176,7 @@ class ListPreferencesDataSourceTest {
 
             assertTrue(restarted.widgetStackExpanded.value)
             assertEquals(9L, restarted.activeShopId.value)
+            assertTrue(restarted.searchExpanded.value)
+            assertFalse(restarted.showChecked.value)
         }
 }

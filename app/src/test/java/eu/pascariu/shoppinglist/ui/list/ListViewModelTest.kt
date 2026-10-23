@@ -977,4 +977,176 @@ class ListViewModelTest {
 
         assertFalse(restarted.uiState.value.isWidgetStackExpanded)
     }
+
+    @Test
+    fun `uncheckedCountByShop counts per-shop and Global counts all`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1,2]"),
+            itemJson(11, "Bread", isChecked = false, visibleIn = "[2]"),
+            itemJson(12, "Chips", isChecked = true, visibleIn = "[2]"),
+            itemJson(13, "Tea", isChecked = false, visibleIn = "[]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val counts = viewModel.uiState.value.uncheckedCountByShop
+        assertEquals(2, counts[1L])
+        assertEquals(2, counts[2L])
+    }
+
+    @Test
+    fun `fully checked shop has zero count`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[2]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val counts = viewModel.uiState.value.uncheckedCountByShop
+        assertEquals(0, counts[1L])
+        assertEquals(0, counts[2L])
+    }
+
+    @Test
+    fun `checking an item updates drawer badges and switcher count at once`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.uncheckedCountByShop[1L] == 1 }
+
+        val counts = viewModel.uiState.value.uncheckedCountByShop
+        assertEquals(1, counts[1L])
+        assertEquals(0, counts[2L])
+        assertEquals(1, viewModel.uiState.value.drawerShops.first { it.isGlobal }.uncheckedCount)
+        assertEquals(0, viewModel.uiState.value.drawerShops.first { !it.isGlobal }.uncheckedCount)
+    }
+
+    @Test
+    fun `search expanded defaults to collapsed and persists`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        assertFalse(viewModel.uiState.value.searchExpanded)
+
+        viewModel.onSearchExpandedChanged(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.searchExpanded)
+        assertTrue(listPreferences.searchExpanded.value)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(restarted.uiState.value.searchExpanded)
+    }
+
+    @Test
+    fun `collapsing search clears the query`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchExpandedChanged(true)
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+        assertEquals(listOf("Milk"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSearchExpandedChanged(false)
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.uiState.value.searchQuery)
+        assertTrue(viewModel.uiState.value.filteredItems.map { it.name }.containsAll(listOf("Milk", "Bread")))
+    }
+
+    @Test
+    fun `query is never persisted across restart`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchExpandedChanged(true)
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(restarted.uiState.value.searchExpanded)
+        assertEquals("", restarted.uiState.value.searchQuery)
+    }
+
+    @Test
+    fun `showChecked defaults to true and persists`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        assertTrue(viewModel.uiState.value.showChecked)
+
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.showChecked)
+        assertFalse(listPreferences.showChecked.value)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertFalse(restarted.uiState.value.showChecked)
+    }
+
+    @Test
+    fun `hiding excludes checked items but search override keeps matches visible`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1]"),
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[1]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSearchQueryChanged("bre")
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSearchQueryChanged("")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+    }
+
+    @Test
+    fun `manual sort engagement reveals all items regardless of hide toggle`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1]"),
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[1]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+
+        viewModel.onManualSortEngaged(true)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onManualSortEngaged(false)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+    }
 }

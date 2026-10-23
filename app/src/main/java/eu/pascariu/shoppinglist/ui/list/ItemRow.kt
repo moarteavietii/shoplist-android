@@ -1,13 +1,19 @@
 package eu.pascariu.shoppinglist.ui.list
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,35 +30,43 @@ fun ItemRow(
     item: Item,
     onCheckToggled: (Item) -> Unit,
     modifier: Modifier = Modifier,
+    hideChecked: Boolean = false,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .toggleable(
-                value = item.isChecked,
-                role = Role.Checkbox,
-                onValueChange = { onCheckToggled(item) },
-            )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    AnimatedVisibility(
+        visible = !(hideChecked && item.isChecked),
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+        modifier = modifier,
     ) {
-        LedCheckbox(checked = item.isChecked)
-        Text(
-            text = item.name,
-            style = typography.body,
-            color = if (item.isChecked) colors.contentMuted else colors.content,
-            modifier = Modifier.graphicsLayer(alpha = if (item.isChecked) 0.6f else 1f),
-        )
-        if (item.quantity > 1) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = item.isChecked,
+                    role = Role.Checkbox,
+                    onValueChange = { onCheckToggled(item) },
+                )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            LedCheckbox(checked = item.isChecked)
             Text(
-                text = "×${item.quantity}",
-                style = typography.label,
-                color = colors.contentMuted,
+                text = item.name,
+                style = typography.body,
+                color = if (item.isChecked) colors.contentMuted else colors.content,
+                modifier = Modifier.graphicsLayer(alpha = if (item.isChecked) 0.6f else 1f),
             )
+            if (item.quantity > 1) {
+                Text(
+                    text = "×${item.quantity}",
+                    style = typography.label,
+                    color = colors.contentMuted,
+                )
+            }
         }
     }
 }

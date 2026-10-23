@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,9 +30,9 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
@@ -47,7 +45,7 @@ data class DrawerShop(
     val name: String,
     val isGlobal: Boolean,
     val isActive: Boolean,
-    val hasUncheckedItems: Boolean,
+    val uncheckedCount: Int,
 )
 
 @Composable
@@ -139,6 +137,7 @@ private fun DrawerShopRow(
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
+    val shapes = LocalShoplistShapes.current
 
     Row(
         modifier = Modifier
@@ -148,23 +147,14 @@ private fun DrawerShopRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            if (shop.hasUncheckedItems) {
-                Canvas(modifier = Modifier.size(10.dp)) {
-                    drawCircle(
-                        color = colors.ledOn.copy(alpha = 0.6f),
-                        style = Stroke(width = 1.5.dp.toPx()),
-                    )
-                }
-            }
-        }
-
         Text(
             text = shop.name,
             style = typography.body,
             color = if (shop.isActive) colors.ledOn else colors.content,
             modifier = Modifier.weight(1f),
         )
+
+        UncheckedCountBadge(count = shop.uncheckedCount)
 
         if (!shop.isGlobal) {
             Icon(
@@ -177,4 +167,27 @@ private fun DrawerShopRow(
             )
         }
     }
+}
+
+@Composable
+private fun UncheckedCountBadge(count: Int) {
+    val colors = LocalShoplistColors.current
+    val typography = LocalShoplistTypography.current
+    val shapes = LocalShoplistShapes.current
+
+    Text(
+        text = count.toString(),
+        style = typography.label,
+        color = if (count > 0) colors.background else colors.contentMuted,
+        modifier = Modifier
+            .then(
+                if (count > 0) {
+                    Modifier.background(colors.ledOn, shapes.small)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .clearAndSetSemantics { },
+    )
 }

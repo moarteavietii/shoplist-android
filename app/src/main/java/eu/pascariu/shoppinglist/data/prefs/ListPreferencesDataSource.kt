@@ -30,6 +30,12 @@ class ListPreferencesDataSource(
     private val activeShop = MutableStateFlow<Long?>(null)
     val activeShopId: StateFlow<Long?> = activeShop.asStateFlow()
 
+    private val searchExpandedFlow = MutableStateFlow(false)
+    val searchExpanded: StateFlow<Boolean> = searchExpandedFlow.asStateFlow()
+
+    private val showCheckedFlow = MutableStateFlow(true)
+    val showChecked: StateFlow<Boolean> = showCheckedFlow.asStateFlow()
+
     private val ready = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = ready.asStateFlow()
 
@@ -41,6 +47,8 @@ class ListPreferencesDataSource(
             .onEach { prefs ->
                 expanded.value = prefs[KEY_WIDGET_STACK_EXPANDED] ?: false
                 activeShop.value = prefs[KEY_ACTIVE_SHOP_ID]
+                searchExpandedFlow.value = prefs[KEY_SEARCH_EXPANDED] ?: false
+                showCheckedFlow.value = prefs[KEY_SHOW_CHECKED] ?: true
                 ready.value = true
             }
             .launchIn(scope)
@@ -64,8 +72,24 @@ class ListPreferencesDataSource(
         }
     }
 
+    suspend fun setSearchExpanded(isExpanded: Boolean) {
+        searchExpandedFlow.value = isExpanded
+        dataStore.edit { prefs ->
+            prefs[KEY_SEARCH_EXPANDED] = isExpanded
+        }
+    }
+
+    suspend fun setShowChecked(show: Boolean) {
+        showCheckedFlow.value = show
+        dataStore.edit { prefs ->
+            prefs[KEY_SHOW_CHECKED] = show
+        }
+    }
+
     private companion object {
         val KEY_WIDGET_STACK_EXPANDED = booleanPreferencesKey("widget_stack_expanded")
         val KEY_ACTIVE_SHOP_ID = longPreferencesKey("active_shop_id")
+        val KEY_SEARCH_EXPANDED = booleanPreferencesKey("search_expanded")
+        val KEY_SHOW_CHECKED = booleanPreferencesKey("show_checked")
     }
 }

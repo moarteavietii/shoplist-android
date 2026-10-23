@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
@@ -24,7 +25,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.ViewWeek
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,9 +36,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
+import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 
 enum class WidgetStackControl {
     VIEW_SWITCHER,
@@ -64,6 +67,9 @@ fun LedDot(filled: Boolean, modifier: Modifier = Modifier) {
 fun WidgetStack(
     isDrawerOpen: Boolean,
     isExpanded: Boolean,
+    isSearchExpanded: Boolean,
+    isShowingCheckedItems: Boolean,
+    globalUncheckedCount: Int,
     onControlTapped: (WidgetStackControl) -> Unit,
     onExpandedChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -92,18 +98,26 @@ fun WidgetStack(
             horizontalAlignment = Alignment.End,
             modifier = Modifier.background(colors.surface, shapes.medium),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable(role = Role.Button) { onExpandedChanged(!isExpanded) },
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Collapse widget stack" else "Expand widget stack",
-                    tint = colors.contentMuted,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .graphicsLayer(rotationZ = chevronRotation),
-                )
+            Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable(role = Role.Button) { onExpandedChanged(!isExpanded) },
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Collapse widget stack" else "Expand widget stack",
+                        tint = colors.contentMuted,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .graphicsLayer(rotationZ = chevronRotation),
+                    )
+                }
+                if (globalUncheckedCount > 0) {
+                    SwitcherBadge(
+                        count = globalUncheckedCount,
+                        modifier = Modifier.align(Alignment.TopEnd),
+                    )
+                }
             }
             AnimatedVisibility(
                 visible = isExpanded,
@@ -114,7 +128,12 @@ fun WidgetStack(
                     WidgetStackControl.entries.forEach { control ->
                         WidgetStackControlRow(
                             control = control,
-                            isActive = control == WidgetStackControl.VIEW_SWITCHER && isDrawerOpen,
+                            isActive = when (control) {
+                                WidgetStackControl.VIEW_SWITCHER -> isDrawerOpen
+                                WidgetStackControl.SEARCH -> isSearchExpanded
+                                WidgetStackControl.CHECKED_ITEMS_TOGGLE -> isShowingCheckedItems
+                                else -> false
+                            },
                             onTapped = { onControlTapped(control) },
                         )
                     }
@@ -122,6 +141,22 @@ fun WidgetStack(
             }
         }
     }
+}
+
+@Composable
+private fun SwitcherBadge(count: Int, modifier: Modifier = Modifier) {
+    val colors = LocalShoplistColors.current
+    val typography = LocalShoplistTypography.current
+
+    Text(
+        text = count.toString(),
+        style = typography.label,
+        color = colors.background,
+        modifier = modifier
+            .background(colors.ledOn, RoundedCornerShape(8.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp)
+            .clearAndSetSemantics { },
+    )
 }
 
 @Composable

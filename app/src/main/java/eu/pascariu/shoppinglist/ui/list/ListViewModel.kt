@@ -71,6 +71,16 @@ class ListViewModel @Inject constructor(
             val expanded = listPreferences.widgetStackExpanded.value
             localState.update { it.copy(isWidgetStackExpanded = expanded) }
         }
+        viewModelScope.launch {
+            listPreferences.isReady.first { it }
+            val expanded = listPreferences.searchExpanded.value
+            localState.update { it.copy(searchExpanded = expanded) }
+        }
+        viewModelScope.launch {
+            listPreferences.isReady.first { it }
+            val show = listPreferences.showChecked.value
+            localState.update { it.copy(showChecked = show) }
+        }
     }
 
     fun refresh() {
@@ -89,6 +99,29 @@ class ListViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         localState.update { it.copy(searchQuery = query) }
+    }
+
+    fun onSearchExpandedChanged(expanded: Boolean) {
+        localState.update {
+            it.copy(
+                searchExpanded = expanded,
+                searchQuery = if (expanded) it.searchQuery else "",
+            )
+        }
+        viewModelScope.launch {
+            listPreferences.setSearchExpanded(expanded)
+        }
+    }
+
+    fun onShowCheckedChanged(show: Boolean) {
+        localState.update { it.copy(showChecked = show) }
+        viewModelScope.launch {
+            listPreferences.setShowChecked(show)
+        }
+    }
+
+    fun onManualSortEngaged(engaged: Boolean) {
+        localState.update { it.copy(isManualSortEngaged = engaged) }
     }
 
     fun onCheckToggled(item: Item) {
@@ -262,11 +295,10 @@ class ListViewModel @Inject constructor(
     fun onWidgetStackControlTapped(control: WidgetStackControl) {
         when (control) {
             WidgetStackControl.VIEW_SWITCHER -> onDrawerToggled()
-            WidgetStackControl.SETTINGS,
-            WidgetStackControl.SORT_MODE,
-            WidgetStackControl.CHECKED_ITEMS_TOGGLE,
-            WidgetStackControl.SEARCH,
-            -> Unit
+            WidgetStackControl.SETTINGS -> Unit
+            WidgetStackControl.SORT_MODE -> Unit
+            WidgetStackControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
+            WidgetStackControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
         }
     }
 
@@ -397,18 +429,21 @@ class ListViewModel @Inject constructor(
         }
         val sorted = sortManual(items = viewItems, viewId = activeViewId)
         val query = local.searchQuery.trim()
-        val filtered = if (query.isEmpty()) sorted else sorted.filter { fuzzyMatch(query, it.name) }
+        val queryActive = query.isNotEmpty()
+        val filtered = if (queryActive) sorted.filter { fuzzyMatch(query, it.name) } else sorted
+        val hideChecked = !local.showChecked && !queryActive && !local.isManualSortEngaged
         val activeName = when {
             activeShop != null -> activeShop.name
             globalShop != null -> globalShop.name
             else -> GLOBAL_VIEW_NAME
         }
         val hasUnchecked = deriveHasUncheckedItems(items, shops)
+        val uncheckedCounts = deriveUncheckedCountByShop(items, shops)
         val drawerShops = buildDrawerShops(
             shops = shops,
             globalShopId = globalShopId,
             activeViewId = activeViewId,
-            hasUncheckedItems = hasUnchecked,
+            uncheckedCountByShop = uncheckedCounts,
         )
         return ListUiState(
             items = sorted,
@@ -416,9 +451,13 @@ class ListViewModel @Inject constructor(
             activeViewId = activeViewId,
             isWidgetStackExpanded = local.isWidgetStackExpanded,
             hasUncheckedItems = hasUnchecked,
+            uncheckedCountByShop = uncheckedCounts,
             drawerShops = drawerShops,
             drawerOpen = local.drawerOpen,
             searchQuery = local.searchQuery,
+            searchExpanded = local.searchExpanded,
+            showChecked = local.showChecked,
+            hideChecked = hideChecked,
             filteredItems = filtered,
             showAddAffordance = query.isNotEmpty() && filtered.isEmpty(),
             showUndoBar = undoEntries.isNotEmpty(),
@@ -433,7 +472,7 @@ class ListViewModel @Inject constructor(
         shops: List<Shop>,
         globalShopId: Long?,
         activeViewId: Long?,
-        hasUncheckedItems: Map<Long, Boolean>,
+        uncheckedCountByShop: Map<Long, Int>,
     ): List<DrawerShop> {
         val global = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }
         val others = shops
@@ -444,7 +483,7 @@ class ListViewModel @Inject constructor(
             name = GLOBAL_VIEW_NAME,
             isGlobal = true,
             isActive = activeViewId == null || activeViewId == global?.id,
-            hasUncheckedItems = globalShopId != null && hasUncheckedItems[globalShopId] == true,
+            uncheckedCount = globalShopId?.let { uncheckedCountByShop[it] } ?: 0,
         )
         val otherRows = others.map { shop ->
             DrawerShop(
@@ -452,10 +491,26 @@ class ListViewModel @Inject constructor(
                 name = shop.name,
                 isGlobal = false,
                 isActive = shop.id == activeViewId,
-                hasUncheckedItems = hasUncheckedItems[shop.id] == true,
+                uncheckedCount = uncheckedCountByShop[shop.id] ?: 0,
             )
         }
         return listOf(globalRow) + otherRows
+    }
+
+    private fun deriveUncheckedCountByShop(items: List<Item>, shops: List<Shop>): Map<Long, Int> {
+        val globalShopId = shops.firstOrNull { it.name == GLOBAL_VIEW_NAME }?.id
+        val counts = mutableMapOf<Long, Int>()
+        for (item in items) {
+            if (item.isChecked) continue
+            if (item.visibleIn.isEmpty()) {
+                if (globalShopId != null) counts.merge(globalShopId, 1, Int::plus)
+            } else {
+                for (shopId in item.visibleIn) {
+                    counts.merge(shopId, 1, Int::plus)
+                }
+            }
+        }
+        return shops.associate { shop -> shop.id to (counts[shop.id] ?: 0) }
     }
 
     private fun deriveHasUncheckedItems(items: List<Item>, shops: List<Shop>): Map<Long, Boolean> {
@@ -495,6 +550,9 @@ class ListViewModel @Inject constructor(
 
     private data class LocalUiState(
         val searchQuery: String = "",
+        val searchExpanded: Boolean = false,
+        val showChecked: Boolean = true,
+        val isManualSortEngaged: Boolean = false,
         val activeViewId: Long? = null,
         val drawerOpen: Boolean = false,
         val isWidgetStackExpanded: Boolean = false,

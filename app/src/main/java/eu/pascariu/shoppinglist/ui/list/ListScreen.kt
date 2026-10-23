@@ -2,20 +2,22 @@ package eu.pascariu.shoppinglist.ui.list
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -23,8 +25,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -33,6 +37,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,12 +45,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -91,12 +95,23 @@ fun ListScreen(
         }
     }
 
+    LaunchedEffect(state.searchExpanded) {
+        if (state.searchExpanded) {
+            searchFocusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
+
     BackHandler(enabled = state.addItemModal != null) {
         viewModel.onAddItemDiscard()
     }
 
     BackHandler(enabled = state.shopModal != null) {
         viewModel.onShopDiscard()
+    }
+
+    BackHandler(enabled = state.searchExpanded) {
+        viewModel.onSearchExpandedChanged(false)
     }
 
     Box(
@@ -134,13 +149,21 @@ fun ListScreen(
                         ),
                 ) {
                     items(state.filteredItems, key = { it.id }) { item ->
-                        ItemRow(item = item, onCheckToggled = viewModel::onCheckToggled)
+                        ItemRow(
+                            item = item,
+                            onCheckToggled = viewModel::onCheckToggled,
+                            hideChecked = state.hideChecked,
+                            modifier = Modifier.animateItem(),
+                        )
                     }
                 }
 
                 WidgetStack(
                     isDrawerOpen = state.drawerOpen,
                     isExpanded = state.isWidgetStackExpanded,
+                    isSearchExpanded = state.searchExpanded,
+                    isShowingCheckedItems = state.showChecked,
+                    globalUncheckedCount = state.drawerShops.firstOrNull { it.isGlobal }?.uncheckedCount ?: 0,
                     onControlTapped = viewModel::onWidgetStackControlTapped,
                     onExpandedChanged = viewModel::onWidgetStackExpandedChanged,
                     modifier = Modifier.align(Alignment.TopEnd),
@@ -195,12 +218,19 @@ fun ListScreen(
                 )
             }
 
-            SearchField(
-                query = state.searchQuery,
-                onQueryChanged = viewModel::onSearchQueryChanged,
-                onImeAction = viewModel::onAddAffordanceTapped,
-                focusRequester = searchFocusRequester,
-            )
+            AnimatedVisibility(
+                visible = state.searchExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                ExpandableSearchField(
+                    query = state.searchQuery,
+                    onQueryChanged = viewModel::onSearchQueryChanged,
+                    onDismiss = { viewModel.onSearchExpandedChanged(false) },
+                    onImeAction = viewModel::onAddAffordanceTapped,
+                    focusRequester = searchFocusRequester,
+                )
+            }
         }
 
         ViewDrawer(
@@ -266,15 +296,19 @@ fun ListScreen(
 }
 
 @Composable
-private fun SearchField(
+private fun ExpandableSearchField(
     query: String,
     onQueryChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
     onImeAction: () -> Unit,
     focusRequester: FocusRequester,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { SEARCH_DISMISS_THRESHOLD.toPx() }
+    var dragTotal by remember { mutableFloatStateOf(0f) }
 
     TextField(
         value = query,
@@ -297,9 +331,35 @@ private fun SearchField(
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Clear search",
+                    tint = colors.contentMuted,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) { onQueryChanged("") },
+                )
+            }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
+            .imePadding()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragTotal = 0f },
+                ) { _, dragAmount ->
+                    dragTotal += dragAmount
+                    if (dragTotal >= dismissThresholdPx) {
+                        dragTotal = 0f
+                        onDismiss()
+                    }
+                }
+            }
             .padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
+
+private val SEARCH_DISMISS_THRESHOLD = 96.dp
