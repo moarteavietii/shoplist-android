@@ -515,16 +515,16 @@ private fun DeleteItemConfirmDialog(
                     style = typography.label,
                     color = colors.contentMuted,
                     modifier = Modifier
-                        .clickable(role = Role.Button) { onCancel() }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) { onCancel() },
                 )
                 Text(
                     text = "Delete",
                     style = typography.label,
                     color = colors.danger,
                     modifier = Modifier
-                        .clickable(role = Role.Button) { onConfirm() }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) { onConfirm() },
                 )
             }
         }
