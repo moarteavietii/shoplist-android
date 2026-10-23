@@ -598,6 +598,8 @@ class ListViewModelTest {
         assertTrue(base.copy(name = "Toast").canSave)
         assertTrue(base.isUnchanged)
         assertFalse(base.copy(name = "Toast").isUnchanged)
+        assertTrue(base.allViewsSelected)
+        assertTrue(base.copy(selectedViewIds = emptySet()).allViewsSelected)
     }
 
     @Test
@@ -615,8 +617,14 @@ class ListViewModelTest {
         viewModel.onEditItemToggleAllTapped()
         awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L) }
 
+        viewModel.onEditItemViewToggled(1L)
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == emptySet<Long>() }
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L, 2L) }
+
         assertEquals("Crackers", viewModel.uiState.value.editItemModal?.name)
-        assertEquals(setOf(1L), viewModel.uiState.value.editItemModal?.selectedViewIds)
+        assertEquals(setOf(1L, 2L), viewModel.uiState.value.editItemModal?.selectedViewIds)
     }
 
     @Test
