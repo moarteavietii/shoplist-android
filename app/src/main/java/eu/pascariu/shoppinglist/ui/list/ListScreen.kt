@@ -2,20 +2,23 @@ package eu.pascariu.shoppinglist.ui.list
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -23,12 +26,19 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,20 +46,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
+import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
+import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStack
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ListScreen(
@@ -66,6 +81,13 @@ fun ListScreen(
     if (state.addItemModal != null) {
         lastAddItemModal = state.addItemModal
     }
+    var lastShopModal by remember { mutableStateOf<ShopModalUiState?>(null) }
+    if (state.shopModal != null) {
+        lastShopModal = state.shopModal
+    }
+    var draggingItemId by remember { mutableStateOf<Long?>(null) }
+    var dragOrder by remember { mutableStateOf<List<Item>>(emptyList()) }
+    val dragEnabled = state.dragEnabled
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -73,15 +95,36 @@ fun ListScreen(
 
     LaunchedEffect(state.postSaveSignal) {
         if (state.postSaveSignal != null) {
-            listState.scrollToItem(0)
+            if (state.filteredItems.isNotEmpty()) {
+                listState.scrollToItem(state.filteredItems.lastIndex)
+            }
             searchFocusRequester.requestFocus()
             keyboard?.show()
             viewModel.consumePostSaveSignal()
         }
     }
 
+    LaunchedEffect(state.searchExpanded) {
+        if (state.searchExpanded) {
+            searchFocusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
+
     BackHandler(enabled = state.addItemModal != null) {
         viewModel.onAddItemDiscard()
+    }
+
+    BackHandler(enabled = state.shopModal != null) {
+        viewModel.onShopDiscard()
+    }
+
+    BackHandler(
+        enabled = state.searchExpanded &&
+            state.addItemModal == null &&
+            state.shopModal == null,
+    ) {
+        viewModel.onSearchExpandedChanged(false)
     }
 
     Box(
@@ -108,16 +151,69 @@ fun ListScreen(
                         .graphicsLayer(alpha = 0.07f),
                 )
 
+                val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+                    val mutable = dragOrder.toMutableList()
+                    val moved = mutable.removeAt(from.index)
+                    mutable.add(to.index, moved)
+                    dragOrder = mutable
+                }
                 LazyColumn(
                     state = listState,
-                    reverseLayout = true,
+                    verticalArrangement = Arrangement.Bottom,
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .leftEdgeSwipeToOpen(
+                            isEnabled = !state.drawerOpen,
+                            onOpen = viewModel::onDrawerToggled,
+                        ),
                 ) {
-                    items(state.filteredItems, key = { it.id }) { item ->
-                        ItemRow(item = item, onCheckToggled = viewModel::onCheckToggled)
+                    val visibleItems = if (draggingItemId != null) dragOrder else state.filteredItems
+                    items(visibleItems, key = { it.id }) { item ->
+                        ReorderableItem(
+                            state = reorderableState,
+                            key = item.id,
+                            enabled = dragEnabled,
+                        ) { isDragging ->
+                            val rowIsDragging = isDragging && draggingItemId == item.id
+                            ItemRow(
+                                item = item,
+                                onCheckToggled = viewModel::onCheckToggled,
+                                hideChecked = state.hideChecked,
+                                dragEnabled = dragEnabled,
+                                isDragging = rowIsDragging,
+                                dragHandleModifier = Modifier.draggableHandle(
+                                    onDragStarted = {
+                                        draggingItemId = item.id
+                                        dragOrder = state.items
+                                    },
+                                    onDragStopped = {
+                                        val dropIndex = dragOrder.indexOfFirst { it.id == item.id }
+                                        if (dropIndex >= 0) {
+                                            viewModel.onItemDropped(item, dropIndex)
+                                        }
+                                        draggingItemId = null
+                                        dragOrder = emptyList()
+                                    },
+                                ),
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
                     }
                 }
+
+                WidgetStack(
+                    isDrawerOpen = state.drawerOpen,
+                    isExpanded = state.isWidgetStackExpanded,
+                    isSearchExpanded = state.searchExpanded,
+                    isShowingCheckedItems = state.showChecked,
+                    isSortModeEnabled = state.sortModeEnabled,
+                    sortOrder = state.sortOrder,
+                    globalUncheckedCount = state.drawerShops.firstOrNull { it.isGlobal }?.uncheckedCount ?: 0,
+                    onControlTapped = viewModel::onWidgetStackControlTapped,
+                    onSortOrderSelected = viewModel::onSortOrderChanged,
+                    onExpandedChanged = viewModel::onWidgetStackExpandedChanged,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
             }
 
             AnimatedVisibility(
@@ -168,13 +264,30 @@ fun ListScreen(
                 )
             }
 
-            SearchField(
-                query = state.searchQuery,
-                onQueryChanged = viewModel::onSearchQueryChanged,
-                onImeAction = viewModel::onAddAffordanceTapped,
-                focusRequester = searchFocusRequester,
-            )
+            AnimatedVisibility(
+                visible = state.searchExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                ExpandableSearchField(
+                    query = state.searchQuery,
+                    onQueryChanged = viewModel::onSearchQueryChanged,
+                    onDismiss = { viewModel.onSearchExpandedChanged(false) },
+                    onImeAction = viewModel::onAddAffordanceTapped,
+                    focusRequester = searchFocusRequester,
+                )
+            }
         }
+
+        ViewDrawer(
+            visible = state.drawerOpen,
+            shops = state.drawerShops,
+            onShopSelected = viewModel::onViewSelected,
+            onShopEdit = viewModel::onShopEditTapped,
+            onAddShop = viewModel::onAddShopTapped,
+            onDismiss = viewModel::onDrawerDismissed,
+            modifier = Modifier.matchParentSize(),
+        )
 
         if (state.addItemModal != null) {
             Box(
@@ -205,19 +318,43 @@ fun ListScreen(
                 )
             }
         }
+
+        if (state.shopModal != null || lastShopModal != null) {
+            AnimatedVisibility(
+                visible = state.shopModal != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                lastShopModal?.let { modal ->
+                    ShopModal(
+                        modal = modal,
+                        onNameChanged = viewModel::onShopNameChanged,
+                        onSave = viewModel::onShopSave,
+                        onDiscard = viewModel::onShopDiscard,
+                        onDeleteTapped = viewModel::onShopDeleteTapped,
+                        onDeleteConfirmed = viewModel::onShopDeleteConfirmed,
+                        onDeleteCancelled = viewModel::onShopDeleteCancelled,
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun SearchField(
+private fun ExpandableSearchField(
     query: String,
     onQueryChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
     onImeAction: () -> Unit,
     focusRequester: FocusRequester,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { SEARCH_DISMISS_THRESHOLD.toPx() }
+    var dragTotal by remember { mutableFloatStateOf(0f) }
 
     TextField(
         value = query,
@@ -240,9 +377,35 @@ private fun SearchField(
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Clear search",
+                    tint = colors.contentMuted,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) { onQueryChanged("") },
+                )
+            }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
+            .imePadding()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragTotal = 0f },
+                ) { _, dragAmount ->
+                    dragTotal += dragAmount
+                    if (dragTotal >= dismissThresholdPx) {
+                        dragTotal = 0f
+                        onDismiss()
+                    }
+                }
+            }
             .padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
+
+private val SEARCH_DISMISS_THRESHOLD = 96.dp

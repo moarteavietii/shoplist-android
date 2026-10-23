@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.updateAndGet
 import retrofit2.HttpException
 
 @Singleton
@@ -63,8 +65,49 @@ class ItemsRepository @Inject constructor(
             val updated = itemsApi.updateItem(itemId, UpdateItemRequest(isChecked = isChecked, isUndo = if (isUndo) true else null))
             cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
             return updated
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             cache.update { current -> current.map { if (it.id == itemId) it.copy(isChecked = previous.isChecked) else it } }
+            throw error
+        }
+    }
+
+    suspend fun reorder(itemId: Long, viewId: Long, newKey: String): Item {
+        val viewKey = viewId.toString()
+        var previousKey: String? = null
+        val mergedItem = cache.updateAndGet { current ->
+            current.map { item ->
+                if (item.id == itemId) {
+                    previousKey = item.orderMap[viewKey]
+                    item.copy(orderMap = item.orderMap + (viewKey to newKey))
+                } else {
+                    item
+                }
+            }
+        }.firstOrNull { it.id == itemId }
+            ?: throw IllegalArgumentException("item $itemId not cached")
+        try {
+            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap))
+            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            return updated
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            cache.update { current ->
+                current.map { item ->
+                    if (item.id == itemId) {
+                        if (item.orderMap[viewKey] == newKey) {
+                            val restoredOrderMap = if (previousKey == null) item.orderMap - viewKey else item.orderMap + (viewKey to previousKey)
+                            item.copy(orderMap = restoredOrderMap)
+                        } else {
+                            item
+                        }
+                    } else {
+                        item
+                    }
+                }
+            }
             throw error
         }
     }

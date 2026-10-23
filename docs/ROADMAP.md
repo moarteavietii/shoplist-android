@@ -30,11 +30,13 @@ Replace the XML/AppCompat scaffold with the real foundation:
 - Items list, check-off with optimistic update + rollback, instant undo (50 entries / 30-min TTL, device-local)
 - Quick add from empty search
 
-## 5. Views (shops) + widget stack
+## 5. Views (shops) + widget stack 🔶 (in progress — `views-shops-management` + `widget-stack-persistence` + `badges-search-restructure`, archived 2026-10-22/23; remaining: sort modes, drag-drop)
 
-- View drawer (per-shop views, Global first), add/rename/delete shops
-- Sort modes: Manual / A→Z / Frequency; show/hide checked; expandable fuzzy search
-- LED status dots, unchecked-count badges
+- View drawer (per-shop views, Global first), add/rename/delete shops ✅
+- Widget stack (chevron, five control slots, swipe-collapse) + persisted expand state and active view ✅
+- LED status dots, unchecked-count badges (drawer + View Switcher) ✅
+- Show/hide checked; expandable fuzzy search ✅
+- Sort modes: Manual / A→Z / Frequency; drag-drop
 
 ## 6. Feature parity
 

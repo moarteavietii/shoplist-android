@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import eu.pascariu.shoppinglist.di.ApplicationScope
+import eu.pascariu.shoppinglist.di.UndoHistoryDataStore
 import eu.pascariu.shoppinglist.di.IoDispatcher
 import java.io.IOException
 import javax.inject.Inject
@@ -38,7 +39,7 @@ class UndoHistoryStore(
 
     @Inject
     constructor(
-        dataStore: DataStore<Preferences>,
+        @UndoHistoryDataStore dataStore: DataStore<Preferences>,
         json: Json,
         @ApplicationScope storeScope: CoroutineScope,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,

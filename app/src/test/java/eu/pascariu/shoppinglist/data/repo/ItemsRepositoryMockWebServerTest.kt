@@ -2,6 +2,7 @@ package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
+import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -9,10 +10,15 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -52,6 +58,7 @@ class ItemsRepositoryMockWebServerTest {
         name: String = "Milk",
         isChecked: Boolean = false,
         checkCount: Int = 0,
+        orderMapJson: String = """{"a0": "a1"}""",
     ): String =
         """
         {
@@ -59,7 +66,7 @@ class ItemsRepositoryMockWebServerTest {
           "listId": $listId,
           "name": "$name",
           "isChecked": $isChecked,
-          "orderMap": {"a0": "a1"},
+          "orderMap": $orderMapJson,
           "quantity": 2,
           "isTemporary": false,
           "checkCount": $checkCount,
@@ -284,5 +291,131 @@ class ItemsRepositoryMockWebServerTest {
         val rolledBack = repository.items.first().single()
         assertEquals(false, rolledBack.isChecked)
         assertEquals("Organic Milk", rolledBack.name)
+    }
+
+    @Test
+    fun `reorder optimistically merges orderMap before PATCH settles`() = runTest {
+        val patchSettled = CountDownLatch(1)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                if (request.method == "PATCH") {
+                    patchSettled.await(5, TimeUnit.SECONDS)
+                    enqueueItemResponse(enqueueItemJson(id = 10))
+                } else {
+                    enqueueItemListJson(enqueueItemJson(id = 10))
+                }
+        }
+
+        repository.refetch(listId = 1)
+        server.takeRequest()
+
+        val deferred = async { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") }
+
+        runCurrent()
+        assertEquals("a5", repository.items.first().single().orderMap["1"])
+
+        patchSettled.countDown()
+        deferred.join()
+        assertEquals(10L, deferred.await().id)
+    }
+
+    @Test
+    fun `reorder sends PATCH with merged orderMap`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(enqueueItemResponse(enqueueItemJson(id = 10)))
+
+        repository.reorder(itemId = 10, viewId = 1, newKey = "a5")
+
+        val recorded = server.takeRequest()
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"orderMap\""))
+        assertTrue(body.contains("\"1\":\"a5\""))
+    }
+
+    @Test
+    fun `failed reorder rolls cache back and rethrows`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val thrown = runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        val rolledBack = repository.items.first().single()
+        assertNull(rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
+    }
+
+    @Test
+    fun `failed reorder rollback only reverts the reordered view key keeping remote fields`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString<Item>(enqueueItemJson(id = 10, name = "Organic Milk")),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertEquals("Organic Milk", rolledBack.name)
+        assertNull(rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
+    }
+
+    @Test
+    fun `failed reorder rollback keeps concurrent orderMap change for reordered view`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString<Item>(enqueueItemJson(id = 10, orderMapJson = """{"a0": "a1", "1": "b9"}""")),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertEquals("b9", rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
+    }
+
+    @Test
+    fun `failed reorder rollback keeps concurrent orderMap change from another view`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString<Item>(enqueueItemJson(id = 10, orderMapJson = """{"a0": "a1", "2": "b0"}""")),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertNull(rolledBack.orderMap["1"])
+        assertEquals("b0", rolledBack.orderMap["2"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
     }
 }

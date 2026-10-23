@@ -4,6 +4,8 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
@@ -20,6 +22,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -50,6 +54,7 @@ class ListViewModelTest {
     private lateinit var itemsRepository: ItemsRepository
     private lateinit var shopsRepository: ShopsRepository
     private lateinit var undoHistoryStore: UndoHistoryStore
+    private lateinit var listPreferences: ListPreferencesDataSource
     private lateinit var viewModel: ListViewModel
 
     private val json = Json
@@ -77,7 +82,14 @@ class ListViewModelTest {
             pruneInterval = java.time.Duration.ofHours(1),
             clock = System::currentTimeMillis,
         )
-        viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore)
+        listPreferences = ListPreferencesDataSource(
+            dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
+                java.io.File(tmpFolder.root, "list_prefs_viewmodel_test.preferences_pb")
+            },
+            storeScope = storeScope,
+            ioDispatcher = testDispatcher,
+        )
+        viewModel = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
     }
 
     @After
@@ -107,8 +119,9 @@ class ListViewModelTest {
         id: Long,
         name: String,
         isChecked: Boolean = false,
-        orderKey: String = "a0",
+        orderKey: String? = "a0",
         visibleIn: String = "[1]",
+        checkCount: Int = 0,
     ): String =
         """
         {
@@ -116,10 +129,10 @@ class ListViewModelTest {
           "listId": 1,
           "name": "$name",
           "isChecked": $isChecked,
-          "orderMap": {"1": "$orderKey"},
+          "orderMap": ${if (orderKey == null) "{}" else "{\"1\": \"$orderKey\"}"},
           "quantity": 1,
           "isTemporary": false,
-          "checkCount": 0,
+          "checkCount": $checkCount,
           "expiresAt": null,
           "createdAt": "2026-10-22T09:00:00Z",
           "visibleIn": $visibleIn
@@ -589,6 +602,50 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `active view defaults to Global`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        val state = viewModel.uiState.value
+        assertEquals(1L, state.activeViewId)
+        assertEquals("Global", state.watermarkName)
+    }
+
+    @Test
+    fun `selecting a view filters and sorts by that view`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", visibleIn = "[1]"),
+            itemJson(11, "Bread", orderKey = "a1", visibleIn = "[1,2]"),
+            itemJson(12, "Chips", orderKey = "a0", visibleIn = "[2]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+
+        val state = viewModel.uiState.value
+        assertEquals(2L, state.activeViewId)
+        assertEquals("Auchan", state.watermarkName)
+        assertEquals(listOf("Bread", "Chips"), state.items.map { it.name })
+    }
+
+    @Test
+    fun `fallback to Global when active shop is deleted`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+
+        shopsRepository.applyDeleted(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 1L }
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
     fun `remote item deleted event drops row while undo bar visible`() = runTest(testDispatcher) {
         loadFixtures()
         server.enqueue(
@@ -604,5 +661,726 @@ class ListViewModelTest {
 
         assertEquals(listOf(10L), viewModel.uiState.value.items.map { it.id })
         assertTrue(viewModel.uiState.value.showUndoBar)
+    }
+
+    @Test
+    fun `add shop opens create modal with empty name`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onAddShopTapped()
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertEquals(ShopModalMode.CREATE, modal?.mode)
+        assertEquals("", modal?.name)
+        assertFalse(modal?.canSave ?: true)
+    }
+
+    @Test
+    fun `edit shop opens modal pre-filled and save disabled while unchanged`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertEquals(ShopModalMode.EDIT, modal?.mode)
+        assertEquals(2L, modal?.shopId)
+        assertEquals("Auchan", modal?.name)
+        assertTrue(modal?.isUnchanged == true)
+        assertFalse(modal?.canSave ?: true)
+        assertEquals("Close", modal?.secondaryLabel)
+    }
+
+    @Test
+    fun `shop name change enables save and trims on save`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onShopEditTapped(2L)
+
+        viewModel.onShopNameChanged("  Auchan Nord  ")
+        awaitUntil { viewModel.uiState.value.shopModal?.name == "  Auchan Nord  " }
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.isUnchanged ?: true)
+        assertTrue(modal?.canSave ?: false)
+        assertEquals("Discard", modal?.secondaryLabel)
+        assertEquals("  Auchan Nord  ", modal?.name)
+    }
+
+    @Test
+    fun `whitespace-only name cannot be saved`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onAddShopTapped()
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopNameChanged("   ")
+        awaitUntil { viewModel.uiState.value.shopModal?.name == "   " }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.canSave ?: true)
+    }
+
+    @Test
+    fun `saving create mode creates shop and closes modal`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(shopJson(3, "Lidl")),
+        )
+
+        viewModel.onAddShopTapped()
+        viewModel.onShopNameChanged("Lidl")
+        viewModel.onShopSave()
+        awaitUntil { viewModel.uiState.value.shopModal == null }
+
+        awaitUntil { shopsRepository.shops.value.any { it.id == 3L } }
+        assertEquals(listOf("Global", "Auchan", "Lidl"), shopsRepository.shops.value.map { it.name })
+        val drawer = viewModel.uiState.value.drawerShops
+        assertEquals(listOf("Global", "Auchan", "Lidl"), drawer.map { it.name })
+    }
+
+    @Test
+    fun `saving rename updates shop everywhere`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(shopJson(2, "Auchan Express")),
+        )
+
+        viewModel.onShopEditTapped(2L)
+        viewModel.onShopNameChanged("Auchan Express")
+        viewModel.onShopSave()
+        awaitUntil { viewModel.uiState.value.shopModal == null }
+
+        awaitUntil { viewModel.uiState.value.drawerShops.any { it.name == "Auchan Express" } }
+        assertEquals(listOf("Global", "Auchan Express"), viewModel.uiState.value.drawerShops.map { it.name })
+    }
+
+    @Test
+    fun `failed create keeps modal open and surfaces error`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(409)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"error": "duplicate"}"""),
+        )
+
+        viewModel.onAddShopTapped()
+        viewModel.onShopNameChanged("Auchan")
+        viewModel.onShopSave()
+        awaitUntil { viewModel.uiState.value.shopModal?.error != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.saving ?: true)
+        assertNotNull(modal?.error)
+    }
+
+    @Test
+    fun `discard closes shop modal`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onAddShopTapped()
+        viewModel.onShopDiscard()
+
+        assertNull(viewModel.uiState.value.shopModal)
+    }
+
+    @Test
+    fun `delete confirmation flow deletes shop and closes dialogs`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"status": "ok"}"""),
+        )
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopDeleteTapped()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == true }
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertTrue(modal?.deleteConfirmOpen == true)
+
+        viewModel.onShopDeleteConfirmed()
+        awaitUntil { viewModel.uiState.value.shopModal == null }
+        awaitUntil { shopsRepository.shops.value.none { it.id == 2L } }
+
+        assertNull(viewModel.uiState.value.shopModal)
+        assertTrue(viewModel.uiState.value.drawerShops.none { it.id == 2L })
+    }
+
+    @Test
+    fun `failed shop delete shows delete-specific error`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(403)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"error": "protected"}"""),
+        )
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopDeleteTapped()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == true }
+        viewModel.onShopDeleteConfirmed()
+        awaitUntil { viewModel.uiState.value.shopModal?.error != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.saving ?: true)
+        assertEquals("The Global shop cannot be deleted", modal?.error)
+    }
+
+    @Test
+    fun `cancelling delete returns to edit modal`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopDeleteTapped()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == true }
+        viewModel.onShopDeleteCancelled()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == false }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.deleteConfirmOpen ?: true)
+    }
+
+    private fun newViewModel(): ListViewModel {
+        val instance = ListViewModel(itemsRepository, shopsRepository, undoHistoryStore, listPreferences)
+        viewModel = instance
+        return instance
+    }
+
+    @Test
+    fun `valid persisted shop id is restored once shops load`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(2L)
+        advanceUntilIdle()
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+
+        newViewModel().refresh()
+        advanceUntilIdle()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+
+        assertEquals(2L, viewModel.uiState.value.activeViewId)
+        assertEquals("Auchan", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `view selected while shops load is not overwritten by restore`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(2L)
+        advanceUntilIdle()
+
+        newViewModel()
+        viewModel.onViewSelected(1L)
+        advanceUntilIdle()
+
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+        advanceUntilIdle()
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `selecting placeholder global row clears active shop instead of persisting sentinel`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+
+        viewModel.onViewSelected(ListViewModel.GLOBAL_PLACEHOLDER_ID)
+        advanceUntilIdle()
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+        assertNull(listPreferences.activeShopId.value)
+    }
+
+    @Test
+    fun `invalid persisted shop id falls back to Global`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(999L)
+        advanceUntilIdle()
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+
+        newViewModel().refresh()
+        advanceUntilIdle()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+        assertNull(listPreferences.activeShopId.value)
+    }
+
+    @Test
+    fun `nothing persisted defaults to Global`() = runTest(testDispatcher) {
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+
+        newViewModel().refresh()
+        advanceUntilIdle()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() }
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `persisted id is not applied before shops load`() = runTest(testDispatcher) {
+        listPreferences.setActiveShopId(2L)
+        advanceUntilIdle()
+
+        newViewModel()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+    }
+
+    @Test
+    fun `view selection writes the persisted id immediately`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onViewSelected(2L)
+        advanceUntilIdle()
+
+        assertEquals(2L, listPreferences.activeShopId.value)
+    }
+
+    @Test
+    fun `widget stack expand state persists and is restored on a new view model`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onWidgetStackExpandedChanged(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isWidgetStackExpanded)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(restarted.uiState.value.isWidgetStackExpanded)
+    }
+
+    @Test
+    fun `widget stack collapse persists`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onWidgetStackExpandedChanged(true)
+        advanceUntilIdle()
+        viewModel.onWidgetStackExpandedChanged(false)
+        advanceUntilIdle()
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertFalse(restarted.uiState.value.isWidgetStackExpanded)
+    }
+
+    @Test
+    fun `uncheckedCountByShop counts per-shop and Global counts all`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1,2]"),
+            itemJson(11, "Bread", isChecked = false, visibleIn = "[2]"),
+            itemJson(12, "Chips", isChecked = true, visibleIn = "[2]"),
+            itemJson(13, "Tea", isChecked = false, visibleIn = "[]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val counts = viewModel.uiState.value.uncheckedCountByShop
+        assertEquals(2, counts[1L])
+        assertEquals(2, counts[2L])
+    }
+
+    @Test
+    fun `fully checked shop has zero count`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[2]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        val counts = viewModel.uiState.value.uncheckedCountByShop
+        assertEquals(0, counts[1L])
+        assertEquals(0, counts[2L])
+    }
+
+    @Test
+    fun `checking an item updates drawer badges and switcher count at once`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.uncheckedCountByShop[1L] == 1 }
+
+        val counts = viewModel.uiState.value.uncheckedCountByShop
+        assertEquals(1, counts[1L])
+        assertEquals(0, counts[2L])
+        assertEquals(1, viewModel.uiState.value.drawerShops.first { it.isGlobal }.uncheckedCount)
+        assertEquals(0, viewModel.uiState.value.drawerShops.first { !it.isGlobal }.uncheckedCount)
+    }
+
+    @Test
+    fun `search expanded defaults to collapsed and persists`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        assertFalse(viewModel.uiState.value.searchExpanded)
+
+        viewModel.onSearchExpandedChanged(true)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.searchExpanded)
+        assertTrue(listPreferences.searchExpanded.value)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(restarted.uiState.value.searchExpanded)
+    }
+
+    @Test
+    fun `collapsing search clears the query`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchExpandedChanged(true)
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+        assertEquals(listOf("Milk"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSearchExpandedChanged(false)
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.uiState.value.searchQuery)
+        assertTrue(viewModel.uiState.value.filteredItems.map { it.name }.containsAll(listOf("Milk", "Bread")))
+    }
+
+    @Test
+    fun `query is never persisted across restart`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchExpandedChanged(true)
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertTrue(restarted.uiState.value.searchExpanded)
+        assertEquals("", restarted.uiState.value.searchQuery)
+    }
+
+    @Test
+    fun `showChecked defaults to true and persists`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        assertTrue(viewModel.uiState.value.showChecked)
+
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.showChecked)
+        assertFalse(listPreferences.showChecked.value)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertFalse(restarted.uiState.value.showChecked)
+    }
+
+    @Test
+    fun `hiding excludes checked items but search override keeps matches visible`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1]"),
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[1]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSearchQueryChanged("bre")
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSearchQueryChanged("")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.filteredItems.map { it.name })
+    }
+
+    @Test
+    fun `manual sort engagement reveals all items regardless of hide toggle`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", isChecked = false, visibleIn = "[1]"),
+            itemJson(11, "Bread", isChecked = true, visibleIn = "[1]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        viewModel.onSortOrderChanged(SortOrder.MANUAL)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+    }
+
+    @Test
+    fun `alphabetical order re-orders items case-insensitively`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        advanceUntilIdle()
+
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `frequency order re-orders live when a check count changes`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", checkCount = 5),
+            itemJson(11, "Bread", orderKey = "a1", checkCount = 2),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onSortOrderChanged(SortOrder.FREQUENCY)
+        advanceUntilIdle()
+        assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread", isChecked = true, checkCount = 7)),
+        )
+
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.items.first { it.id == 11L }.checkCount == 7 }
+
+        assertEquals(listOf("Bread", "Milk"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `switching back to manual restores the exact stored order`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", checkCount = 5),
+            itemJson(11, "Bread", orderKey = "a1", checkCount = 2),
+            itemJson(12, "Eggs", orderKey = "a2", checkCount = 9),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onSortOrderChanged(SortOrder.FREQUENCY)
+        advanceUntilIdle()
+        assertEquals(listOf("Eggs", "Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
+
+        viewModel.onSortOrderChanged(SortOrder.MANUAL)
+        advanceUntilIdle()
+        assertEquals(listOf("Milk", "Bread", "Eggs"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `sort mode and order persist across restart`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSortModeToggled()
+        viewModel.onSortOrderChanged(SortOrder.FREQUENCY)
+        advanceUntilIdle()
+
+        assertFalse(listPreferences.sortModeEnabled.value)
+        assertEquals(SortOrder.FREQUENCY, listPreferences.sortOrder.value)
+
+        val restarted = newViewModel()
+        advanceUntilIdle()
+
+        assertFalse(restarted.uiState.value.sortModeEnabled)
+        assertEquals(SortOrder.FREQUENCY, restarted.uiState.value.sortOrder)
+    }
+
+    @Test
+    fun `drag gating matrix - enabled only in manual mode with sort on and no overlays`() =
+        runTest(testDispatcher) {
+            loadFixtures()
+
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onSortModeToggled()
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onSortModeToggled()
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onSortOrderChanged(SortOrder.MANUAL)
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onAddAffordanceTapped()
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onAddItemDiscard()
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+
+            viewModel.onAddShopTapped()
+            advanceUntilIdle()
+            assertFalse(viewModel.isDragEnabled())
+
+            viewModel.onShopDiscard()
+            advanceUntilIdle()
+            assertTrue(viewModel.isDragEnabled())
+        }
+
+    @Test
+    fun `drag disabled while search query is active`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isDragEnabled())
+
+        viewModel.onSearchQueryChanged("")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.isDragEnabled())
+    }
+
+    @Test
+    fun `drop with active search query does not reorder`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onSearchQueryChanged("mlk")
+        advanceUntilIdle()
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 0)
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `drop in non-manual order does not reorder`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        advanceUntilIdle()
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `valid manual drop sends reorder with fractional key and updates cache`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", orderKey = "a2")),
+        )
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)!!
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/items/10", recorded.path)
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"orderMap\""))
+        assertTrue(body.contains("\"1\":\"a2\""))
+        awaitUntil { viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"] == "a2" }
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `drop past keyed tail clamps to end of keyed list`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0"),
+            itemJson(11, "Bread", orderKey = "a1"),
+            itemJson(12, "Eggs", orderKey = null),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", orderKey = "a2")),
+        )
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 2)
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)!!
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"1\":\"a2\""))
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `failed reorder shows error message`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
+        awaitUntil { viewModel.uiState.value.errorMessage != null }
+
+        assertEquals("Couldn't move the item", viewModel.uiState.value.errorMessage)
+        assertEquals("a0", viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"])
     }
 }

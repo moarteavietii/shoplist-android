@@ -21,11 +21,20 @@ import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.device.DeviceIdInterceptor
 import eu.pascariu.shoppinglist.data.device.DeviceIdStore
 import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
+import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
+import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
+import eu.pascariu.shoppinglist.data.realtime.RealtimeClientContract
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
+import eu.pascariu.shoppinglist.di.ApplicationScope
+import eu.pascariu.shoppinglist.di.IoDispatcher
+import eu.pascariu.shoppinglist.di.ListPreferencesDataStore
+import eu.pascariu.shoppinglist.di.UndoHistoryDataStore
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -98,6 +107,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @UndoHistoryDataStore
     fun provideUndoHistoryDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
@@ -106,15 +116,33 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @ListPreferencesDataStore
+    fun provideListPreferencesDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        File(context.filesDir, "datastore/list_preferences.preferences_pb")
+    }
+
+    @Provides
+    @Singleton
+    fun provideListPreferencesDataSource(
+        @ListPreferencesDataStore dataStore: DataStore<Preferences>,
+        @ApplicationScope storeScope: CoroutineScope,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ): ListPreferencesDataSource =
+        ListPreferencesDataSource(dataStore, storeScope, ioDispatcher)
+
+    @Provides
+    @Singleton
     fun provideRealtimeClient(
         okHttpClient: OkHttpClient,
         json: Json,
         baseUrl: String,
-    ): eu.pascariu.shoppinglist.data.realtime.RealtimeClientContract =
-        eu.pascariu.shoppinglist.data.realtime.RealtimeClient(
+    ): RealtimeClientContract =
+        RealtimeClient(
             okHttpClient = okHttpClient,
             json = json,
             baseUrl = baseUrl,
-            listId = eu.pascariu.shoppinglist.data.realtime.RealtimeClient.DEFAULT_LIST_ID,
+            listId = RealtimeClient.DEFAULT_LIST_ID,
         )
 }
