@@ -335,6 +335,8 @@ class ListViewModel @Inject constructor(
         val shopExists = shopsRepository.shops.value.any { it.id == persistedId }
         if (shopExists) {
             localState.update { it.copy(activeViewId = persistedId) }
+        } else {
+            listPreferences.setActiveShopId(null)
         }
     }
 

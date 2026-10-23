@@ -936,6 +936,7 @@ class ListViewModelTest {
 
         assertEquals(1L, viewModel.uiState.value.activeViewId)
         assertEquals("Global", viewModel.uiState.value.watermarkName)
+        assertNull(listPreferences.activeShopId.value)
     }
 
     @Test
