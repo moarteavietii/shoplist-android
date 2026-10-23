@@ -6,15 +6,20 @@ import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
+import eu.pascariu.shoppinglist.data.realtime.ChangeToastLabel
+import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
+import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -58,6 +63,7 @@ class ListViewModelTest {
     private lateinit var undoHistoryStore: UndoHistoryStore
     private lateinit var listPreferences: ListPreferencesDataSource
     private lateinit var expiryTick: MutableStateFlow<Long>
+    private lateinit var fakeSyncManager: FakeRealtimeSyncManager
     private lateinit var viewModel: ListViewModel
 
     private val json = Json
@@ -93,11 +99,13 @@ class ListViewModelTest {
             ioDispatcher = testDispatcher,
         )
         expiryTick = MutableStateFlow(System.currentTimeMillis())
+        fakeSyncManager = FakeRealtimeSyncManager()
         viewModel = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
+            realtimeSyncManager = fakeSyncManager,
             expiryTicker = expiryTick,
         )
     }
@@ -759,6 +767,60 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `edit modal toggle all selects everything and deselects all but Global`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        assertEquals(setOf(1L), viewModel.uiState.value.editItemModal?.selectedViewIds)
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L, 2L) }
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(1L) }
+
+        assertEquals(setOf(1L), viewModel.uiState.value.editItemModal?.selectedViewIds)
+    }
+
+    @Test
+    fun `edit modal save strips fallback global sentinel from visibleIn`() = runTest(testDispatcher) {
+        enqueueItemList(itemJson(11, "Bread", orderKey = "a1"))
+        enqueueShopList(shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        assertEquals(
+            listOf("Global", "Auchan"),
+            viewModel.uiState.value.editItemModal?.availableViews?.map { it.name },
+        )
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(GLOBAL_FALLBACK_ID, 2L) }
+
+        viewModel.onEditItemToggleAllTapped()
+        awaitUntil { viewModel.uiState.value.editItemModal?.selectedViewIds == setOf(GLOBAL_FALLBACK_ID) }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread", visibleIn = "[]")),
+        )
+
+        viewModel.onEditItemSave()
+        awaitUntil { server.requestCount == 3 }
+
+        val recorded = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(recorded)
+        val body = recorded!!.body.readUtf8()
+        assertTrue(body.contains("\"visibleIn\":[]"))
+        assertFalse(body.contains("-2"))
+        awaitUntil { viewModel.uiState.value.editItemModal == null }
+    }
+
+    @Test
     fun `edit modal save failure restores name and shows error`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
@@ -1023,6 +1085,40 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `remote item updated with changed visibleIn re-filters active view`() = runTest(testDispatcher) {
+        enqueueItemList(
+            itemJson(10, "Milk", orderKey = "a0", visibleIn = "[1]"),
+            itemJson(11, "Bread", orderKey = "a1", visibleIn = "[1,2]"),
+        )
+        enqueueShopList(shopJson(1, "Global"), shopJson(2, "Auchan"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        server.takeRequest(5, TimeUnit.SECONDS)
+
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+        assertEquals(listOf("Bread"), viewModel.uiState.value.filteredItems.map { it.name })
+
+        itemsRepository.applyUpdated(
+            eu.pascariu.shoppinglist.data.model.Item(
+                id = 11L,
+                listId = 1L,
+                name = "Bread",
+                isChecked = false,
+                orderMap = mapOf("1" to "a1"),
+                quantity = 1,
+                isTemporary = false,
+                checkCount = 0,
+                expiresAt = null,
+                createdAt = "2026-10-22T09:00:00Z",
+                visibleIn = listOf(1L),
+            ),
+        )
+        awaitUntil { viewModel.uiState.value.filteredItems.isEmpty() }
+    }
+
+    @Test
     fun `selecting a view filters and sorts by that view`() = runTest(testDispatcher) {
         enqueueItemList(
             itemJson(10, "Milk", orderKey = "a0", visibleIn = "[1]"),
@@ -1272,6 +1368,7 @@ class ListViewModelTest {
             shopsRepository = shopsRepository,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
+            realtimeSyncManager = fakeSyncManager,
             expiryTicker = expiryTick,
         )
         viewModel = instance
@@ -1947,5 +2044,92 @@ class ListViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("Milk"), viewModel.uiState.value.items.map { it.name })
+    }
+
+    @Test
+    fun `remote label batch shows first toast and queues the rest`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        fakeSyncManager.emit(listOf("checked: Milk", "Milk → Bread"))
+        runCurrent()
+
+        assertEquals("checked: Milk", viewModel.changeToast.value?.text)
+
+        viewModel.onToastSwipedDismissed()
+        runCurrent()
+
+        assertEquals("Milk → Bread", viewModel.changeToast.value?.text)
+    }
+
+    @Test
+    fun `new batch replaces the visible toast and restarts the timer`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+        val firstToast = viewModel.changeToast.value
+        assertEquals("checked: Milk", firstToast?.text)
+
+        fakeSyncManager.emit(listOf("new item: Bread"))
+        runCurrent()
+
+        val replacedToast = viewModel.changeToast.value
+        assertEquals("new item: Bread", replacedToast?.text)
+        assertTrue(replacedToast!!.id != firstToast!!.id)
+    }
+
+    @Test
+    fun `toast auto-dismisses after the timeout`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+        assertEquals("checked: Milk", viewModel.changeToast.value?.text)
+
+        testDispatcher.scheduler.advanceTimeBy(ListViewModel.TOAST_AUTO_DISMISS_MS)
+        runCurrent()
+
+        assertNull(viewModel.changeToast.value)
+    }
+
+    @Test
+    fun `disabled preference suppresses toast display`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        listPreferences.setChangeToastsEnabled(false)
+        advanceUntilIdle()
+
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+
+        assertNull(viewModel.changeToast.value)
+    }
+
+    @Test
+    fun `re-enabling the preference resumes toast display`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        listPreferences.setChangeToastsEnabled(false)
+        advanceUntilIdle()
+        fakeSyncManager.emit(listOf("checked: Milk"))
+        runCurrent()
+        assertNull(viewModel.changeToast.value)
+
+        listPreferences.setChangeToastsEnabled(true)
+        advanceUntilIdle()
+        fakeSyncManager.emit(listOf("new item: Bread"))
+        runCurrent()
+
+        assertEquals("new item: Bread", viewModel.changeToast.value?.text)
+    }
+}
+
+private class FakeRealtimeSyncManager : RealtimeSyncManagerContract {
+    private val labels = MutableSharedFlow<List<ChangeToastLabel>>(extraBufferCapacity = 64)
+
+    override val changeToastLabels: SharedFlow<List<ChangeToastLabel>> = labels
+
+    suspend fun emit(batch: List<String>) {
+        labels.emit(batch.map { ChangeToastLabel(it) })
     }
 }

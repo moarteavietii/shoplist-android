@@ -169,6 +169,23 @@ class ListPreferencesDataSourceTest {
     }
 
     @Test
+    fun `change toasts enabled defaults to true`() = runTest(testDispatcher) {
+        settle()
+
+        assertTrue(dataSource.changeToastsEnabled.value)
+    }
+
+    @Test
+    fun `change toasts enabled round-trips through storage`() = runTest(testDispatcher) {
+        settle()
+
+        dataSource.setChangeToastsEnabled(false)
+        settle()
+
+        assertFalse(dataSource.changeToastsEnabled.value)
+    }
+
+    @Test
     fun `keys are isolated - writing one does not affect the other`() = runTest(testDispatcher) {
         settle()
 
@@ -198,6 +215,7 @@ class ListPreferencesDataSourceTest {
             dataSource.setShowChecked(false)
             dataSource.setSortModeEnabled(false)
             dataSource.setSortOrder(SortOrder.ALPHABETICAL)
+            dataSource.setChangeToastsEnabled(false)
             settle()
 
             storeScope.cancel()
@@ -218,6 +236,7 @@ class ListPreferencesDataSourceTest {
             assertFalse(restarted.showChecked.value)
             assertFalse(restarted.sortModeEnabled.value)
             assertEquals(SortOrder.ALPHABETICAL, restarted.sortOrder.value)
+            assertFalse(restarted.changeToastsEnabled.value)
         }
 
     @Test

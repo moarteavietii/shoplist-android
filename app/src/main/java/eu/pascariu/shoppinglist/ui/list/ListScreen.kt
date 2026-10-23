@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -79,6 +80,7 @@ fun ListScreen(
     viewModel: ListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val changeToast by viewModel.changeToast.collectAsStateWithLifecycle()
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
     val shapes = LocalShoplistShapes.current
@@ -310,6 +312,14 @@ fun ListScreen(
             onAddShop = viewModel::onAddShopTapped,
             onDismiss = viewModel::onDrawerDismissed,
             modifier = Modifier.matchParentSize(),
+        )
+
+        ChangeToastOverlay(
+            toast = changeToast,
+            onDismissed = viewModel::onToastSwipedDismissed,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding(),
         )
 
         if (state.addItemModal != null) {
