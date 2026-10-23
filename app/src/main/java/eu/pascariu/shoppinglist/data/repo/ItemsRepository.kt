@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.updateAndGet
 import retrofit2.HttpException
 
@@ -64,6 +65,8 @@ class ItemsRepository @Inject constructor(
             val updated = itemsApi.updateItem(itemId, UpdateItemRequest(isChecked = isChecked, isUndo = if (isUndo) true else null))
             cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
             return updated
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             cache.update { current -> current.map { if (it.id == itemId) it.copy(isChecked = previous.isChecked) else it } }
             throw error
@@ -88,6 +91,8 @@ class ItemsRepository @Inject constructor(
             val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap))
             cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
             return updated
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             cache.update { current ->
                 current.map { item ->
