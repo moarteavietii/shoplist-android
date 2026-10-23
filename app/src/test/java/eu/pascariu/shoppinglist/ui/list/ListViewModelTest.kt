@@ -895,6 +895,20 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `selecting placeholder global row clears active shop instead of persisting sentinel`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onViewSelected(2L)
+        awaitUntil { viewModel.uiState.value.activeViewId == 2L }
+
+        viewModel.onViewSelected(ListViewModel.GLOBAL_PLACEHOLDER_ID)
+        advanceUntilIdle()
+
+        assertEquals(1L, viewModel.uiState.value.activeViewId)
+        assertEquals("Global", viewModel.uiState.value.watermarkName)
+        assertNull(listPreferences.activeShopId.value)
+    }
+
+    @Test
     fun `invalid persisted shop id falls back to Global`() = runTest(testDispatcher) {
         listPreferences.setActiveShopId(999L)
         advanceUntilIdle()
