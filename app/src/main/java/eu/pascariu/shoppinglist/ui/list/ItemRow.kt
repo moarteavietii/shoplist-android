@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import eu.pascariu.shoppinglist.data.model.Item
@@ -86,6 +89,10 @@ fun ItemRow(
             Row(
                 modifier = Modifier
                     .weight(1f)
+                    .semantics {
+                        toggleableState =
+                            if (item.isChecked) ToggleableState.On else ToggleableState.Off
+                    }
                     .combinedClickable(
                         onClick = { onCheckToggled(item) },
                         onLongClick = onLongPress,
