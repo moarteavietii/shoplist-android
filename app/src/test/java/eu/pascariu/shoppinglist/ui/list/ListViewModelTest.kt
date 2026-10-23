@@ -817,6 +817,28 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `failed shop delete shows delete-specific error`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(403)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"error": "protected"}"""),
+        )
+
+        viewModel.onShopEditTapped(2L)
+        awaitUntil { viewModel.uiState.value.shopModal != null }
+        viewModel.onShopDeleteTapped()
+        awaitUntil { viewModel.uiState.value.shopModal?.deleteConfirmOpen == true }
+        viewModel.onShopDeleteConfirmed()
+        awaitUntil { viewModel.uiState.value.shopModal?.error != null }
+
+        val modal = viewModel.uiState.value.shopModal
+        assertNotNull(modal)
+        assertFalse(modal?.saving ?: true)
+        assertEquals("The Global shop cannot be deleted", modal?.error)
+    }
+
+    @Test
     fun `cancelling delete returns to edit modal`() = runTest(testDispatcher) {
         loadFixtures()
 

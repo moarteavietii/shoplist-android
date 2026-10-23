@@ -432,7 +432,7 @@ class ListViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 localState.update {
-                    it.copy(shopModal = it.shopModal?.copy(saving = false, error = shopErrorMessage(e)))
+                    it.copy(shopModal = it.shopModal?.copy(saving = false, error = shopDeleteErrorMessage(e)))
                 }
             }
         }
@@ -442,6 +442,12 @@ class ListViewModel @Inject constructor(
         when {
             e is HttpException && e.code() == 409 -> "A shop with this name already exists"
             else -> "Could not save shop"
+        }
+
+    private fun shopDeleteErrorMessage(e: Exception): String =
+        when {
+            e is HttpException && e.code() == 403 -> "The Global shop cannot be deleted"
+            else -> "Could not delete shop"
         }
 
     private fun openAddItemModal(prefilledTitle: String) {
