@@ -67,6 +67,10 @@ fun ItemRow(
                         shape = dragShape
                         scaleX = 1.02f
                         scaleY = 1.02f
+                    } else {
+                        shadowElevation = 0f
+                        scaleX = 1f
+                        scaleY = 1f
                     }
                 }
                 .background(if (isDragging) colors.surface else Color.Transparent, dragShape)
