@@ -375,6 +375,28 @@ class ItemsRepositoryMockWebServerTest {
     }
 
     @Test
+    fun `failed reorder rollback keeps concurrent orderMap change for reordered view`() = runTest {
+        server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
+        repository.refetch(listId = 1)
+        server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+
+        val deferred = async { runCatching { repository.reorder(itemId = 10, viewId = 1, newKey = "a5") } }
+        runCurrent()
+
+        repository.applyUpdated(
+            Json.decodeFromString<Item>(enqueueItemJson(id = 10, orderMapJson = """{"a0": "a1", "1": "b9"}""")),
+        )
+
+        deferred.join()
+        assertTrue(deferred.await().exceptionOrNull() is HttpException)
+
+        val rolledBack = repository.items.first().single()
+        assertEquals("b9", rolledBack.orderMap["1"])
+        assertEquals("a1", rolledBack.orderMap["a0"])
+    }
+
+    @Test
     fun `failed reorder rollback keeps concurrent orderMap change from another view`() = runTest {
         server.enqueue(enqueueItemListJson(enqueueItemJson(id = 10)))
         repository.refetch(listId = 1)
