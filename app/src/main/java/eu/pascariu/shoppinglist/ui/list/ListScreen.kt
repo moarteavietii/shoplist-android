@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -362,9 +360,7 @@ fun ListScreen(
             visible = state.addItemModal != null,
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             lastAddItemModal?.let { modal ->
                 AddItemModal(
@@ -385,9 +381,7 @@ fun ListScreen(
             visible = state.editItemModal != null,
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             lastEditItemModal?.let { modal ->
                 EditItemModal(
@@ -486,7 +480,6 @@ private fun ExpandableSearchField(
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
-            .imePadding()
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { dragTotal = 0f },
