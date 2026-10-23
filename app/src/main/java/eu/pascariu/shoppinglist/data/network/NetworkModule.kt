@@ -24,11 +24,13 @@ import eu.pascariu.shoppinglist.data.device.EncryptedDeviceIdStore
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.di.ApplicationScope
+import eu.pascariu.shoppinglist.di.IoDispatcher
 import eu.pascariu.shoppinglist.di.ListPreferencesDataStore
 import eu.pascariu.shoppinglist.di.UndoHistoryDataStore
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -122,9 +124,10 @@ object NetworkModule {
     @Singleton
     fun provideListPreferencesDataSource(
         @ListPreferencesDataStore dataStore: DataStore<Preferences>,
-        @ApplicationScope externalScope: CoroutineScope,
+        @ApplicationScope storeScope: CoroutineScope,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ): eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource =
-        eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource(dataStore, externalScope)
+        eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource(dataStore, storeScope, ioDispatcher)
 
     @Provides
     @Singleton
