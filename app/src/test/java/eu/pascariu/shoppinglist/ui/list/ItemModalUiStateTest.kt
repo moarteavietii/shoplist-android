@@ -103,4 +103,59 @@ class ItemModalUiStateTest {
 
         assertFalse(modal.canSave)
     }
+
+    @Test
+    fun `edit modal secondary label reads Close when unchanged and Discard when changed`() {
+        val base = EditItemUiState(
+            itemId = 42L,
+            originalName = "Milk",
+            name = "Milk",
+            availableViews = shops,
+            selectedViewIds = setOf(1L),
+            originalVisibleIn = setOf(1L),
+        )
+
+        assertEquals("Close", base.secondaryLabel)
+        assertEquals("Discard", base.copy(selectedViewIds = emptySet()).secondaryLabel)
+        assertEquals("Discard", base.copy(name = "Almond milk").secondaryLabel)
+        assertEquals("Discard", base.copy(quantity = 3, originalQuantity = 1).secondaryLabel)
+        assertEquals("Discard", base.copy(isTemporary = true).secondaryLabel)
+    }
+
+    @Test
+    fun `edit modal pre-selects shops from visibleIn`() {
+        val modal = EditItemUiState(
+            itemId = 42L,
+            originalName = "Milk",
+            name = "Milk",
+            availableViews = listOf(
+                Shop(id = 1L, name = "Global", createdAt = "2026-10-22T09:00:00Z"),
+                Shop(id = 2L, name = "Auchan", createdAt = "2026-10-22T09:00:00Z"),
+                Shop(id = 3L, name = "Carrefour", createdAt = "2026-10-22T09:00:00Z"),
+            ),
+            selectedViewIds = setOf(1L, 3L),
+            originalVisibleIn = setOf(1L, 3L),
+        )
+
+        assertTrue(1L in modal.selectedViewIds)
+        assertTrue(3L in modal.selectedViewIds)
+        assertFalse(2L in modal.selectedViewIds)
+        assertFalse(modal.allViewsSelected)
+    }
+
+    @Test
+    fun `edit modal selection change enables save and unchanged selection keeps it disabled`() {
+        val base = EditItemUiState(
+            itemId = 42L,
+            originalName = "Milk",
+            name = "Milk",
+            availableViews = shops,
+            selectedViewIds = setOf(1L),
+            originalVisibleIn = setOf(1L),
+        )
+
+        assertFalse(base.canSave)
+        assertTrue(base.copy(selectedViewIds = emptySet()).canSave)
+        assertFalse(base.copy(selectedViewIds = setOf(1L), originalVisibleIn = setOf(1L)).canSave)
+    }
 }

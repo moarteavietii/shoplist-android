@@ -58,6 +58,7 @@ fun AddItemModal(
         canSave = modal.canSave,
         onDelete = null,
         onSave = onSave,
+        secondaryLabel = "Discard",
         modifier = modifier,
     )
 }
@@ -91,6 +92,7 @@ fun EditItemModal(
         canSave = modal.canSave,
         onDelete = onDelete,
         onSave = onSave,
+        secondaryLabel = modal.secondaryLabel,
         modifier = modifier,
     )
 }
@@ -112,6 +114,7 @@ private fun ItemModalContent(
     canSave: Boolean,
     onDelete: (() -> Unit)?,
     onSave: () -> Unit,
+    secondaryLabel: String,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalShoplistColors.current
@@ -259,7 +262,7 @@ private fun ItemModalContent(
                 )
             }
             Text(
-                text = "Discard",
+                text = secondaryLabel,
                 style = typography.label,
                 color = colors.contentMuted,
                 modifier = Modifier

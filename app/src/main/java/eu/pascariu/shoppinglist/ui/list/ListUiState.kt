@@ -63,6 +63,7 @@ data class EditItemUiState(
             quantity == originalQuantity &&
             isTemporary == originalIsTemporary
     val canSave: Boolean get() = name.isNotBlank() && !isUnchanged
+    val secondaryLabel: String get() = if (isUnchanged) "Close" else "Discard"
 }
 
 data class ShopModalUiState(

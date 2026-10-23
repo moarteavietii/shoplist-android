@@ -44,4 +44,24 @@ class ViewOrderingTest {
         val shops = listOf(shop(1, "Global"), shop(2, "Auchan"))
         assertEquals(shops, orderViewsGlobalFirst(shops))
     }
+
+    @Test
+    fun `missing global gets display-only fallback first in modal views`() {
+        val ordered = modalAvailableViews(
+            listOf(shop(2, "Carrefour"), shop(3, "Auchan")),
+        )
+
+        assertEquals(listOf("Global", "Auchan", "Carrefour"), ordered.map { it.name })
+        assertEquals(GLOBAL_FALLBACK_ID, ordered.first().id)
+    }
+
+    @Test
+    fun `modal views keep real global without sentinel`() {
+        val ordered = modalAvailableViews(
+            listOf(shop(1, "Global"), shop(2, "Auchan")),
+        )
+
+        assertEquals(listOf("Global", "Auchan"), ordered.map { it.name })
+        assertEquals(1L, ordered.first().id)
+    }
 }
