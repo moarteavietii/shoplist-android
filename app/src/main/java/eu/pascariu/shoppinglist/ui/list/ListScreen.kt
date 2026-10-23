@@ -186,6 +186,7 @@ fun ListScreen(
                                     onDragStarted = {
                                         draggingItemId = item.id
                                         dragOrder = state.items
+                                        viewModel.onManualSortEngaged(true)
                                     },
                                     onDragStopped = {
                                         val dropIndex = dragOrder.indexOfFirst { it.id == item.id }
@@ -194,6 +195,7 @@ fun ListScreen(
                                         }
                                         draggingItemId = null
                                         dragOrder = emptyList()
+                                        viewModel.onManualSortEngaged(false)
                                     },
                                 ),
                                 modifier = Modifier.animateItem(),
