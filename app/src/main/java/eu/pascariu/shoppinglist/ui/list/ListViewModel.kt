@@ -138,15 +138,7 @@ class ListViewModel @Inject constructor(
         }
     }
 
-    fun isDragEnabled(): Boolean {
-        val local = localState.value
-        val overlaysOpen = local.addItemModal != null || local.shopModal != null
-        val queryActive = local.searchQuery.isNotBlank()
-        return local.sortModeEnabled &&
-            local.sortOrder == SortOrder.MANUAL &&
-            !overlaysOpen &&
-            !queryActive
-    }
+    fun isDragEnabled(): Boolean = uiState.value.dragEnabled
 
     fun onItemDropped(item: Item, dropIndex: Int) {
         if (!isDragEnabled()) return
@@ -489,6 +481,11 @@ class ListViewModel @Inject constructor(
         val hideChecked = !local.showChecked &&
             !queryActive &&
             !(local.sortModeEnabled && local.sortOrder == SortOrder.MANUAL)
+        val dragEnabled = local.sortModeEnabled &&
+            local.sortOrder == SortOrder.MANUAL &&
+            local.addItemModal == null &&
+            local.shopModal == null &&
+            local.searchQuery.isBlank()
         val activeName = when {
             activeShop != null -> activeShop.name
             globalShop != null -> globalShop.name
@@ -508,6 +505,7 @@ class ListViewModel @Inject constructor(
             isWidgetStackExpanded = local.isWidgetStackExpanded,
             sortModeEnabled = local.sortModeEnabled,
             sortOrder = local.sortOrder,
+            dragEnabled = dragEnabled,
             uncheckedCountByShop = uncheckedCounts,
             drawerShops = drawerShops,
             drawerOpen = local.drawerOpen,

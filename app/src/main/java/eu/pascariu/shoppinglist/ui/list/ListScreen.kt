@@ -57,7 +57,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
-import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
 import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
@@ -88,11 +87,7 @@ fun ListScreen(
     }
     var draggingItemId by remember { mutableStateOf<Long?>(null) }
     var dragOrder by remember { mutableStateOf<List<Item>>(emptyList()) }
-    val dragEnabled = state.sortModeEnabled &&
-        state.sortOrder == SortOrder.MANUAL &&
-        state.addItemModal == null &&
-        state.shopModal == null &&
-        state.searchQuery.isBlank()
+    val dragEnabled = state.dragEnabled
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
