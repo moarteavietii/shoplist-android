@@ -44,7 +44,7 @@ class MutationDrainer @Inject constructor(
             when (outcome) {
                 ReplayOutcome.SUCCESS -> queue.deleteById(mutation.id)
                 ReplayOutcome.DROPPED -> queue.deleteById(mutation.id)
-                ReplayOutcome.RETRY_LATER -> return@withContext
+                ReplayOutcome.STOP -> return@withContext
             }
         }
     }
@@ -66,8 +66,7 @@ class MutationDrainer @Inject constructor(
                     when {
                         response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
                         response.code() == 404 -> Unit
-                        else -> return ReplayOutcome.RETRY_LATER
-                    }
+                        else -> return replayOutcomeFor(response.code())
                 }
                 is MutationPayload.ItemCheck -> {
                     val updated = itemsApi.updateItem(
@@ -90,8 +89,7 @@ class MutationDrainer @Inject constructor(
                     when {
                         response.isSuccessful || response.code() == 404 ->
                             shopsRepository.applyDeleted(payload.shopId)
-                        else -> return ReplayOutcome.RETRY_LATER
-                    }
+                        else -> return replayOutcomeFor(response.code())
                 }
             }
             ReplayOutcome.SUCCESS
@@ -99,15 +97,17 @@ class MutationDrainer @Inject constructor(
             throw error
         } catch (error: Exception) {
             if (error is retrofit2.HttpException) {
-                when (error.code()) {
-                    404, 409 -> ReplayOutcome.DROPPED
-                    401, 403 -> ReplayOutcome.RETRY_LATER
-                    else -> ReplayOutcome.RETRY_LATER
-                }
+                replayOutcomeFor(error.code())
             } else {
-                ReplayOutcome.RETRY_LATER
+                ReplayOutcome.STOP
             }
         }
+    }
+
+    private fun replayOutcomeFor(httpCode: Int): ReplayOutcome = when (httpCode) {
+        401, 403 -> ReplayOutcome.STOP
+        in 400..499 -> ReplayOutcome.DROPPED
+        else -> ReplayOutcome.STOP
     }
 
     private suspend fun remapFollowUps(oldItemId: Long, newItemId: Long) {
@@ -156,5 +156,5 @@ class MutationDrainer @Inject constructor(
 private enum class ReplayOutcome {
     SUCCESS,
     DROPPED,
-    RETRY_LATER,
+    STOP,
 }
