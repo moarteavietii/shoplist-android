@@ -7,7 +7,7 @@ Define check-off commit semantics and the device-local undo history: instant opt
 ## Requirements
 
 ### Requirement: Check and uncheck actions commit instantly
-When the user checks or unchecks an item, the app SHALL optimistically flip the row immediately and send `PATCH /api/items/:itemId` with the new `isChecked` value without any artificial delay. If the PATCH fails, the app SHALL revert the optimistic flip and SHALL NOT record a history entry.
+When the user checks or unchecks an item, the app SHALL optimistically flip the row immediately and send `PATCH /api/v1/items/:itemId` with the new `isChecked` value without any artificial delay. If the PATCH fails, the app SHALL revert the optimistic flip and SHALL NOT record a history entry.
 
 #### Scenario: Check commits immediately
 - **WHEN** the user taps the checkbox for an unchecked item

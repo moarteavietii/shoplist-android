@@ -22,7 +22,7 @@ Reordering SHALL initiate only from a dedicated drag handle on the row; row-body
 - **THEN** rows render without a handle zone
 
 ### Requirement: A drop persists a fractional-index reorder optimistically
-On drop, the app SHALL compute a new fractional index between the item's neighbors (or a boundary index at the start/end), update the cache optimistically so the item stays in the dropped position until the server responds, and send `PATCH /api/items/:itemId` with the merged `orderMap`. A failed reorder SHALL roll back the optimistic update and surface an error.
+On drop, the app SHALL compute a new fractional index between the item's neighbors (or a boundary index at the start/end), update the cache optimistically so the item stays in the dropped position until the server responds, and send `PATCH /api/v1/items/:itemId` with the merged `orderMap`. A failed reorder SHALL roll back the optimistic update and surface an error.
 
 #### Scenario: Drop between neighbors
 - **WHEN** the user drops an item between two others

@@ -5,7 +5,7 @@ Define how the user controls which shops an item appears in: the shop-visibility
 ## Requirements
 
 ### Requirement: The edit modal lists all available shops with Global first
-The item edit modal SHALL list every shop returned by `GET /api/shops`, ordered with the Global shop first and all other shops in alphabetical order. If the Global shop is missing from the fetched shop list, the modal SHALL still show a Global option first.
+The item edit modal SHALL list every shop returned by `GET /api/v1/shops`, ordered with the Global shop first and all other shops in alphabetical order. If the Global shop is missing from the fetched shop list, the modal SHALL still show a Global option first.
 
 #### Scenario: Global is first
 - **WHEN** the modal opens and the shops are "Carrefour", "Auchan", and "Global"
@@ -60,7 +60,7 @@ Saving SHALL persist the selected shops together with any other changed fields b
 
 #### Scenario: Save updates visibility
 - **WHEN** the user checks "Carrefour" and taps Save
-- **THEN** the app calls `PATCH /api/items/:itemId` with `visibleIn` containing the Carrefour shop id
+- **THEN** the app calls `PATCH /api/v1/items/:itemId` with `visibleIn` containing the Carrefour shop id
 
 #### Scenario: Save omits unchanged visibility
 - **WHEN** the user changes only the item name and taps Save

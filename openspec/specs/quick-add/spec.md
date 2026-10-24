@@ -112,11 +112,11 @@ When the user saves the modal, the app SHALL create the item with a `visibleIn` 
 
 #### Scenario: Save with multiple views selected
 - **WHEN** the user enters a title, selects "Global" and "Carrefour", and taps Save
-- **THEN** the app calls `POST /api/lists/:listId/items` with the title and `visibleIn` set to the selected view ids
+- **THEN** the app calls `POST /api/v1/lists/:listId/items` with the title and `visibleIn` set to the selected view ids
 
 #### Scenario: Save with only Global selected
 - **WHEN** the user enters a title and leaves only "Global" selected
-- **THEN** the app calls `POST /api/lists/:listId/items` with `visibleIn` set to `[globalShopId]`
+- **THEN** the app calls `POST /api/v1/lists/:listId/items` with `visibleIn` set to `[globalShopId]`
 
 ### Requirement: Focus returns to search field after item creation
 After an item is created from the search flow, the app SHALL return focus to the search field so the next search or item creation can start immediately.
