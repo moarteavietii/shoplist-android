@@ -24,7 +24,6 @@ object LocalModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ShoplistDatabase =
         Room.databaseBuilder(context, ShoplistDatabase::class.java, "shoplist.db")
-            .fallbackToDestructiveMigration()
             .build()
 
     @Provides
