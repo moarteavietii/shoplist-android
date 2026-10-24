@@ -21,6 +21,7 @@ class ConnectivityMonitor @Inject constructor(
     val connectivity: StateFlow<BackendConnectivity> = _connectivity.asStateFlow()
 
     private var registered = false
+    private val availabilityTracker = NetworkAvailabilityTracker<Network>()
 
     @Suppress("DEPRECATION")
     fun start() {
@@ -49,13 +50,24 @@ class ConnectivityMonitor @Inject constructor(
         _connectivity.value = BackendConnectivity.UNREACHABLE
     }
 
+    private fun updateState() {
+        _connectivity.value =
+            if (availabilityTracker.hasAvailableNetwork()) {
+                BackendConnectivity.REACHABLE
+            } else {
+                BackendConnectivity.UNREACHABLE
+            }
+    }
+
     private val callback = object : android.net.ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: android.net.Network) {
-            _connectivity.value = BackendConnectivity.REACHABLE
+        override fun onAvailable(network: Network) {
+            availabilityTracker.onNetworkAvailable(network)
+            updateState()
         }
 
-        override fun onLost(network: android.net.Network) {
-            _connectivity.value = BackendConnectivity.UNREACHABLE
+        override fun onLost(network: Network) {
+            availabilityTracker.onNetworkLost(network)
+            updateState()
         }
     }
 }
