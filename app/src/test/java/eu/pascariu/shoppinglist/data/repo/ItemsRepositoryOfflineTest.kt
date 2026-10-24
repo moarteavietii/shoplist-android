@@ -87,6 +87,46 @@ class ItemsRepositoryOfflineTest {
     }
 
     @Test
+    fun `offline updateDetails enqueues an item_update mutation and keeps the optimistic state`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = sampleItems())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        val updated = repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Oat milk"))
+
+        assertEquals("Oat milk", repository.items.first().single().name)
+        assertEquals("Oat milk", updated.name)
+        assertEquals(1, mutationDao.listAll().size)
+        assertEquals(MutationKind.ITEM_UPDATE, mutationDao.listAll().single().kind)
+    }
+
+    @Test
+    fun `offline reorder enqueues an item_update mutation and keeps the optimistic order`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = sampleItems())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        val reordered = repository.reorder(itemId = 42L, viewId = 2L, newKey = "a5")
+
+        assertEquals("a5", repository.items.first().single().orderMap["2"])
+        assertEquals("a5", reordered.orderMap["2"])
+        assertEquals(1, mutationDao.listAll().size)
+        assertEquals(MutationKind.ITEM_UPDATE, mutationDao.listAll().single().kind)
+    }
+
+    @Test
     fun `placeholder ids never collide`() = runTest {
         val api = OfflineFakeItemsApi(itemsForFetch = emptyList())
         val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.UNREACHABLE), testScope)
