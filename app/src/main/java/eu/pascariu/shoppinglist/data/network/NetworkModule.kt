@@ -16,6 +16,9 @@ import eu.pascariu.shoppinglist.data.auth.AuthResponseInterceptor
 import eu.pascariu.shoppinglist.data.auth.AuthInterceptor
 import eu.pascariu.shoppinglist.data.auth.EncryptedTokenStore
 import eu.pascariu.shoppinglist.data.auth.TokenStore
+import eu.pascariu.shoppinglist.data.connectivity.BackendReachability
+import eu.pascariu.shoppinglist.data.connectivity.BackendReachabilityListener
+import eu.pascariu.shoppinglist.data.connectivity.ConnectivityMonitor
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
 import eu.pascariu.shoppinglist.data.device.DeviceIdInterceptor
@@ -66,10 +69,12 @@ object NetworkModule {
         authInterceptor: AuthInterceptor,
         tokenStore: TokenStore,
         deviceIdInterceptor: DeviceIdInterceptor,
+        reachabilityListener: BackendReachabilityListener,
     ): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
+            .eventListener(reachabilityListener)
             .addNetworkInterceptor(authInterceptor)
             .addInterceptor(AuthResponseInterceptor(authEventBus, tokenStore))
             .addInterceptor(deviceIdInterceptor)
@@ -161,4 +166,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRealtimeSyncManager(impl: RealtimeSyncManager): RealtimeSyncManagerContract = impl
+
+    @Provides
+    @Singleton
+    fun provideBackendReachability(impl: ConnectivityMonitor): BackendReachability = impl
 }
