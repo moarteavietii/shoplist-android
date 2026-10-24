@@ -45,9 +45,10 @@ class ItemsRepository @Inject constructor(
     val cachedListIdFlow: StateFlow<Long?> = _cachedListId.asStateFlow()
 
     suspend fun refetch(listId: Long) {
+        val fetched = itemsApi.listItems(listId).map { it.toEntity() }
         cachedListId = listId
         _cachedListId.value = listId
-        itemDao.replaceAll(itemsApi.listItems(listId).map { it.toEntity() })
+        itemDao.replaceAll(fetched)
     }
 
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
