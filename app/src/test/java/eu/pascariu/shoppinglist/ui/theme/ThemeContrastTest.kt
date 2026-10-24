@@ -60,6 +60,7 @@ class ThemeContrastTest {
             assertContrast(palette.content, palette.background, 4.5, "${themeId.name} content/background")
             assertContrast(palette.accent, palette.surface, 3.0, "${themeId.name} accent/surface")
             assertContrast(palette.danger, palette.surface, 3.0, "${themeId.name} danger/surface")
+            assertContrast(palette.ledOn, palette.background, 3.0, "${themeId.name} ledOn/background (checkmark)")
         }
     }
 }

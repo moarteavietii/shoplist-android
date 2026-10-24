@@ -7,7 +7,7 @@ Define check-off commit semantics and the device-local undo history: instant opt
 ## Requirements
 
 ### Requirement: Check and uncheck actions commit instantly
-When the user checks or unchecks an item, the app SHALL optimistically flip the row immediately and send `PATCH /api/v1/items/:itemId` with the new `isChecked` value without any artificial delay. If the PATCH fails, the app SHALL revert the optimistic flip and SHALL NOT record a history entry.
+When the user checks or unchecks an item by tapping its checkbox, the app SHALL optimistically flip the row immediately and send `PATCH /api/v1/items/:itemId` with the new `isChecked` value without any artificial delay. If the PATCH fails, the app SHALL revert the optimistic flip and SHALL NOT record a history entry. The checkbox tap SHALL be the only row-level trigger for checking or unchecking; taps on the row body outside the checkbox SHALL NOT commit a check action.
 
 #### Scenario: Check commits immediately
 - **WHEN** the user taps the checkbox for an unchecked item
@@ -23,6 +23,10 @@ When the user checks or unchecks an item, the app SHALL optimistically flip the 
 - **WHEN** the user checks item A and then checks item B
 - **THEN** item A remains checked
 - **AND** item B also appears checked
+
+#### Scenario: Row body tap does not commit a check
+- **WHEN** the user taps the row body outside the checkbox
+- **THEN** no check or uncheck is committed and no `PATCH` is sent
 
 ### Requirement: Committed check actions are recorded in a device-local history
 The app SHALL record every successfully committed check or uncheck performed by this device as an entry containing the item id, the previous checked value (`from`), the new checked value (`to`), and the commit time. Changes arriving from other users via realtime sync SHALL NOT be recorded. The history SHALL be bounded to the 50 most recent entries, with the oldest evicted when the bound is exceeded.
