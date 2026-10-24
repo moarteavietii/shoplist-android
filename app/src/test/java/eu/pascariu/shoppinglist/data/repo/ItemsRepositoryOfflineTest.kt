@@ -5,6 +5,7 @@ import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
 import eu.pascariu.shoppinglist.data.local.FakeItemDao
 import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
 import eu.pascariu.shoppinglist.data.local.MutationKind
+import eu.pascariu.shoppinglist.data.local.MutationPayload
 import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
@@ -66,7 +67,13 @@ class ItemsRepositoryOfflineTest {
     @Test
     fun `offline check coalesces into the queue`() = runTest {
         val api = OfflineFakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.UNREACHABLE), testScope)
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
         repository.refetch(listId = 1)
 
         repository.setChecked(itemId = 42L, isChecked = true)
@@ -74,6 +81,12 @@ class ItemsRepositoryOfflineTest {
 
         val cached = repository.items.first().single()
         assertEquals(false, cached.isChecked)
+        assertEquals(1, mutationDao.listAll().size)
+        val mutation = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_CHECK, mutation.kind)
+        val payload = json.decodeFromString<MutationPayload.ItemCheck>(mutation.payloadJson)
+        assertEquals(42L, payload.itemId)
+        assertEquals(false, payload.isChecked)
     }
 
     @Test
