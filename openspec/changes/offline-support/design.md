@@ -38,11 +38,12 @@ Hooked into the same place as the existing SSE reconnect refetch: when connectiv
 Each mutating repository method checks the connectivity state: reachable → existing behavior (network + cache update); unreachable → append to `pending_mutations` + apply optimistic write to Room. This keeps call sites (ViewModels) unchanged.
 
 **7. Create-while-offline uses client-generated placeholder ids.**
-Offline-created items get a negative temporary id locally; the queued create carries the full request body. On replay, the server returns the real item; the local placeholder row is replaced (negative id → server id) and any queued follow-up mutations referencing the placeholder are remapped. Alternative: block creates while offline — rejected, poor UX and the spec requires queued creates.
+Offline-created items get a negative temporary id locally; the queued create carries the full request body including a client-generated idempotency key (`clientId` UUID, generated once per create attempt and shared by the online request and the offline-queue fallback). On replay, the server returns the real item; the local placeholder row is replaced (negative id → server id) and any queued follow-up mutations referencing the placeholder are remapped. The backend dedupes creates on `clientId`, so a replay after a lost response returns the already-created row instead of duplicating it. Alternative: block creates while offline — rejected, poor UX and the spec requires queued creates.
 
 ## Risks / Trade-offs
 
 - [Replay vs SSE race: an SSE event for the same item arrives mid-drain] → Merge rules are already idempotent/diff-checked; server responses overwrite local rows, and the post-drain refetch is the final reconciler.
+- [Create replay duplicates after a lost response] → Resolved: queued creates carry a `clientId` idempotency key and the backend dedupes on it (exactly-once create replay).
 - [Placeholder id leaks into orderMap keys] → orderMap keys are shop ids, not item ids, so no collision; placeholder id only lives in the local row and queue payloads, remapped at replay.
 - [Queue grows unbounded during long offline periods] → Mutations per kind collapse where safe (e.g. repeated checks on the same item coalesce to the latest value); cap is not needed for realistic shopping-list usage, revisit if it becomes a problem.
 - [Room Flow emissions on every write could cause UI jank on bulk refetch] → Batch writes in one transaction so the observable emits once per logical change.

@@ -22,6 +22,8 @@ The app SHALL enqueue every user-initiated item or shop mutation (create, update
 ### Requirement: Queued mutations replay in order on reconnect
 When connectivity to the backend is restored, the app SHALL replay queued mutations in enqueue order, waiting for each to settle before sending the next. A replayed mutation SHALL apply its recorded operation against the current server state; when the server's response conflicts with the recorded intent, the server's response wins and the local state is reconciled to it. A replayed mutation that fails with a non-retryable error (e.g. 404 item deleted, 409 duplicate) SHALL be dropped without blocking the rest of the queue.
 
+Queued create mutations (items and shops) SHALL carry a client-generated idempotency key (`clientId`, a UUID generated once at enqueue time and persisted in the mutation payload). Replays SHALL reuse the recorded key, and the backend SHALL dedupe on it: the first request creates the row, a replay with the same key returns the already-created row. This makes create replay exactly-once from the client's perspective, so a create the server already processed is never duplicated by a replay.
+
 #### Scenario: Queue drains in order after reconnect
 - **WHEN** connectivity is restored with multiple mutations queued
 - **THEN** the mutations are sent one at a time in enqueue order until the queue is empty

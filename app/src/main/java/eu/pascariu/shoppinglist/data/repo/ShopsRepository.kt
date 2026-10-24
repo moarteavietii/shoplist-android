@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
+import java.util.UUID
 
 @Singleton
 class ShopsRepository @Inject constructor(
@@ -41,6 +42,7 @@ class ShopsRepository @Inject constructor(
     }
 
     suspend fun create(name: String): Shop {
+        val request = CreateShopRequest(name = name, clientId = UUID.randomUUID().toString())
         if (mutationQueue.isOffline) {
             val placeholderId = nextPlaceholderId()
             val optimistic = Shop(
@@ -49,10 +51,10 @@ class ShopsRepository @Inject constructor(
                 createdAt = java.time.Instant.now().toString(),
             )
             shopDao.upsert(optimistic.toEntity())
-            mutationQueue.enqueue(MutationPayload.ShopCreate(placeholderId, CreateShopRequest(name = name)))
+            mutationQueue.enqueue(MutationPayload.ShopCreate(placeholderId, request))
             return optimistic
         }
-        val created = shopsApi.createShop(CreateShopRequest(name = name))
+        val created = shopsApi.createShop(request)
         shopDao.upsert(created.toEntity())
         return created
     }

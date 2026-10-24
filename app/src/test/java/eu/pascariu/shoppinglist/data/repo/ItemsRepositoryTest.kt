@@ -110,7 +110,8 @@ class ItemsRepositoryTest {
         repository.create(listId = 1, request)
 
         assertEquals(1L, api.lastCreateListId)
-        assertEquals(request, api.lastCreateRequest)
+        assertEquals(request.copy(clientId = api.lastCreateRequest?.clientId), api.lastCreateRequest)
+        assertTrue(api.lastCreateRequest?.clientId != null)
         assertEquals(listOf(created), repository.items.first())
     }
 

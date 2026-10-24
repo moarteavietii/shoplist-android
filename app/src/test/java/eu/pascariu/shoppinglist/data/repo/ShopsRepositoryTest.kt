@@ -65,7 +65,8 @@ class ShopsRepositoryTest {
         api.createdShop = shop(3, "Alpine")
         repository.create("Alpine")
 
-        assertEquals(CreateShopRequest(name = "Alpine"), api.lastCreateRequest)
+        assertEquals(CreateShopRequest(name = "Alpine", clientId = api.lastCreateRequest?.clientId), api.lastCreateRequest)
+        assertTrue(api.lastCreateRequest?.clientId != null)
         assertEquals(
             listOf("Global", "Alpine", "Bakery"),
             repository.shops.first().map { it.name },

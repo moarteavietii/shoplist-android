@@ -180,6 +180,64 @@ class MutationDrainerTest {
     }
 
     @Test
+    fun `replayed item create reuses the same clientId after a failed attempt`() = runTest {
+        val itemsApi = RecordingItemsApi().apply {
+            createError = IOException("connection lost")
+            createdItem = sampleItem(id = 7)
+        }
+        val queue = queue()
+        queue.enqueue(
+            MutationPayload.ItemCreate(
+                listId = 1,
+                placeholderId = -1L,
+                request = CreateItemRequest(name = "Milk", clientId = "client-id-1"),
+            ),
+        )
+
+        val drainer = drainer(itemsApi = itemsApi, queue = queue)
+        assertFalse(drainer.drainAll())
+
+        itemsApi.createError = null
+        drainer.drainAll()
+
+        assertEquals(listOf("client-id-1", "client-id-1"), itemsApi.createClientIds)
+        assertEquals(0, queue.listAll().size)
+    }
+
+    @Test
+    fun `replayed shop create reuses the same clientId after a failed attempt`() = runTest {
+        val shopsApi = RecordingShopsApi().apply {
+            createError = IOException("connection lost")
+            createdShop = sampleShop(id = 7)
+        }
+        val queue = queue()
+        queue.enqueue(
+            MutationPayload.ShopCreate(
+                placeholderId = -1L,
+                request = CreateShopRequest(name = "Lidl", clientId = "client-id-2"),
+            ),
+        )
+
+        val itemsApi = RecordingItemsApi()
+        val drainer = MutationDrainer(
+            queue = queue,
+            itemsApi = itemsApi,
+            shopsApi = shopsApi,
+            itemsRepository = ItemsRepository(itemsApi, FakeItemDao(), queue, testScope),
+            shopsRepository = ShopsRepository(shopsApi, FakeShopDao(), queue, testScope),
+            json = json,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        assertFalse(drainer.drainAll())
+
+        shopsApi.createError = null
+        drainer.drainAll()
+
+        assertEquals(listOf("client-id-2", "client-id-2"), shopsApi.createClientIds)
+        assertEquals(0, queue.listAll().size)
+    }
+
+    @Test
     fun `cancellation after successful replay still removes the mutation from the queue`() = runTest {
         val itemsApi = RecordingItemsApi()
         val dao = object : FakePendingMutationDao() {
@@ -327,17 +385,21 @@ private fun sampleItem(id: Long, isChecked: Boolean): Item = sampleItem(id).copy
 
 private class RecordingItemsApi : ItemsApi {
     val checkedItemIds = mutableListOf<Long>()
+    val createClientIds = mutableListOf<String?>()
     var updateCalls = 0
     var deleteCalls = 0
     var checkError: IOException? = null
     var checkErrorCode: Int? = null
     var deleteErrorCode: Int? = null
+    var createError: IOException? = null
     var createdItem: Item? = null
     var listedItems: List<Item> = emptyList()
 
     override suspend fun listItems(listId: Long): List<Item> = listedItems
 
     override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
+        createClientIds.add(body.clientId)
+        createError?.let { throw it }
         return requireNotNull(createdItem)
     }
 
@@ -359,14 +421,18 @@ private class RecordingItemsApi : ItemsApi {
 }
 
 private class RecordingShopsApi : ShopsApi {
+    val createClientIds = mutableListOf<String?>()
     var deleteCalls = 0
     var deleteErrorCode: Int? = null
     var renameCalls = 0
     var renamedShopIds = mutableListOf<Long>()
+    var createError: IOException? = null
     var createdShop: Shop? = null
 
     override suspend fun listShops(): List<Shop> = emptyList()
     override suspend fun createShop(body: CreateShopRequest): Shop {
+        createClientIds.add(body.clientId)
+        createError?.let { throw it }
         return requireNotNull(createdShop)
     }
     override suspend fun renameShop(shopId: Long, body: RenameShopRequest): Shop {

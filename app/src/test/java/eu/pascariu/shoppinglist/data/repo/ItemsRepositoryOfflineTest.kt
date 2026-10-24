@@ -21,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
+import java.util.UUID
 
 class ItemsRepositoryOfflineTest {
 
@@ -194,6 +195,67 @@ class ItemsRepositoryOfflineTest {
         assertEquals(ids.size, ids.toSet().size)
         assertTrue(ids.all { it < 0 })
     }
+
+    @Test
+    fun `offline create stores a clientId in the queued payload`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = emptyList())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        repository.create(listId = 1, CreateItemRequest(name = "Milk"))
+
+        val payload = json.decodeFromString<MutationPayload.ItemCreate>(
+            mutationDao.listAll().single().payloadJson,
+        )
+        assertTrue(payload.request.clientId != null)
+        assertTrue(UUID.fromString(payload.request.clientId) != null)
+    }
+
+    @Test
+    fun `offline create reuses the caller-provided clientId`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = emptyList())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        repository.create(listId = 1, CreateItemRequest(name = "Milk", clientId = "fixed-client-id"))
+
+        val payload = json.decodeFromString<MutationPayload.ItemCreate>(
+            mutationDao.listAll().single().payloadJson,
+        )
+        assertEquals("fixed-client-id", payload.request.clientId)
+    }
+
+    @Test
+    fun `online create sends a generated clientId`() = runTest {
+        val api = OnlineRecordingItemsApi()
+        val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.REACHABLE), testScope)
+
+        repository.create(listId = 1, CreateItemRequest(name = "Milk"))
+
+        assertTrue(api.lastCreateRequest?.clientId != null)
+    }
+
+    @Test
+    fun `online create reuses the caller-provided clientId`() = runTest {
+        val api = OnlineRecordingItemsApi()
+        val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.REACHABLE), testScope)
+
+        repository.create(listId = 1, CreateItemRequest(name = "Milk", clientId = "fixed-client-id"))
+
+        assertEquals("fixed-client-id", api.lastCreateRequest?.clientId)
+    }
 }
 
 private fun sampleItems(): List<Item> = listOf(
@@ -232,6 +294,37 @@ private class OfflineFakeItemsApi(
 
     override suspend fun deleteItem(itemId: Long): Response<Unit> {
         throw AssertionError("network calls are not expected while offline")
+    }
+}
+
+private class OnlineRecordingItemsApi : ItemsApi {
+    var lastCreateRequest: CreateItemRequest? = null
+
+    override suspend fun listItems(listId: Long): List<Item> = emptyList()
+
+    override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
+        lastCreateRequest = body
+        return Item(
+            id = 100,
+            listId = listId,
+            name = body.name,
+            isChecked = false,
+            orderMap = body.orderMap ?: emptyMap(),
+            quantity = body.quantity ?: 1,
+            isTemporary = body.isTemporary ?: false,
+            checkCount = 0,
+            expiresAt = null,
+            createdAt = "2026-10-24T10:00:00.000Z",
+            visibleIn = body.visibleIn ?: emptyList(),
+        )
+    }
+
+    override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item {
+        throw AssertionError("network calls are not expected in this test")
+    }
+
+    override suspend fun deleteItem(itemId: Long): Response<Unit> {
+        throw AssertionError("network calls are not expected in this test")
     }
 }
 

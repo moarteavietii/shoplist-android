@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
+import java.util.UUID
 
 @Singleton
 class ItemsRepository @Inject constructor(
@@ -50,11 +51,12 @@ class ItemsRepository @Inject constructor(
     }
 
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
+        val idempotentRequest = request.copy(clientId = request.clientId ?: UUID.randomUUID().toString())
         if (mutationQueue.isOffline) {
-            return createOffline(listId, request)
+            return createOffline(listId, idempotentRequest)
         }
         try {
-            val created = itemsApi.createItem(listId, request)
+            val created = itemsApi.createItem(listId, idempotentRequest)
             if (listId == _cachedListId.value) {
                 itemDao.upsert(created.toEntity())
             }
@@ -62,7 +64,7 @@ class ItemsRepository @Inject constructor(
         } catch (error: CancellationException) {
             throw error
         } catch (error: IOException) {
-            return createOffline(listId, request)
+            return createOffline(listId, idempotentRequest)
         }
     }
 
