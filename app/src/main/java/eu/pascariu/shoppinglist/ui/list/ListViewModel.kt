@@ -53,7 +53,7 @@ import kotlinx.coroutines.sync.withLock
 class ListViewModel @Inject constructor(
     private val itemsRepository: ItemsRepository,
     private val shopsRepository: ShopsRepository,
-    connectivity: @JvmSuppressWildcards StateFlow<eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity>,
+    private val connectivity: @JvmSuppressWildcards StateFlow<eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity>,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
     private val themeRepository: ThemeRepository,
@@ -169,6 +169,9 @@ class ListViewModel @Inject constructor(
     }
 
     fun refresh() {
+        if (connectivity.value == eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity.UNREACHABLE) {
+            return
+        }
         viewModelScope.launch {
             try {
                 itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
