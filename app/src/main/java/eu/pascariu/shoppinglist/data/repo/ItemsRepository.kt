@@ -35,7 +35,6 @@ class ItemsRepository @Inject constructor(
     @ApplicationScope externalScope: CoroutineScope,
 ) {
 
-    private var cachedListId: Long? = null
     private val _cachedListId = MutableStateFlow<Long?>(null)
     private val placeholderMutex = Mutex()
     private var nextPlaceholderCandidate = -1L
@@ -46,7 +45,6 @@ class ItemsRepository @Inject constructor(
 
     suspend fun refetch(listId: Long) {
         val fetched = itemsApi.listItems(listId).map { it.toEntity() }
-        cachedListId = listId
         _cachedListId.value = listId
         itemDao.replaceAll(fetched)
     }
@@ -57,7 +55,7 @@ class ItemsRepository @Inject constructor(
         }
         try {
             val created = itemsApi.createItem(listId, request)
-            if (listId == cachedListId) {
+            if (listId == _cachedListId.value) {
                 itemDao.upsert(created.toEntity())
             }
             return created
@@ -94,7 +92,7 @@ class ItemsRepository @Inject constructor(
         }
         try {
             val updated = itemsApi.updateItem(itemId, request)
-            if (updated.listId == cachedListId) {
+            if (updated.listId == _cachedListId.value) {
                 itemDao.upsert(updated.toEntity())
             }
             return updated
@@ -255,19 +253,19 @@ class ItemsRepository @Inject constructor(
     }
 
     suspend fun applyCreated(item: Item) {
-        if (item.listId != cachedListId) return
+        if (item.listId != _cachedListId.value) return
         if (itemDao.getById(item.id) != null) return
         itemDao.upsert(item.toEntity())
     }
 
     suspend fun applyRestored(item: Item, previousIndex: Int) {
-        if (item.listId != cachedListId) return
+        if (item.listId != _cachedListId.value) return
         if (itemDao.getById(item.id) != null) return
         itemDao.upsert(item.toEntity())
     }
 
     suspend fun applyUpdated(item: Item) {
-        if (item.listId != cachedListId) return
+        if (item.listId != _cachedListId.value) return
         val existing = itemDao.getById(item.id)?.toModel() ?: return
         if (existing == item) return
         itemDao.upsert(item.toEntity())
