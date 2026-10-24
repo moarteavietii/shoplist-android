@@ -20,6 +20,7 @@ import eu.pascariu.shoppinglist.data.model.ShopEvent
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
+import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -105,8 +106,8 @@ class RealtimeLifecycleTest {
         itemsApi.gate.complete(Unit)
         advanceUntilIdle()
 
-        assertEquals(2, mutationQueue.listAll().size)
         assertEquals(2, itemsApi.updateCalls)
+        assertEquals(0, mutationQueue.listAll().size)
     }
 
     @Test
@@ -120,13 +121,17 @@ class RealtimeLifecycleTest {
         controller.launchOrSkipDrain()
         advanceUntilIdle()
         assertEquals(1, itemsApi.updateCalls)
+        assertEquals(1, mutationQueue.listAll().size)
+
+        itemsApi.gate.complete(Unit)
+        advanceUntilIdle()
         assertEquals(0, mutationQueue.listAll().size)
 
         mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
         controller.onConnectivity(BackendConnectivity.REACHABLE)
         advanceUntilIdle()
 
-        assertEquals(1, itemsApi.updateCalls)
+        assertEquals(2, itemsApi.updateCalls)
         assertEquals(0, mutationQueue.listAll().size)
     }
 
@@ -143,6 +148,38 @@ class RealtimeLifecycleTest {
 
         assertEquals(0, itemsApi.updateCalls)
         assertEquals(1, mutationQueue.listAll().size)
+    }
+
+    @Test
+    fun `failed drain does not refetch`() = runTest {
+        val connectivity = MutableStateFlow(BackendConnectivity.REACHABLE)
+        val itemsApi = GatedItemsApi().apply { failUpdates = true }
+        val mutationQueue = queue(connectivity)
+        val controller = controller(this, itemsApi, mutationQueue)
+        mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+
+        controller.launchOrSkipDrain()
+        advanceUntilIdle()
+
+        assertEquals(0, itemsApi.listCalls)
+        assertEquals(1, mutationQueue.listAll().size)
+    }
+
+    @Test
+    fun `successful drain refetches from the backend`() = runTest {
+        val connectivity = MutableStateFlow(BackendConnectivity.REACHABLE)
+        val itemsApi = GatedItemsApi()
+        val mutationQueue = queue(connectivity)
+        val controller = controller(this, itemsApi, mutationQueue)
+        mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+
+        controller.launchOrSkipDrain()
+        advanceUntilIdle()
+        itemsApi.gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, itemsApi.listCalls)
+        assertEquals(0, mutationQueue.listAll().size)
     }
 }
 
@@ -176,14 +213,20 @@ private class NoopShopsApi : ShopsApi {
 private class GatedItemsApi : ItemsApi {
     val gate = CompletableDeferred<Unit>()
     var updateCalls = 0
+    var listCalls = 0
+    var failUpdates = false
     private var gatedCallDone = false
 
-    override suspend fun listItems(listId: Long): List<Item> = emptyList()
+    override suspend fun listItems(listId: Long): List<Item> {
+        listCalls++
+        return emptyList()
+    }
 
     override suspend fun createItem(listId: Long, body: CreateItemRequest): Item = throw AssertionError("not expected")
 
     override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item {
         updateCalls++
+        if (failUpdates) throw IOException("offline")
         if (!gatedCallDone) {
             gatedCallDone = true
             gate.await()
