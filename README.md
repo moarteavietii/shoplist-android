@@ -1,13 +1,14 @@
 # Shoplist Android
 
-A native Android shopping list app.
+A native Android shopping list app. Works offline: items, shops, and pending changes are persisted locally (Room) and synced to the backend on reconnect.
 
 ## Tech Stack
 
 - **Platform:** Android (minSdk 35, target/compile SDK 37)
 - **Build system:** Gradle with Kotlin DSL, Android Gradle Plugin via version catalog (`gradle/libs.versions.toml`)
 - **UI:** Jetpack Compose with a custom design language (token-based theming; Material 3 only as an unthemed component toolkit)
-- **Testing:** JUnit4 (unit), AndroidX Test + Espresso (instrumented)
+- **Persistence:** Room (items, shops, pending-mutation queue); server is source of truth on refetch
+- **Testing:** JUnit4 (unit), Robolectric (Room DAO tests), AndroidX Test + Espresso (instrumented)
 
 ## Project Structure
 

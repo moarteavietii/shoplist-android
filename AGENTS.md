@@ -2,7 +2,7 @@
 
 ## Project State
 
-This is an **OpenSpec-managed repo** for a native Android shopping list app. The `:app` module hosts a Jetpack Compose app with a custom design language (token-based theming via CompositionLocals), Hilt DI, Retrofit/OkHttp/kotlinx-serialization networking, and Cloudflare Access service-token auth (no-op in debug builds). Feature behavior lives in the capability specs under `openspec/specs/` — consult those instead of this file for feature-level contracts.
+This is an **OpenSpec-managed repo** for a native Android shopping list app. The `:app` module hosts a Jetpack Compose app with a custom design language (token-based theming via CompositionLocals), Hilt DI, Retrofit/OkHttp/kotlinx-serialization networking, Room-backed local persistence with an offline mutation queue, and Cloudflare Access service-token auth (no-op in debug builds). Feature behavior lives in the capability specs under `openspec/specs/` — consult those instead of this file for feature-level contracts.
 
 ## Architecture & Stack
 
@@ -10,7 +10,8 @@ This is an **OpenSpec-managed repo** for a native Android shopping list app. The
 - **Build system:** Gradle with Kotlin DSL (`build.gradle.kts`), Android Gradle Plugin via version catalog
 - **Module layout:** Single `:app` module
 - **UI:** Jetpack Compose with a custom design language (token-based theming via CompositionLocals; Material 3 only as an unthemed component toolkit)
-- **Testing:** JUnit4 (unit), AndroidX Test + Espresso (instrumented)
+- **Persistence:** Room (items, shops, pending-mutation queue); repositories expose Room-backed `Flow`s, server is truth on refetch
+- **Testing:** JUnit4 (unit), Robolectric (Room DAO tests), AndroidX Test + Espresso (instrumented)
 
 ## Safe Agent Commands
 
@@ -48,14 +49,14 @@ This repo uses the `spec-driven` OpenSpec schema. Use the provided commands rath
 
 The matching skills live under `.coda/skills/openspec-*` if you need the full steps.
 
-## Migration Conventions (until migration is complete)
+## Migration Conventions (migration complete)
 
-The Android app replaces the shoppinglist web frontend; the backend REST + SSE API is reused as-is. `docs/MIGRATION_PLAN.md` is the authoritative reference for the migration — read it before any migration work. Until the migration is done:
+The Android app replaces the shoppinglist web frontend; the backend REST + SSE API is reused as-is. The migration is **complete** (all roadmap items done; see `docs/MIGRATION_PLAN.md` for the full traceability matrix and decisions log). `docs/MIGRATION_PLAN.md` remains the authoritative reference for the API/SSE/data-model contracts and the decisions log — consult it before changing anything that touches those contracts.
 
 - **Consult `docs/MIGRATION_PLAN.md` first.** It holds the discovered API/SSE/data-model contracts, the decisions log, and the traceability matrix. Do not re-derive contracts from the web repo when the plan already records them; go to the web repo only for details the plan lacks.
 - **Follow the migration workflow in the plan** (§5): pick a roadmap item from `docs/ROADMAP.md` → branch → `/opsx-propose` (consulting the web specs listed in the traceability matrix as source material — adapt, don't copy) → `/opsx-apply` → `/opsx-archive` → update the matrix status in `docs/MIGRATION_PLAN.md`.
 - **Never propose or implement backend changes in this repo.** Specs marked `n/a` in the matrix (database, deploy, dev-env) belong to the web repo.
-- **Respect the decisions log.** The plan's decisions table (design language, auth + dev bypass, minSdk 35, no pull-to-refresh, backgrounded = no network, base URLs, no Room initially) is settled — do not relitigate or contradict it in proposals. If a decision must change, surface it to the user first and update the log.
+- **Respect the decisions log.** The plan's decisions table (design language, auth + dev bypass, minSdk 35, no pull-to-refresh, backgrounded = no network, base URLs, Room as the persistent local store) is settled — do not relitigate or contradict it in proposals. If a decision must change, surface it to the user first and update the log.
 - **After each `/opsx-archive`,** update the traceability matrix row(s) for the archived change and check whether `docs/ROADMAP.md` needs its item status adjusted.
 
 ## Repo Layout
