@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 
-class FakePendingMutationDao : PendingMutationDao {
+open class FakePendingMutationDao : PendingMutationDao {
 
     private var nextId = 1L
     private val rows = mutableListOf<PendingMutation>()
@@ -24,7 +24,7 @@ class FakePendingMutationDao : PendingMutationDao {
 
     override fun observeCount() = MutableStateFlow(rows.size)
 
-    override suspend fun deleteById(mutationId: Long) {
+    open override suspend fun deleteById(mutationId: Long) {
         rows.removeAll { it.id == mutationId }
     }
 
