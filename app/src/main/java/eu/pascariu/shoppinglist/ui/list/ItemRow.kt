@@ -10,7 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -95,7 +96,9 @@ fun ItemRow(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                    .pointerInput(onLongPress) {
+                        detectTapGestures(onLongPress = { onLongPress?.invoke() })
+                    }
                     .padding(horizontal = if (dragEnabled) 0.dp else 16.dp, vertical = 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -166,6 +169,10 @@ private fun CircleCheckbox(
     )
     val checkColor = colors.background
 
+    val checkPath = remember { Path() }
+    val checkMeasure = remember { PathMeasure() }
+    val partialPath = remember { Path() }
+
     Box(
         modifier = modifier
             .size(48.dp)
@@ -182,16 +189,15 @@ private fun CircleCheckbox(
         Canvas(modifier = Modifier.size(20.dp)) {
             drawCircle(color = circleColor)
             if (checkProgress > 0f) {
-                val checkPath = Path().apply {
-                    moveTo(size.width * 0.25f, size.height * 0.52f)
-                    lineTo(size.width * 0.42f, size.height * 0.70f)
-                    lineTo(size.width * 0.78f, size.height * 0.32f)
-                }
-                val measure = PathMeasure().apply { setPath(checkPath, false) }
-                val partial = Path()
-                measure.getSegment(0f, measure.length * checkProgress, partial, true)
+                checkPath.reset()
+                checkPath.moveTo(size.width * 0.25f, size.height * 0.52f)
+                checkPath.lineTo(size.width * 0.42f, size.height * 0.70f)
+                checkPath.lineTo(size.width * 0.78f, size.height * 0.32f)
+                checkMeasure.setPath(checkPath, false)
+                partialPath.reset()
+                checkMeasure.getSegment(0f, checkMeasure.length * checkProgress, partialPath, true)
                 drawPath(
-                    path = partial,
+                    path = partialPath,
                     color = checkColor,
                     style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
                 )
