@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 
 @Singleton
@@ -31,6 +33,8 @@ class ShopsRepository @Inject constructor(
     val shops: StateFlow<List<Shop>> = shopDao.observeAll()
         .map { entities -> orderViewsGlobalFirst(entities.map { it.toModel() }) }
         .stateIn(externalScope, SharingStarted.Eagerly, emptyList())
+    private val placeholderMutex = Mutex()
+    private var nextPlaceholderCandidate = -1L
 
     suspend fun refetch() {
         shopDao.replaceAll(shopsApi.listShops().map { it.toEntity() })
@@ -98,9 +102,10 @@ class ShopsRepository @Inject constructor(
         shopDao.upsert(realShop.toEntity())
     }
 
-    private suspend fun nextPlaceholderId(): Long {
-        var candidate = -1L
+    private suspend fun nextPlaceholderId(): Long = placeholderMutex.withLock {
+        var candidate = nextPlaceholderCandidate
         while (shopDao.getById(candidate) != null) candidate -= 1
-        return candidate
+        nextPlaceholderCandidate = candidate - 1
+        candidate
     }
 }
