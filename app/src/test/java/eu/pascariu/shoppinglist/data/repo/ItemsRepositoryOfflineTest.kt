@@ -142,6 +142,32 @@ class ItemsRepositoryOfflineTest {
     }
 
     @Test
+    fun `offline update applies checked and order fields optimistically`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = sampleItems())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        val updated = repository.update(
+            itemId = 42L,
+            UpdateItemRequest(isChecked = true, orderMap = mapOf("2" to "a9")),
+        )
+
+        assertTrue(updated.isChecked)
+        assertEquals("a9", updated.orderMap["2"])
+        val cached = repository.items.first().single()
+        assertTrue(cached.isChecked)
+        assertEquals("a9", cached.orderMap["2"])
+        assertEquals(1, mutationDao.listAll().size)
+        assertEquals(MutationKind.ITEM_UPDATE, mutationDao.listAll().single().kind)
+    }
+
+    @Test
     fun `placeholder ids never collide`() = runTest {
         val api = OfflineFakeItemsApi(itemsForFetch = emptyList())
         val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.UNREACHABLE), testScope)

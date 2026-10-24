@@ -108,14 +108,17 @@ class ItemsRepository @Inject constructor(
     private suspend fun updateOffline(itemId: Long, request: UpdateItemRequest): Item {
         val previous = itemDao.getById(itemId)?.toModel()
             ?: throw IllegalArgumentException("item $itemId not cached")
+        val optimisticIsChecked = request.isChecked ?: previous.isChecked
         val optimistic = previous.copy(
             name = request.name ?: previous.name,
+            isChecked = optimisticIsChecked,
+            orderMap = request.orderMap ?: previous.orderMap,
             visibleIn = request.visibleIn ?: previous.visibleIn,
             quantity = request.quantity ?: previous.quantity,
             isTemporary = request.isTemporary ?: previous.isTemporary,
             expiresAt = when {
                 request.isTemporary == false -> null
-                request.isTemporary == true && previous.isChecked -> stampExpiry()
+                request.isTemporary == true && optimisticIsChecked -> stampExpiry()
                 else -> previous.expiresAt
             },
         )
