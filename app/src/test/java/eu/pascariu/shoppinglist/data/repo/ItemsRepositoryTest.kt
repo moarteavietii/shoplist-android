@@ -78,6 +78,20 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `failed refetch of another list keeps cache and cached list id unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
+        repository.refetch(listId = 1)
+        api.listError = httpException(404)
+
+        val thrown = runCatching { repository.refetch(listId = 2) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(sampleItems(), repository.items.first())
+        assertEquals(1L, repository.cachedListIdFlow.first())
+    }
+
+    @Test
     fun `create adds server-returned item to cache`() = runTest {
         val api = FakeItemsApi(itemsForFetch = emptyList())
         val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
