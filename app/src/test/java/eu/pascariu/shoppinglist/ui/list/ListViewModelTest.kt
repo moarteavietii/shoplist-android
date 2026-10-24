@@ -248,6 +248,42 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `failed refresh retries on reconnect and clears error on success`() = runTest(testDispatcher) {
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+        advanceUntilIdle()
+
+        server.enqueue(MockResponse().setResponseCode(500))
+        connectivityFlow.value = BackendConnectivity.REACHABLE
+        awaitUntil { viewModel.uiState.value.errorMessage != null }
+        assertEquals("Couldn't refresh the list", viewModel.uiState.value.errorMessage)
+
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"))
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+        advanceUntilIdle()
+        connectivityFlow.value = BackendConnectivity.REACHABLE
+        awaitUntil { viewModel.uiState.value.errorMessage == null }
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `reconnect without prior failure does not duplicate the initial refresh`() = runTest(testDispatcher) {
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        assertEquals(2, server.requestCount)
+
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+        advanceUntilIdle()
+        connectivityFlow.value = BackendConnectivity.REACHABLE
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
     fun `search query filters items with fuzzy match`() = runTest(testDispatcher) {
         loadFixtures()
 

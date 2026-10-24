@@ -125,6 +125,16 @@ class ListViewModel @Inject constructor(
                 showChangeToasts(labelBatch.map { it.text })
             }
         }
+        viewModelScope.launch {
+            var previous = connectivity.value
+            connectivity.collect { state ->
+                val wasUnreachable = previous == BackendConnectivity.UNREACHABLE
+                previous = state
+                if (wasUnreachable && state == BackendConnectivity.REACHABLE) {
+                    refresh()
+                }
+            }
+        }
     }
 
     private fun showChangeToasts(texts: List<String>) {
