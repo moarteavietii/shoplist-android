@@ -3,6 +3,7 @@ package eu.pascariu.shoppinglist.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
@@ -53,7 +54,7 @@ import kotlinx.coroutines.sync.withLock
 class ListViewModel @Inject constructor(
     private val itemsRepository: ItemsRepository,
     private val shopsRepository: ShopsRepository,
-    private val connectivity: @JvmSuppressWildcards StateFlow<eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity>,
+    private val connectivity: @JvmSuppressWildcards StateFlow<BackendConnectivity>,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
     private val themeRepository: ThemeRepository,
@@ -67,7 +68,7 @@ class ListViewModel @Inject constructor(
 
     val isOffline: StateFlow<Boolean> =
         connectivity
-            .map { it == eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity.UNREACHABLE }
+            .map { it == BackendConnectivity.UNREACHABLE }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _changeToast = MutableStateFlow<ChangeToast?>(null)
@@ -169,7 +170,7 @@ class ListViewModel @Inject constructor(
     }
 
     fun refresh() {
-        if (connectivity.value == eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity.UNREACHABLE) {
+        if (connectivity.value == BackendConnectivity.UNREACHABLE) {
             return
         }
         viewModelScope.launch {
