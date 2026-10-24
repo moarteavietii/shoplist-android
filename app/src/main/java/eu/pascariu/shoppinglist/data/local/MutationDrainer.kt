@@ -79,6 +79,7 @@ class MutationDrainer @Inject constructor(
                 is MutationPayload.ShopCreate -> {
                     val created = shopsApi.createShop(payload.request)
                     shopsRepository.remapPlaceholder(payload.placeholderId, created)
+                    remapShopFollowUps(payload.placeholderId, created.id)
                 }
                 is MutationPayload.ShopRename -> {
                     val renamed = shopsApi.renameShop(payload.shopId, payload.request)
@@ -120,6 +121,20 @@ class MutationDrainer @Inject constructor(
                 }
                 is MutationPayload.ItemDelete -> if (payload.itemId == oldItemId) {
                     queue.updatePayload(entry.id, payload.copy(itemId = newItemId))
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    private suspend fun remapShopFollowUps(oldShopId: Long, newShopId: Long) {
+        queue.listAll().forEach { entry ->
+            when (val payload = decode(entry.payloadJson)) {
+                is MutationPayload.ShopRename -> if (payload.shopId == oldShopId) {
+                    queue.updatePayload(entry.id, payload.copy(shopId = newShopId))
+                }
+                is MutationPayload.ShopDelete -> if (payload.shopId == oldShopId) {
+                    queue.updatePayload(entry.id, payload.copy(shopId = newShopId))
                 }
                 else -> Unit
             }

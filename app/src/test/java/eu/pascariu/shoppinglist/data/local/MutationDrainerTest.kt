@@ -184,6 +184,34 @@ class MutationDrainerTest {
         assertEquals(77L, itemDao.getById(77L)?.id)
         assertNull(itemDao.getById(-1))
     }
+
+    @Test
+    fun `successful shop create remaps the placeholder row and follow-ups`() = runTest {
+        val shopsApi = RecordingShopsApi().apply { createdShop = sampleShop(id = 55) }
+        val shopDao = FakeShopDao()
+        val queue = queue()
+        val shopsRepository = ShopsRepository(shopsApi, shopDao, queue, testScope)
+        shopDao.upsert(sampleShop(id = -1).toEntity())
+        queue.enqueue(MutationPayload.ShopCreate(placeholderId = -1, request = CreateShopRequest(name = "Lidl")))
+        queue.enqueue(MutationPayload.ShopRename(shopId = -1, request = RenameShopRequest(name = "Lidl Mega")))
+        queue.enqueue(MutationPayload.ShopDelete(shopId = -1))
+
+        MutationDrainer(
+            queue = queue,
+            itemsApi = RecordingItemsApi(),
+            shopsApi = shopsApi,
+            itemsRepository = ItemsRepository(RecordingItemsApi(), FakeItemDao(), queue, testScope),
+            shopsRepository = shopsRepository,
+            json = json,
+            ioDispatcher = Dispatchers.Unconfined,
+        ).drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(listOf(55L), shopsApi.renamedShopIds)
+        assertEquals(1, shopsApi.deleteCalls)
+        assertNull(shopDao.getById(55L))
+        assertNull(shopDao.getById(-1))
+    }
 }
 
 private fun sampleItem(id: Long): Item = Item(
@@ -237,13 +265,18 @@ private class RecordingItemsApi : ItemsApi {
 private class RecordingShopsApi : ShopsApi {
     var deleteCalls = 0
     var deleteErrorCode: Int? = null
+    var renameCalls = 0
+    var renamedShopIds = mutableListOf<Long>()
+    var createdShop: Shop? = null
 
     override suspend fun listShops(): List<Shop> = emptyList()
     override suspend fun createShop(body: CreateShopRequest): Shop {
-        throw AssertionError("not expected in this test")
+        return requireNotNull(createdShop)
     }
     override suspend fun renameShop(shopId: Long, body: RenameShopRequest): Shop {
-        throw AssertionError("not expected in this test")
+        renameCalls++
+        renamedShopIds.add(shopId)
+        return sampleShop(id = shopId, name = body.name)
     }
     override suspend fun deleteShop(shopId: Long): Response<Unit> {
         deleteCalls++
@@ -251,3 +284,9 @@ private class RecordingShopsApi : ShopsApi {
         return Response.success(Unit)
     }
 }
+
+private fun sampleShop(id: Long, name: String = "Shop"): Shop = Shop(
+    id = id,
+    name = name,
+    createdAt = "2026-10-22T10:00:00.000Z",
+)
