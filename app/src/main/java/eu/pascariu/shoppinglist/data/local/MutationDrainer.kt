@@ -33,9 +33,10 @@ class MutationDrainer @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
-    suspend fun drainAll() = withContext(ioDispatcher) {
-        while (true) {
-            val mutation = queue.peekOldest() ?: return@withContext
+    suspend fun drainAll(): Boolean = withContext(ioDispatcher) {
+        var fullyDrained = true
+        while (fullyDrained) {
+            val mutation = queue.peekOldest() ?: break
             val payload = decode(mutation.payloadJson)
             if (payload == null) {
                 queue.deleteById(mutation.id)
@@ -49,9 +50,10 @@ class MutationDrainer @Inject constructor(
                 ReplayOutcome.DROPPED -> withContext(NonCancellable) {
                     queue.deleteById(mutation.id)
                 }
-                ReplayOutcome.STOP -> return@withContext
+                ReplayOutcome.STOP -> fullyDrained = false
             }
         }
+        fullyDrained
     }
 
     private suspend fun drainOne(payload: MutationPayload): ReplayOutcome {

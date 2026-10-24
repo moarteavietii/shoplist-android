@@ -21,7 +21,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
@@ -71,6 +73,50 @@ class MutationDrainerTest {
 
         drainer(itemsApi = itemsApi, queue = queue).drainAll()
 
+        assertEquals(2, queue.listAll().size)
+    }
+
+    @Test
+    fun `drainAll returns true when the queue is empty`() = runTest {
+        val drained = drainer(itemsApi = RecordingItemsApi(), queue = queue()).drainAll()
+
+        assertTrue(drained)
+    }
+
+    @Test
+    fun `drainAll returns true after draining every mutation`() = runTest {
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+
+        val drained = drainer(itemsApi = RecordingItemsApi(), queue = queue).drainAll()
+
+        assertTrue(drained)
+        assertEquals(0, queue.listAll().size)
+    }
+
+    @Test
+    fun `drainAll returns false when a network error stops the drain`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkError = IOException("offline") }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        val drained = drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertFalse(drained)
+        assertEquals(2, queue.listAll().size)
+    }
+
+    @Test
+    fun `drainAll returns false when a 401 stops the drain`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        val drained = drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertFalse(drained)
         assertEquals(2, queue.listAll().size)
     }
 

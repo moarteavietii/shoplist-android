@@ -8,6 +8,7 @@ import eu.pascariu.shoppinglist.data.connectivity.ConnectivityMonitor
 import eu.pascariu.shoppinglist.data.local.MutationDrainer
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
@@ -66,9 +67,10 @@ class ConnectivityDrainController(
         if (drainJob?.isActive == true) return
         drainJob = scope.launch {
             try {
-                drainer.drainAll()
-            } finally {
-                syncManager.refetchAll()
+                val drained = drainer.drainAll()
+                if (drained) syncManager.refetchAll()
+            } catch (error: CancellationException) {
+                throw error
             }
         }
     }
