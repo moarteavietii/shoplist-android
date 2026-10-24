@@ -197,13 +197,17 @@ class MutationDrainerTest {
     fun `item delete 404 drops the mutation and continues draining`() = runTest {
         val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 404 }
         val queue = queue()
+        val itemDao = FakeItemDao()
+        itemDao.upsert(sampleItem(id = 1).toEntity())
+        val repository = ItemsRepository(itemsApi, itemDao, queue, testScope)
         queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
         queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
 
-        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+        drainer(itemsApi = itemsApi, queue = queue, itemsRepository = repository).drainAll()
 
         assertEquals(0, queue.listAll().size)
         assertEquals(1, itemsApi.deleteCalls)
+        assertNull(itemDao.getById(1L))
     }
 
     @Test
