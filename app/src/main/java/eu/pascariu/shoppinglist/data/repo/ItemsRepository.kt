@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
+import java.io.IOException
 
 @Singleton
 class ItemsRepository @Inject constructor(
@@ -47,55 +48,75 @@ class ItemsRepository @Inject constructor(
 
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
         if (mutationQueue.isOffline) {
-            val placeholderId = nextPlaceholderId()
-            val optimistic = Item(
-                id = placeholderId,
-                listId = listId,
-                name = request.name,
-                isChecked = false,
-                orderMap = request.orderMap ?: emptyMap(),
-                quantity = request.quantity ?: 1,
-                isTemporary = request.isTemporary ?: false,
-                checkCount = 0,
-                expiresAt = null,
-                createdAt = java.time.Instant.now().toString(),
-                visibleIn = request.visibleIn ?: emptyList(),
-            )
-            itemDao.upsert(optimistic.toEntity())
-            mutationQueue.enqueue(MutationPayload.ItemCreate(listId, placeholderId, request))
-            return optimistic
+            return createOffline(listId, request)
         }
-        val created = itemsApi.createItem(listId, request)
-        if (listId == cachedListId) {
-            itemDao.upsert(created.toEntity())
+        try {
+            val created = itemsApi.createItem(listId, request)
+            if (listId == cachedListId) {
+                itemDao.upsert(created.toEntity())
+            }
+            return created
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: IOException) {
+            return createOffline(listId, request)
         }
-        return created
+    }
+
+    private suspend fun createOffline(listId: Long, request: CreateItemRequest): Item {
+        val placeholderId = nextPlaceholderId()
+        val optimistic = Item(
+            id = placeholderId,
+            listId = listId,
+            name = request.name,
+            isChecked = false,
+            orderMap = request.orderMap ?: emptyMap(),
+            quantity = request.quantity ?: 1,
+            isTemporary = request.isTemporary ?: false,
+            checkCount = 0,
+            expiresAt = null,
+            createdAt = java.time.Instant.now().toString(),
+            visibleIn = request.visibleIn ?: emptyList(),
+        )
+        itemDao.upsert(optimistic.toEntity())
+        mutationQueue.enqueue(MutationPayload.ItemCreate(listId, placeholderId, request))
+        return optimistic
     }
 
     suspend fun update(itemId: Long, request: UpdateItemRequest): Item {
         if (mutationQueue.isOffline) {
-            val previous = itemDao.getById(itemId)?.toModel()
-                ?: throw IllegalArgumentException("item $itemId not cached")
-            val optimistic = previous.copy(
-                name = request.name ?: previous.name,
-                visibleIn = request.visibleIn ?: previous.visibleIn,
-                quantity = request.quantity ?: previous.quantity,
-                isTemporary = request.isTemporary ?: previous.isTemporary,
-                expiresAt = when {
-                    request.isTemporary == false -> null
-                    request.isTemporary == true && previous.isChecked -> stampExpiry()
-                    else -> previous.expiresAt
-                },
-            )
-            itemDao.upsert(optimistic.toEntity())
-            mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, request))
-            return optimistic
+            return updateOffline(itemId, request)
         }
-        val updated = itemsApi.updateItem(itemId, request)
-        if (updated.listId == cachedListId) {
-            itemDao.upsert(updated.toEntity())
+        try {
+            val updated = itemsApi.updateItem(itemId, request)
+            if (updated.listId == cachedListId) {
+                itemDao.upsert(updated.toEntity())
+            }
+            return updated
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: IOException) {
+            return updateOffline(itemId, request)
         }
-        return updated
+    }
+
+    private suspend fun updateOffline(itemId: Long, request: UpdateItemRequest): Item {
+        val previous = itemDao.getById(itemId)?.toModel()
+            ?: throw IllegalArgumentException("item $itemId not cached")
+        val optimistic = previous.copy(
+            name = request.name ?: previous.name,
+            visibleIn = request.visibleIn ?: previous.visibleIn,
+            quantity = request.quantity ?: previous.quantity,
+            isTemporary = request.isTemporary ?: previous.isTemporary,
+            expiresAt = when {
+                request.isTemporary == false -> null
+                request.isTemporary == true && previous.isChecked -> stampExpiry()
+                else -> previous.expiresAt
+            },
+        )
+        itemDao.upsert(optimistic.toEntity())
+        mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, request))
+        return optimistic
     }
 
     suspend fun updateDetails(itemId: Long, request: UpdateItemRequest): Item {
@@ -125,6 +146,9 @@ class ItemsRepository @Inject constructor(
             return updated
         } catch (error: CancellationException) {
             throw error
+        } catch (error: IOException) {
+            mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, request))
+            return optimistic
         } catch (error: Exception) {
             rollbackIfUnchanged(itemId, optimistic.toEntity(), previous.toEntity())
             throw error
@@ -137,9 +161,16 @@ class ItemsRepository @Inject constructor(
             mutationQueue.enqueue(MutationPayload.ItemDelete(itemId))
             return
         }
-        val response = itemsApi.deleteItem(itemId)
-        if (!response.isSuccessful) throw HttpException(response)
-        itemDao.deleteById(itemId)
+        try {
+            val response = itemsApi.deleteItem(itemId)
+            if (!response.isSuccessful) throw HttpException(response)
+            itemDao.deleteById(itemId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: IOException) {
+            itemDao.deleteById(itemId)
+            mutationQueue.enqueue(MutationPayload.ItemDelete(itemId))
+        }
     }
 
     suspend fun setChecked(itemId: Long, isChecked: Boolean, isUndo: Boolean = false): Item {
@@ -163,6 +194,11 @@ class ItemsRepository @Inject constructor(
             return updated
         } catch (error: CancellationException) {
             throw error
+        } catch (error: IOException) {
+            mutationQueue.enqueueCheckCoalesced(
+                MutationPayload.ItemCheck(itemId = itemId, isChecked = isChecked, isUndo = if (isUndo) true else null),
+            )
+            return optimistic
         } catch (error: Exception) {
             itemDao.getById(itemId)?.let { current ->
                 itemDao.upsert(
@@ -192,6 +228,9 @@ class ItemsRepository @Inject constructor(
             return updated
         } catch (error: CancellationException) {
             throw error
+        } catch (error: IOException) {
+            mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap)))
+            return mergedItem
         } catch (error: Exception) {
             itemDao.getById(itemId)?.let { current ->
                 if (current.toModel().orderMap[viewKey] == newKey) {

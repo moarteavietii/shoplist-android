@@ -5,10 +5,12 @@ import eu.pascariu.shoppinglist.data.config.FeatureConfig
 import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
 import eu.pascariu.shoppinglist.data.local.FakeItemDao
 import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.MutationKind
 import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +30,12 @@ class ItemsRepositoryTest {
 
     private fun offlineAwareQueue(): MutationQueue = MutationQueue(
         dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
+    private fun queueWith(dao: FakePendingMutationDao): MutationQueue = MutationQueue(
+        dao = dao,
         connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
         json = Json { ignoreUnknownKeys = true },
     )
@@ -433,6 +441,101 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `create falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.createIoError = IOException("backend unreachable")
+
+        val created = repository.create(listId = 1, CreateItemRequest(name = "Milk"))
+
+        assertTrue(created.id < 0)
+        assertEquals(listOf(created), repository.items.first())
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_CREATE, queued.kind)
+    }
+
+    @Test
+    fun `update falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val updated = repository.update(itemId = 42L, UpdateItemRequest(name = "Crackers"))
+
+        assertEquals("Crackers", updated.name)
+        assertEquals("Crackers", repository.items.first().single().name)
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_UPDATE, queued.kind)
+    }
+
+    @Test
+    fun `delete falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.deleteIoError = IOException("backend unreachable")
+
+        repository.delete(itemId = 42L)
+
+        assertTrue(repository.items.first().isEmpty())
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_DELETE, queued.kind)
+    }
+
+    @Test
+    fun `setChecked falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val checked = repository.setChecked(itemId = 42L, isChecked = true)
+
+        assertTrue(checked.isChecked)
+        assertTrue(repository.items.first().single().isChecked)
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_CHECK, queued.kind)
+    }
+
+    @Test
+    fun `updateDetails falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val updated = repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers"))
+
+        assertEquals("Crackers", updated.name)
+        assertEquals("Crackers", repository.items.first().single().name)
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_UPDATE, queued.kind)
+    }
+
+    @Test
+    fun `reorder falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val reordered = repository.reorder(itemId = 42L, viewId = 2, newKey = "a1")
+
+        assertEquals("a1", reordered.orderMap["2"])
+        assertEquals("a1", repository.items.first().single().orderMap["2"])
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_UPDATE, queued.kind)
+    }
+
+    @Test
     fun `422 on update surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
         val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
@@ -552,6 +655,9 @@ private class FakeItemsApi(
     var listError: HttpException? = null
     var createError: HttpException? = null
     var updateError: HttpException? = null
+    var createIoError: IOException? = null
+    var updateIoError: IOException? = null
+    var deleteIoError: IOException? = null
     var createdItem: Item? = null
     var updatedItem: Item? = null
     var deleted = false
@@ -572,6 +678,7 @@ private class FakeItemsApi(
     override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
         lastCreateListId = listId
         lastCreateRequest = body
+        createIoError?.let { throw it }
         createError?.let { throw it }
         return requireNotNull(createdItem)
     }
@@ -580,6 +687,7 @@ private class FakeItemsApi(
         lastUpdateItemId = itemId
         lastUpdateRequest = body
         onUpdate?.invoke()
+        updateIoError?.let { throw it }
         updateError?.let { throw it }
         return requireNotNull(updatedItem)
     }
@@ -587,6 +695,7 @@ private class FakeItemsApi(
     override suspend fun deleteItem(itemId: Long): Response<Unit> {
         deleted = true
         lastDeleteItemId = itemId
+        deleteIoError?.let { throw it }
         return deleteResponse
     }
 }
