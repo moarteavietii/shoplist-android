@@ -34,3 +34,14 @@ The app SHALL expose the current backend reachability state as an observable str
 #### Scenario: UI can observe offline state
 - **WHEN** the backend becomes unreachable or reachable again
 - **THEN** the observable connectivity state emits the corresponding value
+
+### Requirement: Transient refresh errors clear on reconnect
+The list screen SHALL re-attempt a previously failed refresh when the backend becomes reachable again, so transient error states (e.g. "Couldn't refresh the list") do not outlive the reconnect. Manual dismissal SHALL remain available.
+
+#### Scenario: Stale refresh error clears after reconnect
+- **WHEN** a refresh failed while the backend was unreachable and the backend becomes reachable again
+- **THEN** the refresh is re-attempted automatically and the error state clears on success
+
+#### Scenario: Manual dismissal still works
+- **WHEN** the error state is displayed and the user taps it
+- **THEN** the error state is dismissed immediately

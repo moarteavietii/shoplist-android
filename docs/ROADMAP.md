@@ -57,4 +57,5 @@ Replace the XML/AppCompat scaffold with the real foundation:
 - Local persistence (Room) + persisted mutation queue so the app works without connectivity ✅
 - Sync strategy: drain queue → full refetch on reconnect (network restored or foregrounded); SSE merges into Room ✅
 - Conflicts: server remains source of truth (server wins on replay conflict; non-retryable failures dropped) ✅
+- Stale refresh errors auto-clear on reconnect (`clear-refresh-error-on-reconnect`, archived 2026-10-24) ✅
 - Depends on: data layer (2), realtime sync (3)
