@@ -43,8 +43,8 @@ class RealtimeClient(
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
-    private val itemsUrl = "${baseUrl.trimEnd('/')}/api/lists/$listId/subscribe"
-    private val shopsUrl = "${baseUrl.trimEnd('/')}/api/shops/subscribe"
+    private val itemsUrl = "${baseUrl.trimEnd('/')}/api/v1/lists/$listId/subscribe"
+    private val shopsUrl = "${baseUrl.trimEnd('/')}/api/v1/shops/subscribe"
 
     private val itemEventsFlow = MutableSharedFlow<ItemEvent>(extraBufferCapacity = 64)
     override val itemEvents: SharedFlow<ItemEvent> = itemEventsFlow.asSharedFlow()

@@ -13,15 +13,15 @@ import retrofit2.http.Path
 
 interface ShopsApi {
 
-    @GET("api/shops")
+    @GET("api/v1/shops")
     suspend fun listShops(): List<Shop>
 
-    @POST("api/shops")
+    @POST("api/v1/shops")
     suspend fun createShop(@Body body: CreateShopRequest): Shop
 
-    @PATCH("api/shops/{shopId}")
+    @PATCH("api/v1/shops/{shopId}")
     suspend fun renameShop(@Path("shopId") shopId: Long, @Body body: RenameShopRequest): Shop
 
-    @DELETE("api/shops/{shopId}")
+    @DELETE("api/v1/shops/{shopId}")
     suspend fun deleteShop(@Path("shopId") shopId: Long): Response<Unit>
 }

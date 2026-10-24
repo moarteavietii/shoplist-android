@@ -49,19 +49,21 @@ This repo uses the `spec-driven` OpenSpec schema. Use the provided commands rath
 
 The matching skills live under `.coda/skills/openspec-*` if you need the full steps.
 
-## Migration Conventions (migration complete)
+## API Contract
 
-The Android app replaces the shoppinglist web frontend; the backend REST + SSE API is reused as-is. The migration is **complete** (all roadmap items done; see `docs/MIGRATION_PLAN.md` for the full traceability matrix and decisions log). `docs/MIGRATION_PLAN.md` remains the authoritative reference for the API/SSE/data-model contracts and the decisions log — consult it before changing anything that touches those contracts.
+The backend publishes a machine-readable contract that is the **source of truth** for endpoint paths, payload shapes, and the SSE event catalog:
 
-- **Consult `docs/MIGRATION_PLAN.md` first.** It holds the discovered API/SSE/data-model contracts, the decisions log, and the traceability matrix. Do not re-derive contracts from the web repo when the plan already records them; go to the web repo only for details the plan lacks.
-- **Never propose or implement backend changes in this repo.** Specs marked `n/a` in the matrix (database, deploy, dev-env) belong to the web repo.
-- **Respect the decisions log.** The plan's decisions table (design language, auth + dev bypass, minSdk 35, no pull-to-refresh, backgrounded = no network, base URLs, Room as the persistent local store) is settled — do not relitigate or contradict it in proposals. If a decision must change, surface it to the user first and update the log.
-- **After each `/opsx-archive`,** update the traceability matrix row(s) only if the archived change maps to an existing web-spec row. `docs/ROADMAP.md` is complete and needs no status updates.
+- **REST:** live OpenAPI 3.1 at `GET /openapi.json`. Prod is behind Cloudflare Access — fetch it from the dev backend instead: `http://127.0.0.1:3005/openapi.json` (requires the SSH tunnel to be up).
+- **SSE:** AsyncAPI document at `apps/backend/asyncapi.yaml` in the web repo.
+
+All REST routes are versioned under `/api/v1` (SSE subscribe URLs included); `/health` is unversioned. Breaking changes get a new major prefix plus a deprecation window.
+
+- **Never propose or implement backend changes in this repo.** The backend belongs to the web repo.
+- **Verifying the contract** (e.g. after server changes): fetch the OpenAPI doc and diff paths/schemas against the app's Retrofit interfaces (`data/api/`) and models (`data/model/ShoplistModels.kt`); live-check SSE with `curl -N http://127.0.0.1:3005/api/v1/lists/1/subscribe` (and `/api/v1/shops/subscribe`) while triggering a change via curl.
 
 ## Repo Layout
 
 - `docs/ROADMAP.md` — completed migration roadmap, kept as a historical record of what was built and why. New feature work no longer maps to roadmap items; propose it directly via `/opsx-propose`.
-- `docs/MIGRATION_PLAN.md` — migration reference: discovered contracts, decisions log, traceability matrix (web specs → Android work).
 - `openspec/config.yaml` — OpenSpec config (currently minimal).
 - `openspec/specs/` — main capability specs.
 - `openspec/changes/` — active changes; completed changes move to `openspec/changes/archive/`.
@@ -78,7 +80,7 @@ The Android app replaces the shoppinglist web frontend; the backend REST + SSE A
 - **Explore mode is read-only.** `/opsx-explore` must not produce code or mutate files beyond OpenSpec artifacts.
 - **Archive syncs specs intelligently.** Delta specs use ADDED/MODIFIED/REMOVED/RENAMED sections; merge partial changes rather than replacing whole spec files.
 - **KISS: keep it simple.** Prefer the smallest change that satisfies the spec; avoid premature abstraction.
-- **Always start from a new branch for spec work.** The flow for every change is: create a new branch → create the spec/change (`/opsx-propose`) → implementation (`/opsx-apply`) → spec archival (`/opsx-archive`) → pull request. Never work on a spec or its implementation on `main`.
+- **Always start from a new branch for spec work.** The flow for every change is: create a new branch → create the spec/change (`/opsx-propose`) → implementation (`/opsx-apply`) → spec archival (`/opsx-archive`) → pull request. Never work on a spec or its implementation on `main`. Always create a new branch when starting a proposal, unless the user instructs otherwise.
 - **TDD: always write tests for the code you're about to write.** Run the tests after an implementation is done (all tasks are done).
 - **Avoid code comments.** Write self-explanatory code instead. Only add a comment when it is truly necessary (non-obvious intent, workaround, or gotcha), and keep it to one short line.
 - **After each `/opsx-archive` command,** check `AGENTS.md` and `README.md` against the just-archived change and its synced specs. Decide whether either file needs updating to reflect the new project state, capabilities, or workflow. If changes are warranted, present the proposed edits to the user and wait for confirmation before applying them.

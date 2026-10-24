@@ -32,29 +32,35 @@ Build a native Android (Kotlin + Compose) client for the existing shoppinglist b
 
 ## 3. Discovered Contracts (from the web repo)
 
+**Source of truth:** the backend's machine-readable contract documents are the authoritative reference for all endpoint and SSE work — consult them instead of re-deriving shapes from observation or memory:
+
+- **REST:** the live OpenAPI 3.1 document at `GET /openapi.json` on the backend (all paths, request/response schemas, validation bounds).
+- **SSE:** `apps/backend/asyncapi.yaml` in the web repo (channels, event names, message schemas).
+- **Versioning rule:** breaking backend changes arrive as a new major prefix (`/api/v2`, …) with a deprecation window for the previous version; additive changes stay within the current prefix. The app adopts a new major prefix only through an explicit change and never mixes major versions in one release.
+
 ### 3.1 REST API surface
 
-Base path `/api` on the Elysia backend. No auth at the API level (Cloudflare Access at the edge). No pagination. Errors are plain HTTP status codes with JSON `{ error: string }` bodies (400 validation, 404 missing, 403 protected Global shop, 409 duplicate).
+Base path `/api/v1` on the Elysia backend. No auth at the API level (Cloudflare Access at the edge). No pagination. Errors are plain HTTP status codes with JSON `{ error: string }` bodies (400 validation, 404 missing, 403 protected Global shop, 409 duplicate).
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Liveness probe → `{ status: "ok" }` |
-| GET | `/api/lists/:listId/items` | All items in list (non-expired only; server deletes expired first and broadcasts `item:deleted`) |
-| POST | `/api/lists/:listId/items` | Create item. Body: `{ name (1–200), visibleIn?: number[], orderMap?, quantity? (1–99), isTemporary? }` → 201 + Item. Server generates fractional order keys per shop |
-| GET | `/api/lists/:listId/subscribe` | SSE stream for item events |
-| PATCH | `/api/items/:itemId` | Partial update: `{ name?, isChecked?, isUndo?, orderMap?, visibleIn?, quantity?, isTemporary? }`. `isUndo: true` + `isChecked: false` decrements checkCount (floor 0); plain check-off increments. `visibleIn` change re-derives orderMap server-side |
-| DELETE | `/api/items/:itemId` | Delete → 204 |
-| GET | `/api/shops` | All shops, Global first, then A→Z |
-| GET | `/api/shops/subscribe` | SSE stream for shop events |
-| POST | `/api/shops` | Create shop `{ name (1–100, non-whitespace required) }`; 409 on duplicate |
-| PATCH | `/api/shops/:shopId` | Rename; 403 if "Global" |
-| DELETE | `/api/shops/:shopId` | Delete; 403 if "Global"; cascades item_shops |
+| GET | `/api/v1/lists/:listId/items` | All items in list (non-expired only; server deletes expired first and broadcasts `item:deleted`) |
+| POST | `/api/v1/lists/:listId/items` | Create item. Body: `{ name (1–200), visibleIn?: number[], orderMap?, quantity? (1–99), isTemporary? }` → 201 + Item. Server generates fractional order keys per shop |
+| GET | `/api/v1/lists/:listId/subscribe` | SSE stream for item events |
+| PATCH | `/api/v1/items/:itemId` | Partial update: `{ name?, isChecked?, isUndo?, orderMap?, visibleIn?, quantity?, isTemporary? }`. `isUndo: true` + `isChecked: false` decrements checkCount (floor 0); plain check-off increments. `visibleIn` change re-derives orderMap server-side |
+| DELETE | `/api/v1/items/:itemId` | Delete → 204 |
+| GET | `/api/v1/shops` | All shops, Global first, then A→Z |
+| GET | `/api/v1/shops/subscribe` | SSE stream for shop events |
+| POST | `/api/v1/shops` | Create shop `{ name (1–100, non-whitespace required) }`; 409 on duplicate |
+| PATCH | `/api/v1/shops/:shopId` | Rename; 403 if "Global" |
+| DELETE | `/api/v1/shops/:shopId` | Delete; 403 if "Global"; cascades item_shops |
 
 **Device ID:** mutations carry an `X-Device-Id` header (UUID, ≤ 64 chars, `[A-Za-z0-9_-]`). The backend echoes it as `originDeviceId` in SSE events so clients can suppress toasts for their own changes. GETs and SSE connects do not send it.
 
 ### 3.2 SSE protocol
 
-Two independent streams: items (`/api/lists/:listId/subscribe`) and shops (`/api/shops/subscribe`).
+Two independent streams: items (`/api/v1/lists/:listId/subscribe`) and shops (`/api/v1/shops/subscribe`).
 
 - Wire format: `event: <type>\ndata: <JSON>\n\n`; first frame is `event: connected`; heartbeat comment `: ping` every 25 s.
 - **No replay / no Last-Event-ID:** events during a dropped connection are lost. On every reconnect, refetch the full list (items + shops).

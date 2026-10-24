@@ -109,7 +109,7 @@ class ItemsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("GET", recorded.method)
-        assertEquals("/api/lists/1/items", recorded.path)
+        assertEquals("/api/v1/lists/1/items", recorded.path)
         assertEquals(listOf(10L, 11L), repository.items.first().map { it.id })
         assertEquals(listOf("Milk", "Bread"), repository.items.first().map { it.name })
         assertEquals(listOf(false, false), repository.items.first().map { it.isTemporary })
@@ -127,7 +127,7 @@ class ItemsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("POST", recorded.method)
-        assertEquals("/api/lists/1/items", recorded.path)
+        assertEquals("/api/v1/lists/1/items", recorded.path)
         assertTrue(recorded.body.readUtf8().contains("\"name\":\"Eggs\""))
         assertTrue(recorded.getHeader("Content-Type")!!.startsWith("application/json"))
         assertEquals(12L, created.id)
@@ -146,7 +146,7 @@ class ItemsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("PATCH", recorded.method)
-        assertEquals("/api/items/10", recorded.path)
+        assertEquals("/api/v1/items/10", recorded.path)
         assertTrue(recorded.body.readUtf8().contains("\"isChecked\":true"))
         assertTrue(updated.isChecked)
         assertTrue(repository.items.first().single().isChecked)
@@ -163,7 +163,7 @@ class ItemsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("DELETE", recorded.method)
-        assertEquals("/api/items/10", recorded.path)
+        assertEquals("/api/v1/items/10", recorded.path)
         assertTrue(repository.items.first().isEmpty())
     }
 
@@ -237,7 +237,7 @@ class ItemsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("PATCH", recorded.method)
-        assertEquals("/api/items/10", recorded.path)
+        assertEquals("/api/v1/items/10", recorded.path)
         val body = recorded.body.readUtf8()
         assertTrue(body.contains("\"isChecked\":true"))
         assertTrue(!body.contains("isUndo"))
@@ -343,7 +343,7 @@ class ItemsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("PATCH", recorded.method)
-        assertEquals("/api/items/10", recorded.path)
+        assertEquals("/api/v1/items/10", recorded.path)
         val body = recorded.body.readUtf8()
         assertTrue(body.contains("\"orderMap\""))
         assertTrue(body.contains("\"1\":\"a5\""))
