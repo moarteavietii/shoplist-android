@@ -71,8 +71,8 @@ class MutationDrainer @Inject constructor(
                 is MutationPayload.ItemDelete -> {
                     val response = itemsApi.deleteItem(payload.itemId)
                     when {
-                        response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
-                        response.code() == 404 -> Unit
+                        response.isSuccessful || response.code() == 404 ->
+                            itemsRepository.applyDeleted(payload.itemId)
                         else -> return replayOutcomeFor(response.code())
                     }
                 }
