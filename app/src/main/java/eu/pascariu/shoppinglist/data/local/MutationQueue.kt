@@ -47,8 +47,4 @@ class MutationQueue @Inject constructor(
     suspend fun updatePayload(mutationId: Long, payload: MutationPayload) {
         dao.updatePayload(mutationId, payload.toJson(json))
     }
-
-    suspend fun clear() {
-        dao.clear()
-    }
 }

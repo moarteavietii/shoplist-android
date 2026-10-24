@@ -24,7 +24,4 @@ interface PendingMutationDao {
 
     @Query("UPDATE pending_mutations SET payloadJson = :payloadJson WHERE id = :mutationId")
     suspend fun updatePayload(mutationId: Long, payloadJson: String)
-
-    @Query("DELETE FROM pending_mutations")
-    suspend fun clear()
 }

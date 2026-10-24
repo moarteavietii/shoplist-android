@@ -1,7 +1,5 @@
 package eu.pascariu.shoppinglist.data.local
 
-import kotlinx.serialization.json.Json
-
 open class FakePendingMutationDao : PendingMutationDao {
 
     private var nextId = 1L
@@ -26,9 +24,5 @@ open class FakePendingMutationDao : PendingMutationDao {
     override suspend fun updatePayload(mutationId: Long, payloadJson: String) {
         val index = rows.indexOfFirst { it.id == mutationId }
         if (index >= 0) rows[index] = rows[index].copy(payloadJson = payloadJson)
-    }
-
-    override suspend fun clear() {
-        rows.clear()
     }
 }
