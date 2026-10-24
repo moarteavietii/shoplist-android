@@ -10,6 +10,7 @@ import eu.pascariu.shoppinglist.data.model.RenameShopRequest
 import eu.pascariu.shoppinglist.data.model.Shop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -207,6 +208,26 @@ class ShopsRepositoryTest {
             listOf("Global", "Supermarket"),
             repository.shops.first().map { it.name },
         )
+    }
+
+    @Test
+    fun `concurrent offline creates get distinct placeholder ids`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = emptyList())
+        val repository = ShopsRepository(
+            api,
+            FakeShopDao(),
+            MutationQueue(FakePendingMutationDao(), MutableStateFlow(BackendConnectivity.UNREACHABLE), Json { ignoreUnknownKeys = true }),
+            testScope,
+        )
+        repository.refetch()
+
+        val created = (1..8).map { index ->
+            async { repository.create("Shop $index") }
+        }.map { it.await() }
+
+        val ids = created.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue(ids.all { it < 0 })
     }
 }
 

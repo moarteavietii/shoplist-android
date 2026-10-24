@@ -11,6 +11,7 @@ import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -138,6 +139,21 @@ class ItemsRepositoryOfflineTest {
 
         assertTrue(first.id < 0)
         assertTrue(second.id < first.id)
+    }
+
+    @Test
+    fun `concurrent offline creates get distinct placeholder ids`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.UNREACHABLE), testScope)
+        repository.refetch(listId = 1)
+
+        val created = (1..8).map { index ->
+            async { repository.create(listId = 1, CreateItemRequest(name = "Item $index")) }
+        }.map { it.await() }
+
+        val ids = created.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue(ids.all { it < 0 })
     }
 }
 

@@ -3,6 +3,7 @@ package eu.pascariu.shoppinglist.data.local
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.yield
 
 class FakeShopDao : ShopDao {
 
@@ -10,7 +11,10 @@ class FakeShopDao : ShopDao {
 
     override fun observeAll() = rows.map { list -> list.sortedBy { it.id } }
 
-    override suspend fun getById(shopId: Long): ShopEntity? = rows.value.firstOrNull { it.id == shopId }
+    override suspend fun getById(shopId: Long): ShopEntity? {
+        yield()
+        return rows.value.firstOrNull { it.id == shopId }
+    }
 
     override suspend fun upsertAll(shops: List<ShopEntity>) {
         val mutable = rows.value.toMutableList()
@@ -21,7 +25,10 @@ class FakeShopDao : ShopDao {
         rows.value = mutable
     }
 
-    override suspend fun upsert(shop: ShopEntity) = upsertAll(listOf(shop))
+    override suspend fun upsert(shop: ShopEntity) {
+        yield()
+        upsertAll(listOf(shop))
+    }
 
     override suspend fun deleteById(shopId: Long) {
         rows.value = rows.value.filterNot { it.id == shopId }

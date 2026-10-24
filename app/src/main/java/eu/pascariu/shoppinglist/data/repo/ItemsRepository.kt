@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -35,6 +37,8 @@ class ItemsRepository @Inject constructor(
 
     private var cachedListId: Long? = null
     private val _cachedListId = MutableStateFlow<Long?>(null)
+    private val placeholderMutex = Mutex()
+    private var nextPlaceholderCandidate = -1L
     val items: StateFlow<List<Item>> = itemDao.observeAll()
         .map { entities -> entities.map { it.toModel() } }
         .stateIn(externalScope, SharingStarted.Eagerly, emptyList())
@@ -274,10 +278,11 @@ class ItemsRepository @Inject constructor(
         itemDao.upsert(realItem.toEntity())
     }
 
-    private suspend fun nextPlaceholderId(): Long {
-        var candidate = -1L
+    private suspend fun nextPlaceholderId(): Long = placeholderMutex.withLock {
+        var candidate = nextPlaceholderCandidate
         while (itemDao.getById(candidate) != null) candidate -= 1
-        return candidate
+        nextPlaceholderCandidate = candidate - 1
+        candidate
     }
 
     private suspend fun rollbackIfUnchanged(currentId: Long, optimistic: ItemEntity, previous: ItemEntity) {
