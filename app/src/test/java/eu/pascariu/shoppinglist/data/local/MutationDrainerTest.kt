@@ -98,6 +98,31 @@ class MutationDrainerTest {
     }
 
     @Test
+    fun `401 auth failure stops the drain and keeps mutations queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `401 on queued delete keeps the mutation instead of dropping it`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(1, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
     fun `item delete 404 drops the mutation and continues draining`() = runTest {
         val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 404 }
         val queue = queue()
@@ -115,11 +140,10 @@ class MutationDrainerTest {
         val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 500 }
         val queue = queue()
         queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
-        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
 
         drainer(itemsApi = itemsApi, queue = queue).drainAll()
 
-        assertEquals(2, queue.listAll().size)
+        assertEquals(1, queue.listAll().size)
         assertEquals(1, itemsApi.deleteCalls)
     }
 

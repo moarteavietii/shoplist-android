@@ -44,7 +44,7 @@ class MutationDrainer @Inject constructor(
             when (outcome) {
                 ReplayOutcome.SUCCESS -> queue.deleteById(mutation.id)
                 ReplayOutcome.DROPPED -> queue.deleteById(mutation.id)
-                ReplayOutcome.NETWORK_ERROR -> return@withContext
+                ReplayOutcome.RETRY_LATER -> return@withContext
             }
         }
     }
@@ -66,7 +66,7 @@ class MutationDrainer @Inject constructor(
                     when {
                         response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
                         response.code() == 404 -> Unit
-                        else -> return ReplayOutcome.NETWORK_ERROR
+                        else -> return ReplayOutcome.RETRY_LATER
                     }
                 }
                 is MutationPayload.ItemCheck -> {
@@ -89,7 +89,7 @@ class MutationDrainer @Inject constructor(
                     when {
                         response.isSuccessful || response.code() == 404 ->
                             shopsRepository.applyDeleted(payload.shopId)
-                        else -> return ReplayOutcome.NETWORK_ERROR
+                        else -> return ReplayOutcome.RETRY_LATER
                     }
                 }
             }
@@ -100,10 +100,11 @@ class MutationDrainer @Inject constructor(
             if (error is retrofit2.HttpException) {
                 when (error.code()) {
                     404, 409 -> ReplayOutcome.DROPPED
-                    else -> ReplayOutcome.NETWORK_ERROR
+                    401, 403 -> ReplayOutcome.RETRY_LATER
+                    else -> ReplayOutcome.RETRY_LATER
                 }
             } else {
-                ReplayOutcome.NETWORK_ERROR
+                ReplayOutcome.RETRY_LATER
             }
         }
     }
@@ -140,5 +141,5 @@ class MutationDrainer @Inject constructor(
 private enum class ReplayOutcome {
     SUCCESS,
     DROPPED,
-    NETWORK_ERROR,
+    RETRY_LATER,
 }
