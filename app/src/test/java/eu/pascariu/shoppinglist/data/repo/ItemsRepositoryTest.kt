@@ -14,10 +14,12 @@ import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,6 +29,11 @@ import retrofit2.Response
 class ItemsRepositoryTest {
 
     private val testScope = CoroutineScope(Dispatchers.Unconfined)
+
+    @After
+    fun tearDown() {
+        testScope.cancel()
+    }
 
     private fun offlineAwareQueue(): MutationQueue = MutationQueue(
         dao = FakePendingMutationDao(),
@@ -173,9 +180,7 @@ class ItemsRepositoryTest {
         val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.onUpdate = {
-            kotlinx.coroutines.runBlocking {
-                repository.applyUpdated(sampleItems().first().copy(isChecked = true))
-            }
+            repository.applyUpdated(sampleItems().first().copy(isChecked = true))
         }
         api.updateError = httpException(500)
 
@@ -681,7 +686,7 @@ private class FakeItemsApi(
     var lastUpdateItemId: Long? = null
     var lastUpdateRequest: UpdateItemRequest? = null
     var lastDeleteItemId: Long? = null
-    var onUpdate: (() -> Unit)? = null
+    var onUpdate: (suspend () -> Unit)? = null
 
     override suspend fun listItems(listId: Long): List<Item> {
         listCalls++
