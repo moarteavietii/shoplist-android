@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 @Singleton
 class ConnectivityMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : BackendReachability {
 
     private val _connectivity = MutableStateFlow(BackendConnectivity.UNREACHABLE)
     val connectivity: StateFlow<BackendConnectivity> = _connectivity.asStateFlow()
@@ -42,6 +42,14 @@ class ConnectivityMonitor @Inject constructor(
             } else {
                 BackendConnectivity.UNREACHABLE
             }
+    }
+
+    override fun confirmReachable() {
+        _connectivity.value = BackendConnectivity.REACHABLE
+    }
+
+    override fun confirmUnreachable() {
+        _connectivity.value = BackendConnectivity.UNREACHABLE
     }
 
     private fun updateState() {
