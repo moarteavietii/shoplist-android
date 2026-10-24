@@ -17,6 +17,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -42,8 +43,12 @@ class MutationDrainer @Inject constructor(
             }
             val outcome = drainOne(payload)
             when (outcome) {
-                ReplayOutcome.SUCCESS -> queue.deleteById(mutation.id)
-                ReplayOutcome.DROPPED -> queue.deleteById(mutation.id)
+                ReplayOutcome.SUCCESS -> withContext(NonCancellable) {
+                    queue.deleteById(mutation.id)
+                }
+                ReplayOutcome.DROPPED -> withContext(NonCancellable) {
+                    queue.deleteById(mutation.id)
+                }
                 ReplayOutcome.STOP -> return@withContext
             }
         }
@@ -67,6 +72,7 @@ class MutationDrainer @Inject constructor(
                         response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
                         response.code() == 404 -> Unit
                         else -> return replayOutcomeFor(response.code())
+                    }
                 }
                 is MutationPayload.ItemCheck -> {
                     val updated = itemsApi.updateItem(
@@ -90,6 +96,7 @@ class MutationDrainer @Inject constructor(
                         response.isSuccessful || response.code() == 404 ->
                             shopsRepository.applyDeleted(payload.shopId)
                         else -> return replayOutcomeFor(response.code())
+                    }
                 }
             }
             ReplayOutcome.SUCCESS

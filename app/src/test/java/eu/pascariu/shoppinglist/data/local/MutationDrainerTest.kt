@@ -15,7 +15,10 @@ import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -27,6 +30,7 @@ class MutationDrainerTest {
 
     private val testScope = CoroutineScope(Dispatchers.Unconfined)
     private val json = Json { ignoreUnknownKeys = true }
+    private var drainJob: Job? = null
 
     private fun queue(dao: FakePendingMutationDao = FakePendingMutationDao()): MutationQueue =
         MutationQueue(dao, MutableStateFlow(BackendConnectivity.REACHABLE), json)
@@ -120,6 +124,27 @@ class MutationDrainerTest {
 
         assertEquals(1, queue.listAll().size)
         assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
+    fun `cancellation after successful replay still removes the mutation from the queue`() = runTest {
+        val itemsApi = RecordingItemsApi()
+        val dao = object : FakePendingMutationDao() {
+            override suspend fun deleteById(mutationId: Long) {
+                drainJob?.cancel()
+                yield()
+                super.deleteById(mutationId)
+            }
+        }
+        val queue = queue(dao)
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        val drainer = drainer(itemsApi = itemsApi, queue = queue)
+
+        drainJob = launch { drainer.drainAll() }
+        drainJob?.join()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
     }
 
     @Test

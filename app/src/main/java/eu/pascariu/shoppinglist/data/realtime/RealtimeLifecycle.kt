@@ -28,8 +28,7 @@ class RealtimeLifecycle @Inject constructor(
                 var drainJob: Job? = null
                 val connectivityJob = launch {
                     connectivityMonitor.connectivity.collect { state ->
-                        if (state == BackendConnectivity.REACHABLE) {
-                            drainJob?.cancel()
+                        if (state == BackendConnectivity.REACHABLE && drainJob?.isActive != true) {
                             drainJob = launch {
                                 try {
                                     drainer.drainAll()
