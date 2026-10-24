@@ -85,6 +85,19 @@ class MutationDrainerTest {
     }
 
     @Test
+    fun `403 auth failure stops the drain and keeps mutations queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 403 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
+    }
+
+    @Test
     fun `successful item create remaps the placeholder row and follow-ups`() = runTest {
         val itemsApi = RecordingItemsApi().apply { createdItem = sampleItem(id = 77) }
         val itemDao = FakeItemDao()
