@@ -98,6 +98,31 @@ class MutationDrainerTest {
     }
 
     @Test
+    fun `401 auth failure stops the drain and keeps mutations queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `401 on queued delete keeps the mutation instead of dropping it`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(1, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
     fun `successful item create remaps the placeholder row and follow-ups`() = runTest {
         val itemsApi = RecordingItemsApi().apply { createdItem = sampleItem(id = 77) }
         val itemDao = FakeItemDao()
@@ -134,8 +159,10 @@ private fun sampleItem(id: Long, isChecked: Boolean): Item = sampleItem(id).copy
 private class RecordingItemsApi : ItemsApi {
     val checkedItemIds = mutableListOf<Long>()
     var updateCalls = 0
+    var deleteCalls = 0
     var checkError: IOException? = null
     var checkErrorCode: Int? = null
+    var deleteErrorCode: Int? = null
     var createdItem: Item? = null
 
     override suspend fun listItems(listId: Long): List<Item> = emptyList()
@@ -154,7 +181,13 @@ private class RecordingItemsApi : ItemsApi {
         return sampleItem(id = itemId, isChecked = body.isChecked ?: false)
     }
 
-    override suspend fun deleteItem(itemId: Long): Response<Unit> = Response.success(Unit)
+    override suspend fun deleteItem(itemId: Long): Response<Unit> {
+        deleteCalls++
+        deleteErrorCode?.let { code ->
+            return Response.error(code, okhttp3.ResponseBody.create(null, ""))
+        }
+        return Response.success(Unit)
+    }
 }
 
 private class FakeShopsApi : ShopsApi {
