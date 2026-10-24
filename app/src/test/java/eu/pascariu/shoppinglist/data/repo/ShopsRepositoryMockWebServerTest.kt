@@ -1,6 +1,13 @@
 package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ShopsApi
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.FakeShopDao
+import eu.pascariu.shoppinglist.data.local.MutationQueue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -21,6 +28,12 @@ class ShopsRepositoryMockWebServerTest {
     private lateinit var server: MockWebServer
     private lateinit var repository: ShopsRepository
 
+    private fun offlineAwareQueue(): MutationQueue = MutationQueue(
+        dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
     @Before
     fun setUp() {
         server = MockWebServer()
@@ -34,7 +47,7 @@ class ShopsRepositoryMockWebServerTest {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(ShopsApi::class.java)
-        repository = ShopsRepository(api)
+        repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), CoroutineScope(Dispatchers.Unconfined))
     }
 
     @After

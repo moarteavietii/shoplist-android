@@ -2,60 +2,104 @@ package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.config.FeatureConfig
+import eu.pascariu.shoppinglist.data.local.ItemDao
+import eu.pascariu.shoppinglist.data.local.ItemEntity
+import eu.pascariu.shoppinglist.data.local.MutationPayload
+import eu.pascariu.shoppinglist.data.local.MutationQueue
+import eu.pascariu.shoppinglist.data.local.toEntity
+import eu.pascariu.shoppinglist.data.local.toModel
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import eu.pascariu.shoppinglist.di.ApplicationScope
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.updateAndGet
 import retrofit2.HttpException
 
 @Singleton
 class ItemsRepository @Inject constructor(
     private val itemsApi: ItemsApi,
+    private val itemDao: ItemDao,
+    private val mutationQueue: MutationQueue,
+    @ApplicationScope externalScope: CoroutineScope,
 ) {
 
-    private val cache = MutableStateFlow<List<Item>>(emptyList())
-    private val cachedListId = MutableStateFlow<Long?>(null)
-    val items: StateFlow<List<Item>> = cache.asStateFlow()
-    val cachedListIdFlow: StateFlow<Long?> = cachedListId.asStateFlow()
+    private var cachedListId: Long? = null
+    private val _cachedListId = MutableStateFlow<Long?>(null)
+    val items: StateFlow<List<Item>> = itemDao.observeAll()
+        .map { entities -> entities.map { it.toModel() } }
+        .stateIn(externalScope, SharingStarted.Eagerly, emptyList())
+    val cachedListIdFlow: StateFlow<Long?> = _cachedListId.asStateFlow()
 
     suspend fun refetch(listId: Long) {
-        cachedListId.value = listId
-        cache.value = itemsApi.listItems(listId)
+        cachedListId = listId
+        _cachedListId.value = listId
+        itemDao.replaceAll(itemsApi.listItems(listId).map { it.toEntity() })
     }
 
     suspend fun create(listId: Long, request: CreateItemRequest): Item {
+        if (mutationQueue.isOffline) {
+            val placeholderId = nextPlaceholderId()
+            val optimistic = Item(
+                id = placeholderId,
+                listId = listId,
+                name = request.name,
+                isChecked = false,
+                orderMap = request.orderMap ?: emptyMap(),
+                quantity = request.quantity ?: 1,
+                isTemporary = request.isTemporary ?: false,
+                checkCount = 0,
+                expiresAt = null,
+                createdAt = java.time.Instant.now().toString(),
+                visibleIn = request.visibleIn ?: emptyList(),
+            )
+            itemDao.upsert(optimistic.toEntity())
+            mutationQueue.enqueue(MutationPayload.ItemCreate(listId, placeholderId, request))
+            return optimistic
+        }
         val created = itemsApi.createItem(listId, request)
-        if (listId == cachedListId.value) {
-            cache.update { current ->
-                if (current.any { it.id == created.id }) current else current + created
-            }
+        if (listId == cachedListId) {
+            itemDao.upsert(created.toEntity())
         }
         return created
     }
 
     suspend fun update(itemId: Long, request: UpdateItemRequest): Item {
+        if (mutationQueue.isOffline) {
+            val previous = itemDao.getById(itemId)?.toModel()
+                ?: throw IllegalArgumentException("item $itemId not cached")
+            val optimistic = previous.copy(
+                name = request.name ?: previous.name,
+                visibleIn = request.visibleIn ?: previous.visibleIn,
+                quantity = request.quantity ?: previous.quantity,
+                isTemporary = request.isTemporary ?: previous.isTemporary,
+                expiresAt = when {
+                    request.isTemporary == false -> null
+                    request.isTemporary == true && previous.isChecked -> stampExpiry()
+                    else -> previous.expiresAt
+                },
+            )
+            itemDao.upsert(optimistic.toEntity())
+            mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, request))
+            return optimistic
+        }
         val updated = itemsApi.updateItem(itemId, request)
-        if (updated.listId == cachedListId.value) {
-            cache.update { current ->
-                if (current.any { it.id == updated.id }) {
-                    current.map { if (it.id == updated.id) updated else it }
-                } else {
-                    current + updated
-                }
-            }
+        if (updated.listId == cachedListId) {
+            itemDao.upsert(updated.toEntity())
         }
         return updated
     }
 
     suspend fun updateDetails(itemId: Long, request: UpdateItemRequest): Item {
-        val previous = cache.value.firstOrNull { it.id == itemId }
+        val previous = itemDao.getById(itemId)?.toModel()
             ?: throw IllegalArgumentException("item $itemId not cached")
         val isTemporary = request.isTemporary ?: previous.isTemporary
         val optimisticExpiry = when {
@@ -70,65 +114,129 @@ class ItemsRepository @Inject constructor(
             isTemporary = isTemporary,
             expiresAt = optimisticExpiry,
         )
-        cache.update { current -> current.map { if (it.id == itemId) optimistic else it } }
+        itemDao.upsert(optimistic.toEntity())
         try {
             val updated = itemsApi.updateItem(itemId, request)
-            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            itemDao.upsert(updated.toEntity())
             return updated
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            cache.update { current ->
-                current.map { item ->
-                    if (item.id == itemId && item == optimistic) {
-                        item.copy(
-                            name = previous.name,
-                            visibleIn = previous.visibleIn,
-                            quantity = previous.quantity,
-                            isTemporary = previous.isTemporary,
-                            expiresAt = previous.expiresAt,
-                        )
-                    } else {
-                        item
-                    }
-                }
-            }
+            rollbackIfUnchanged(itemId, optimistic.toEntity(), previous.toEntity())
             throw error
         }
     }
 
     suspend fun delete(itemId: Long) {
+        if (mutationQueue.isOffline) {
+            itemDao.deleteById(itemId)
+            mutationQueue.enqueue(MutationPayload.ItemDelete(itemId))
+            return
+        }
         val response = itemsApi.deleteItem(itemId)
         if (!response.isSuccessful) throw HttpException(response)
-        cache.update { current -> current.filterNot { it.id == itemId } }
+        itemDao.deleteById(itemId)
     }
 
     suspend fun setChecked(itemId: Long, isChecked: Boolean, isUndo: Boolean = false): Item {
-        val previous = cache.value.firstOrNull { it.id == itemId }
+        val previous = itemDao.getById(itemId)?.toModel()
             ?: throw IllegalArgumentException("item $itemId not cached")
         val optimisticExpiry = when {
             isChecked && previous.isTemporary -> stampExpiry()
             else -> null
         }
         val optimistic = previous.copy(isChecked = isChecked, expiresAt = optimisticExpiry)
-        cache.update { current -> current.map { if (it.id == itemId) optimistic else it } }
+        itemDao.upsert(optimistic.toEntity())
+        if (mutationQueue.isOffline) {
+            mutationQueue.enqueueCheckCoalesced(
+                MutationPayload.ItemCheck(itemId = itemId, isChecked = isChecked, isUndo = if (isUndo) true else null),
+            )
+            return optimistic
+        }
         try {
             val updated = itemsApi.updateItem(itemId, UpdateItemRequest(isChecked = isChecked, isUndo = if (isUndo) true else null))
-            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
+            itemDao.upsert(updated.toEntity())
             return updated
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            cache.update { current ->
-                current.map { item ->
-                    if (item.id == itemId) {
-                        item.copy(isChecked = previous.isChecked, expiresAt = previous.expiresAt)
+            itemDao.getById(itemId)?.let { current ->
+                itemDao.upsert(
+                    current.toModel()
+                        .copy(isChecked = previous.isChecked, expiresAt = previous.expiresAt)
+                        .toEntity(),
+                )
+            }
+            throw error
+        }
+    }
+
+    suspend fun reorder(itemId: Long, viewId: Long, newKey: String): Item {
+        val viewKey = viewId.toString()
+        val previous = itemDao.getById(itemId)?.toModel()
+            ?: throw IllegalArgumentException("item $itemId not cached")
+        val previousKey = previous.orderMap[viewKey]
+        val mergedItem = previous.copy(orderMap = previous.orderMap + (viewKey to newKey))
+        itemDao.upsert(mergedItem.toEntity())
+        try {
+            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap))
+            itemDao.upsert(updated.toEntity())
+            return updated
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            itemDao.getById(itemId)?.let { current ->
+                if (current.toModel().orderMap[viewKey] == newKey) {
+                    val restored = if (previousKey == null) {
+                        previous.orderMap - viewKey
                     } else {
-                        item
+                        previous.orderMap + (viewKey to previousKey)
                     }
+                    itemDao.upsert(previous.copy(orderMap = restored).toEntity())
                 }
             }
             throw error
+        }
+    }
+
+    suspend fun applyCreated(item: Item) {
+        if (item.listId != cachedListId) return
+        if (itemDao.getById(item.id) != null) return
+        itemDao.upsert(item.toEntity())
+    }
+
+    suspend fun applyRestored(item: Item, previousIndex: Int) {
+        if (item.listId != cachedListId) return
+        if (itemDao.getById(item.id) != null) return
+        itemDao.upsert(item.toEntity())
+    }
+
+    suspend fun applyUpdated(item: Item) {
+        if (item.listId != cachedListId) return
+        val existing = itemDao.getById(item.id)?.toModel() ?: return
+        if (existing == item) return
+        itemDao.upsert(item.toEntity())
+    }
+
+    suspend fun applyDeleted(itemId: Long) {
+        itemDao.deleteById(itemId)
+    }
+
+    suspend fun remapPlaceholder(placeholderId: Long, realItem: Item) {
+        itemDao.deleteById(placeholderId)
+        itemDao.upsert(realItem.toEntity())
+    }
+
+    private suspend fun nextPlaceholderId(): Long {
+        var candidate = -1L
+        while (itemDao.getById(candidate) != null) candidate -= 1
+        return candidate
+    }
+
+    private suspend fun rollbackIfUnchanged(currentId: Long, optimistic: ItemEntity, previous: ItemEntity) {
+        val current = itemDao.getById(currentId)
+        if (current == optimistic) {
+            itemDao.upsert(previous)
         }
     }
 
@@ -136,74 +244,4 @@ class ItemsRepository @Inject constructor(
         java.time.Instant.ofEpochMilli(System.currentTimeMillis())
             .plus(FeatureConfig.TEMPORARY_ITEM_TTL)
             .toString()
-
-    suspend fun reorder(itemId: Long, viewId: Long, newKey: String): Item {
-        val viewKey = viewId.toString()
-        var previousKey: String? = null
-        val mergedItem = cache.updateAndGet { current ->
-            current.map { item ->
-                if (item.id == itemId) {
-                    previousKey = item.orderMap[viewKey]
-                    item.copy(orderMap = item.orderMap + (viewKey to newKey))
-                } else {
-                    item
-                }
-            }
-        }.firstOrNull { it.id == itemId }
-            ?: throw IllegalArgumentException("item $itemId not cached")
-        try {
-            val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap))
-            cache.update { current -> current.map { if (it.id == updated.id) updated else it } }
-            return updated
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            cache.update { current ->
-                current.map { item ->
-                    if (item.id == itemId) {
-                        if (item.orderMap[viewKey] == newKey) {
-                            val restoredOrderMap = if (previousKey == null) item.orderMap - viewKey else item.orderMap + (viewKey to previousKey)
-                            item.copy(orderMap = restoredOrderMap)
-                        } else {
-                            item
-                        }
-                    } else {
-                        item
-                    }
-                }
-            }
-            throw error
-        }
-    }
-
-    fun applyCreated(item: Item) {
-        if (item.listId != cachedListId.value) return
-        cache.update { current ->
-            if (current.any { it.id == item.id }) current else current + item
-        }
-    }
-
-    fun applyRestored(item: Item, previousIndex: Int) {
-        if (item.listId != cachedListId.value) return
-        cache.update { current ->
-            if (current.any { it.id == item.id }) {
-                current
-            } else {
-                val index = previousIndex.coerceIn(0, current.size)
-                current.toMutableList().apply { add(index, item) }
-            }
-        }
-    }
-
-    fun applyUpdated(item: Item) {
-        if (item.listId != cachedListId.value) return
-        cache.update { current ->
-            val existing = current.firstOrNull { it.id == item.id } ?: return@update current
-            if (existing == item) current else current.map { if (it.id == item.id) item else it }
-        }
-    }
-
-    fun applyDeleted(itemId: Long) {
-        cache.update { current -> current.filterNot { it.id == itemId } }
-    }
 }

@@ -80,6 +80,7 @@ fun ListScreen(
     settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val changeToast by viewModel.changeToast.collectAsStateWithLifecycle()
     val settingsTheme by settingsViewModel.theme.collectAsStateWithLifecycle()
     val settingsChangeToasts by settingsViewModel.changeToastsEnabled.collectAsStateWithLifecycle()
@@ -288,6 +289,21 @@ fun ListScreen(
                         .fillMaxWidth()
                         .clickable(role = Role.Button) { viewModel.onErrorDismissed() }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isOffline,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                Text(
+                    text = "Offline — changes are queued",
+                    style = typography.label,
+                    color = colors.ledOn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
 

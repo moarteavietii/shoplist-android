@@ -36,7 +36,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +53,7 @@ import kotlinx.coroutines.sync.withLock
 class ListViewModel @Inject constructor(
     private val itemsRepository: ItemsRepository,
     private val shopsRepository: ShopsRepository,
+    connectivity: @JvmSuppressWildcards StateFlow<eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity>,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
     private val themeRepository: ThemeRepository,
@@ -60,6 +64,11 @@ class ListViewModel @Inject constructor(
     private val localState = MutableStateFlow(LocalUiState())
     private val _uiState = MutableStateFlow(ListUiState())
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
+
+    val isOffline: StateFlow<Boolean> =
+        connectivity
+            .map { it == eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity.UNREACHABLE }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _changeToast = MutableStateFlow<ChangeToast?>(null)
     val changeToast: StateFlow<ChangeToast?> = _changeToast.asStateFlow()
@@ -512,9 +521,9 @@ class ListViewModel @Inject constructor(
             localState.update { it.copy(deleteConfirmItem = null) }
             return
         }
-        itemsRepository.applyDeleted(item.id)
         localState.update { it.copy(deleteConfirmItem = null) }
         viewModelScope.launch {
+            itemsRepository.applyDeleted(item.id)
             try {
                 itemsRepository.delete(item.id)
                 localState.update { it.copy(errorMessage = null) }

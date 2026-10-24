@@ -5,6 +5,11 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.local.FakeItemDao
+import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.MutationQueue
+import eu.pascariu.shoppinglist.data.local.FakeShopDao
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
@@ -73,6 +78,12 @@ class ListViewModelTest {
 
     private val json = Json
 
+    private fun offlineAwareQueue(): MutationQueue = MutationQueue(
+        dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
@@ -84,8 +95,18 @@ class ListViewModelTest {
             .baseUrl(server.url("/"))
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        itemsRepository = ItemsRepository(retrofit.create(ItemsApi::class.java))
-        shopsRepository = ShopsRepository(retrofit.create(ShopsApi::class.java))
+        itemsRepository = ItemsRepository(
+            retrofit.create(ItemsApi::class.java),
+            FakeItemDao(),
+            offlineAwareQueue(),
+            CoroutineScope(testDispatcher + Job()),
+        )
+        shopsRepository = ShopsRepository(
+            retrofit.create(ShopsApi::class.java),
+            FakeShopDao(),
+            offlineAwareQueue(),
+            CoroutineScope(testDispatcher + Job()),
+        )
         undoHistoryStore = UndoHistoryStore(
             dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
                 dataStoreFile
@@ -114,6 +135,7 @@ class ListViewModelTest {
         viewModel = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
+            connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
             themeRepository = themeRepository,
@@ -1016,6 +1038,7 @@ class ListViewModelTest {
         awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
 
         itemsRepository.applyDeleted(11L)
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
         viewModel.onEditItemSave()
         advanceUntilIdle()
 
@@ -1030,6 +1053,7 @@ class ListViewModelTest {
         awaitUntil { viewModel.uiState.value.editItemModal != null }
 
         itemsRepository.applyDeleted(11L)
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
         viewModel.onEditItemDeleteTapped()
         advanceUntilIdle()
 
@@ -1378,6 +1402,7 @@ class ListViewModelTest {
         val instance = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
+            connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
             themeRepository = themeRepository,
