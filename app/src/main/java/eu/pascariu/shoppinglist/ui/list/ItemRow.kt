@@ -1,6 +1,9 @@
 package eu.pascariu.shoppinglist.ui.list
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,38 +11,41 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
+
+object ItemRowTestTags {
+    const val checkbox = "item_row_checkbox"
+}
 
 @Composable
 fun ItemRow(
@@ -89,20 +95,15 @@ fun ItemRow(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .semantics {
-                        toggleableState =
-                            if (item.isChecked) ToggleableState.On else ToggleableState.Off
-                    }
-                    .combinedClickable(
-                        onClick = { onCheckToggled(item) },
-                        onLongClick = onLongPress,
-                        role = Role.Checkbox,
-                    )
-                    .padding(horizontal = if (dragEnabled) 0.dp else 16.dp, vertical = 10.dp),
+                    .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                    .padding(horizontal = if (dragEnabled) 0.dp else 16.dp, vertical = 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                LedCheckbox(checked = item.isChecked)
+                CircleCheckbox(
+                    checked = item.isChecked,
+                    onCheckedChange = { onCheckToggled(item) },
+                )
                 Text(
                     text = item.name,
                     style = typography.body,
@@ -147,14 +148,54 @@ private fun DragHandle(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun LedCheckbox(checked: Boolean) {
+private fun CircleCheckbox(
+    checked: Boolean,
+    onCheckedChange: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = LocalShoplistColors.current
+    val checkProgress by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = tween(200),
+        label = "checkmarkProgress",
+    )
+    val circleColor by animateColorAsState(
+        targetValue = if (checked) colors.ledOn else colors.ledOff,
+        animationSpec = tween(200),
+        label = "circleColor",
+    )
+    val checkColor = colors.background
+
     Box(
-        modifier = Modifier.size(20.dp),
+        modifier = modifier
+            .size(48.dp)
+            .testTag(ItemRowTestTags.checkbox)
+            .toggleable(
+                value = checked,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Checkbox,
+                onValueChange = { onCheckedChange() },
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(10.dp)) {
-            drawCircle(color = if (checked) colors.ledOn else colors.ledOff)
+        Canvas(modifier = Modifier.size(20.dp)) {
+            drawCircle(color = circleColor)
+            if (checkProgress > 0f) {
+                val checkPath = Path().apply {
+                    moveTo(size.width * 0.25f, size.height * 0.52f)
+                    lineTo(size.width * 0.42f, size.height * 0.70f)
+                    lineTo(size.width * 0.78f, size.height * 0.32f)
+                }
+                val measure = PathMeasure().apply { setPath(checkPath, false) }
+                val partial = Path()
+                measure.getSegment(0f, measure.length * checkProgress, partial, true)
+                drawPath(
+                    path = partial,
+                    color = checkColor,
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+                )
+            }
         }
     }
 }
