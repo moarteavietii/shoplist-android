@@ -61,18 +61,16 @@ class ConnectivityMonitor @Inject constructor(
     }
 
     private val callback = object : android.net.ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            availabilityTracker.onNetworkAvailable(network)
-            updateState()
-        }
-
         override fun onCapabilitiesChanged(
             network: Network,
             networkCapabilities: NetworkCapabilities,
         ) {
             if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                _connectivity.value = BackendConnectivity.REACHABLE
+                availabilityTracker.onNetworkAvailable(network)
+            } else {
+                availabilityTracker.onNetworkLost(network)
             }
+            updateState()
         }
 
         override fun onLost(network: Network) {
