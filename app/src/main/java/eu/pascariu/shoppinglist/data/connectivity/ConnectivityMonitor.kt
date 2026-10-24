@@ -21,12 +21,14 @@ class ConnectivityMonitor @Inject constructor(
     val connectivity: StateFlow<BackendConnectivity> = _connectivity.asStateFlow()
 
     private var registered = false
+    private var manager: ConnectivityManager? = null
 
     @Suppress("DEPRECATION")
     fun start() {
         if (registered) return
         registered = true
         val manager = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        this.manager = manager
         val request = android.net.NetworkRequest.Builder()
             .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
@@ -54,8 +56,28 @@ class ConnectivityMonitor @Inject constructor(
             _connectivity.value = BackendConnectivity.REACHABLE
         }
 
+        override fun onCapabilitiesChanged(
+            network: android.net.Network,
+            networkCapabilities: NetworkCapabilities,
+        ) {
+            if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                _connectivity.value = BackendConnectivity.REACHABLE
+            }
+        }
+
         override fun onLost(network: android.net.Network) {
-            _connectivity.value = BackendConnectivity.UNREACHABLE
+            val manager = this@ConnectivityMonitor.manager ?: run {
+                _connectivity.value = BackendConnectivity.UNREACHABLE
+                return
+            }
+            val active = manager.activeNetwork
+            val caps = active?.let { manager.getNetworkCapabilities(it) }
+            _connectivity.value =
+                if (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true) {
+                    BackendConnectivity.REACHABLE
+                } else {
+                    BackendConnectivity.UNREACHABLE
+                }
         }
     }
 }

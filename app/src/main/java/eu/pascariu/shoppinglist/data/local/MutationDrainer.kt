@@ -67,6 +67,7 @@ class MutationDrainer @Inject constructor(
                         response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
                         response.code() == 404 -> Unit
                         else -> return replayOutcomeFor(response.code())
+                    }
                 }
                 is MutationPayload.ItemCheck -> {
                     val updated = itemsApi.updateItem(
@@ -90,6 +91,7 @@ class MutationDrainer @Inject constructor(
                         response.isSuccessful || response.code() == 404 ->
                             shopsRepository.applyDeleted(payload.shopId)
                         else -> return replayOutcomeFor(response.code())
+                    }
                 }
             }
             ReplayOutcome.SUCCESS
