@@ -537,7 +537,7 @@ class ListViewModel @Inject constructor(
                 if (e is HttpException && e.code() == 404) {
                     localState.update { it.copy(errorMessage = null) }
                 } else {
-                    itemsRepository.applyRestored(item, previousIndex)
+                    itemsRepository.applyRestored(item)
                     localState.update {
                         it.copy(errorMessage = "Couldn't delete the item")
                     }

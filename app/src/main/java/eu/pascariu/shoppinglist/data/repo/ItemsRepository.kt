@@ -258,7 +258,7 @@ class ItemsRepository @Inject constructor(
         itemDao.upsert(item.toEntity())
     }
 
-    suspend fun applyRestored(item: Item, previousIndex: Int) {
+    suspend fun applyRestored(item: Item) {
         if (item.listId != _cachedListId.value) return
         if (itemDao.getById(item.id) != null) return
         itemDao.upsert(item.toEntity())
