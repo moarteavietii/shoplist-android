@@ -22,6 +22,7 @@ class ConnectivityMonitor @Inject constructor(
 
     private var registered = false
     private var manager: ConnectivityManager? = null
+    private val availabilityTracker = NetworkAvailabilityTracker<Network>()
 
     @Suppress("DEPRECATION")
     fun start() {
@@ -51,13 +52,30 @@ class ConnectivityMonitor @Inject constructor(
         _connectivity.value = BackendConnectivity.UNREACHABLE
     }
 
+    private fun updateState() {
+        _connectivity.value =
+            if (availabilityTracker.hasAvailableNetwork() || hasValidatedActiveNetwork()) {
+                BackendConnectivity.REACHABLE
+            } else {
+                BackendConnectivity.UNREACHABLE
+            }
+    }
+
+    private fun hasValidatedActiveNetwork(): Boolean {
+        val manager = this.manager ?: return false
+        val active = manager.activeNetwork
+        val caps = active?.let { manager.getNetworkCapabilities(it) }
+        return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+    }
+
     private val callback = object : android.net.ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: android.net.Network) {
-            _connectivity.value = BackendConnectivity.REACHABLE
+        override fun onAvailable(network: Network) {
+            availabilityTracker.onNetworkAvailable(network)
+            updateState()
         }
 
         override fun onCapabilitiesChanged(
-            network: android.net.Network,
+            network: Network,
             networkCapabilities: NetworkCapabilities,
         ) {
             if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
@@ -65,19 +83,9 @@ class ConnectivityMonitor @Inject constructor(
             }
         }
 
-        override fun onLost(network: android.net.Network) {
-            val manager = this@ConnectivityMonitor.manager ?: run {
-                _connectivity.value = BackendConnectivity.UNREACHABLE
-                return
-            }
-            val active = manager.activeNetwork
-            val caps = active?.let { manager.getNetworkCapabilities(it) }
-            _connectivity.value =
-                if (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true) {
-                    BackendConnectivity.REACHABLE
-                } else {
-                    BackendConnectivity.UNREACHABLE
-                }
+        override fun onLost(network: Network) {
+            availabilityTracker.onNetworkLost(network)
+            updateState()
         }
     }
 }
