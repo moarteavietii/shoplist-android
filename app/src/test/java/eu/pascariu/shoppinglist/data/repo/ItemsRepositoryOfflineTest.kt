@@ -87,6 +87,47 @@ class ItemsRepositoryOfflineTest {
     }
 
     @Test
+    fun `offline updateDetails applies the optimistic edit and enqueues an item_update mutation`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = sampleItems())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        val updated = repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Oat milk", quantity = 2))
+
+        assertEquals("Oat milk", updated.name)
+        assertEquals(2, updated.quantity)
+        assertEquals("Oat milk", repository.items.first().single().name)
+        assertEquals(1, mutationDao.listAll().size)
+        assertEquals(MutationKind.ITEM_UPDATE, mutationDao.listAll().single().kind)
+    }
+
+    @Test
+    fun `offline reorder applies the optimistic order and enqueues an item_update mutation`() = runTest {
+        val api = OfflineFakeItemsApi(itemsForFetch = sampleItems())
+        val mutationDao = FakePendingMutationDao()
+        val repository = ItemsRepository(
+            api,
+            FakeItemDao(),
+            MutationQueue(mutationDao, MutableStateFlow(BackendConnectivity.UNREACHABLE), json),
+            testScope,
+        )
+        repository.refetch(listId = 1)
+
+        val reordered = repository.reorder(itemId = 42L, viewId = 2L, newKey = "a5")
+
+        assertEquals("a5", reordered.orderMap["2"])
+        assertEquals("a5", repository.items.first().single().orderMap["2"])
+        assertEquals(1, mutationDao.listAll().size)
+        assertEquals(MutationKind.ITEM_UPDATE, mutationDao.listAll().single().kind)
+    }
+
+    @Test
     fun `placeholder ids never collide`() = runTest {
         val api = OfflineFakeItemsApi(itemsForFetch = emptyList())
         val repository = ItemsRepository(api, FakeItemDao(), queue(BackendConnectivity.UNREACHABLE), testScope)

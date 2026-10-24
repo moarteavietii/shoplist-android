@@ -115,6 +115,10 @@ class ItemsRepository @Inject constructor(
             expiresAt = optimisticExpiry,
         )
         itemDao.upsert(optimistic.toEntity())
+        if (mutationQueue.isOffline) {
+            mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, request))
+            return optimistic
+        }
         try {
             val updated = itemsApi.updateItem(itemId, request)
             itemDao.upsert(updated.toEntity())
@@ -178,6 +182,10 @@ class ItemsRepository @Inject constructor(
         val previousKey = previous.orderMap[viewKey]
         val mergedItem = previous.copy(orderMap = previous.orderMap + (viewKey to newKey))
         itemDao.upsert(mergedItem.toEntity())
+        if (mutationQueue.isOffline) {
+            mutationQueue.enqueue(MutationPayload.ItemUpdate(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap)))
+            return mergedItem
+        }
         try {
             val updated = itemsApi.updateItem(itemId, UpdateItemRequest(orderMap = mergedItem.orderMap))
             itemDao.upsert(updated.toEntity())
