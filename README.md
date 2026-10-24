@@ -87,3 +87,5 @@ Troubleshooting:
 ## Development Workflow
 
 This project is managed with [OpenSpec](https://github.com/Fission-AI/OpenSpec) using the `spec-driven` schema. Feature work follows the flow: create a branch → propose a change (`/opsx-propose`) → implement (`/opsx-apply`) → archive with spec sync (`/opsx-archive`). See `AGENTS.md` for the full conventions.
+
+The migration from the shoppinglist web frontend is **complete** — the app is at feature parity. `docs/ROADMAP.md` and `docs/MIGRATION_PLAN.md` are kept as historical references (contracts, decisions log, traceability matrix).

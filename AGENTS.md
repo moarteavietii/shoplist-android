@@ -54,14 +54,13 @@ The matching skills live under `.coda/skills/openspec-*` if you need the full st
 The Android app replaces the shoppinglist web frontend; the backend REST + SSE API is reused as-is. The migration is **complete** (all roadmap items done; see `docs/MIGRATION_PLAN.md` for the full traceability matrix and decisions log). `docs/MIGRATION_PLAN.md` remains the authoritative reference for the API/SSE/data-model contracts and the decisions log — consult it before changing anything that touches those contracts.
 
 - **Consult `docs/MIGRATION_PLAN.md` first.** It holds the discovered API/SSE/data-model contracts, the decisions log, and the traceability matrix. Do not re-derive contracts from the web repo when the plan already records them; go to the web repo only for details the plan lacks.
-- **Follow the migration workflow in the plan** (§5): pick a roadmap item from `docs/ROADMAP.md` → branch → `/opsx-propose` (consulting the web specs listed in the traceability matrix as source material — adapt, don't copy) → `/opsx-apply` → `/opsx-archive` → update the matrix status in `docs/MIGRATION_PLAN.md`.
 - **Never propose or implement backend changes in this repo.** Specs marked `n/a` in the matrix (database, deploy, dev-env) belong to the web repo.
 - **Respect the decisions log.** The plan's decisions table (design language, auth + dev bypass, minSdk 35, no pull-to-refresh, backgrounded = no network, base URLs, Room as the persistent local store) is settled — do not relitigate or contradict it in proposals. If a decision must change, surface it to the user first and update the log.
-- **After each `/opsx-archive`,** update the traceability matrix row(s) for the archived change and check whether `docs/ROADMAP.md` needs its item status adjusted.
+- **After each `/opsx-archive`,** update the traceability matrix row(s) only if the archived change maps to an existing web-spec row. `docs/ROADMAP.md` is complete and needs no status updates.
 
 ## Repo Layout
 
-- `docs/ROADMAP.md` — ordered, high-level plan for the app. Consult it before proposing changes; new feature work should map to a roadmap item.
+- `docs/ROADMAP.md` — completed migration roadmap, kept as a historical record of what was built and why. New feature work no longer maps to roadmap items; propose it directly via `/opsx-propose`.
 - `docs/MIGRATION_PLAN.md` — migration reference: discovered contracts, decisions log, traceability matrix (web specs → Android work).
 - `openspec/config.yaml` — OpenSpec config (currently minimal).
 - `openspec/specs/` — main capability specs.
