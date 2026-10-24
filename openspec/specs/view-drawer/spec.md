@@ -30,7 +30,7 @@ The shopping list UI SHALL render a view-switcher icon in the widget stack that 
 - **THEN** the view-switcher icon in the widget stack is rendered in an active color
 
 ### Requirement: The drawer lists all available shops with unchecked-count badges
-The view drawer SHALL list every shop returned by `GET /api/shops`, ordered with the Global shop first and all other shops in alphabetical order. Each shop row SHALL render a trailing count badge: an accent pill with the count of unchecked items visible in that shop (the shop's id is in the item's `visibleIn` set), or a muted non-accent "0" with no pill when the shop's visible items are all checked or the shop has no items. The Global shop SHALL count all items. This replaces the previous hollow-circle indicator.
+The view drawer SHALL list every shop returned by `GET /api/v1/shops`, ordered with the Global shop first and all other shops in alphabetical order. Each shop row SHALL render a trailing count badge: an accent pill with the count of unchecked items visible in that shop (the shop's id is in the item's `visibleIn` set), or a muted non-accent "0" with no pill when the shop's visible items are all checked or the shop has no items. The Global shop SHALL count all items. This replaces the previous hollow-circle indicator.
 
 #### Scenario: Drawer shows all shops with counts
 - **WHEN** the drawer opens and the backend returns shops named "Carrefour", "Auchan", and "Global"

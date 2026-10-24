@@ -82,12 +82,12 @@ Tapping Cancel SHALL close the confirmation modal and leave the item unchanged.
 
 ### Requirement: Confirm deletes the item optimistically
 
-Tapping Confirm SHALL remove the item from the local list immediately, call `DELETE /api/items/:itemId`, and close the confirmation modal. On failure, the item SHALL be restored and an error message shown.
+Tapping Confirm SHALL remove the item from the local list immediately, call `DELETE /api/v1/items/:itemId`, and close the confirmation modal. On failure, the item SHALL be restored and an error message shown.
 
 #### Scenario: Confirm deletes an existing item
 
 - **WHEN** the user taps Confirm for an existing item
-- **THEN** the item is removed from the displayed list immediately, the app calls `DELETE /api/items/:itemId`, and the confirmation modal closes
+- **THEN** the item is removed from the displayed list immediately, the app calls `DELETE /api/v1/items/:itemId`, and the confirmation modal closes
 
 #### Scenario: Deletion failure restores the item
 

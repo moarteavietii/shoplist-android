@@ -10,11 +10,11 @@ Define the Android app's data layer: typed API models mirroring the backend payl
 The app SHALL define serializable data models for `Item`, `Shop`, `OrderMap`, `VisibleIn`, and `ShopId` that match the backend's JSON field names and types exactly, so every REST response and request body deserializes without custom adapters.
 
 #### Scenario: Item payload deserializes
-- **WHEN** the app receives an item JSON object from `GET /api/lists/:listId/items`
+- **WHEN** the app receives an item JSON object from `GET /api/v1/lists/:listId/items`
 - **THEN** it deserializes into the item model with `id`, `listId`, `name`, `isChecked`, `orderMap`, `quantity`, `isTemporary`, `checkCount`, `expiresAt` (nullable), `createdAt`, and `visibleIn` populated
 
 #### Scenario: Shop payload deserializes
-- **WHEN** the app receives a shop JSON object from `GET /api/shops`
+- **WHEN** the app receives a shop JSON object from `GET /api/v1/shops`
 - **THEN** it deserializes into the shop model with `id`, `name`, and `createdAt` populated
 
 #### Scenario: Error payload deserializes
@@ -22,7 +22,7 @@ The app SHALL define serializable data models for `Item`, `Shop`, `OrderMap`, `V
 - **THEN** the app can surface the error message from the body
 
 ### Requirement: Items repository fetches and caches list items
-The app SHALL expose an items repository that fetches all items for a list via `GET /api/lists/:listId/items` and stores them in a persistent local database, which serves all subsequent reads. The repository SHALL expose the items as an observable stream backed by the local database that emits the full item list after every change, so consumers react to both local and remote (SSE-driven) mutations. When the backend is unreachable, reads SHALL be served from the local database without error.
+The app SHALL expose an items repository that fetches all items for a list via `GET /api/v1/lists/:listId/items` and stores them in a persistent local database, which serves all subsequent reads. The repository SHALL expose the items as an observable stream backed by the local database that emits the full item list after every change, so consumers react to both local and remote (SSE-driven) mutations. When the backend is unreachable, reads SHALL be served from the local database without error.
 
 #### Scenario: First fetch populates the local store
 - **WHEN** the items repository fetches items for a list for the first time
@@ -45,7 +45,7 @@ The app SHALL expose an items repository that fetches all items for a list via `
 - **THEN** the repository serves the persisted items without surfacing a network error
 
 ### Requirement: Items repository supports create, update, and delete
-The items repository SHALL expose create (`POST /api/lists/:listId/items`), partial update (`PATCH /api/items/:itemId`), and delete (`DELETE /api/items/:itemId`) operations. When the backend is reachable, the repository SHALL update the local database from the server's returned item state on create and update; when unreachable, the mutation SHALL be enqueued for later replay (see `mutation-queue`) and the optimistic result SHALL be applied to the local database immediately. On a non-2xx response while online, the repository SHALL surface an error to the caller and leave the local state unchanged. The repository SHALL also expose merge methods for realtime events: an idempotent created-append, a diff-checked updated-replace, and a deleted-filter. An update whose server-returned item is absent from the local store SHALL be inserted rather than dropped.
+The items repository SHALL expose create (`POST /api/v1/lists/:listId/items`), partial update (`PATCH /api/v1/items/:itemId`), and delete (`DELETE /api/v1/items/:itemId`) operations. When the backend is reachable, the repository SHALL update the local database from the server's returned item state on create and update; when unreachable, the mutation SHALL be enqueued for later replay (see `mutation-queue`) and the optimistic result SHALL be applied to the local database immediately. On a non-2xx response while online, the repository SHALL surface an error to the caller and leave the local state unchanged. The repository SHALL also expose merge methods for realtime events: an idempotent created-append, a diff-checked updated-replace, and a deleted-filter. An update whose server-returned item is absent from the local store SHALL be inserted rather than dropped.
 
 #### Scenario: Create item updates the local store
 - **WHEN** an item is created through the repository while online
@@ -90,7 +90,7 @@ The items repository SHALL expose create (`POST /api/lists/:listId/items`), part
 - **THEN** the item is removed from the local database; an id that is not stored leaves the local state unchanged
 
 ### Requirement: Shops repository fetches and caches shops
-The app SHALL expose a shops repository that fetches all shops via `GET /api/shops`, stores them in the persistent local database, and keeps the stored shops ordered Global-first then A→Z by name after every change. The repository SHALL expose the shops as an observable stream that emits after every change, and SHALL expose idempotent created-append, replace, and deleted-filter merge methods for realtime shop events, re-sorting after every merge. Shop mutations attempted while the backend is unreachable SHALL be enqueued for later replay.
+The app SHALL expose a shops repository that fetches all shops via `GET /api/v1/shops`, stores them in the persistent local database, and keeps the stored shops ordered Global-first then A→Z by name after every change. The repository SHALL expose the shops as an observable stream that emits after every change, and SHALL expose idempotent created-append, replace, and deleted-filter merge methods for realtime shop events, re-sorting after every merge. Shop mutations attempted while the backend is unreachable SHALL be enqueued for later replay.
 
 #### Scenario: Shops are fetched and ordered
 - **WHEN** the shops repository fetches shops
@@ -175,7 +175,7 @@ The app SHALL expose a device-local undo history store that persists check-histo
 - **THEN** the store applies them serially and no entry is lost or resurrected
 
 ### Requirement: Items repository supports optimistic check mutation with rollback
-The items repository SHALL expose a check mutation that optimistically flips the item's `isChecked` value in the local database immediately, sends `PATCH /api/items/:itemId` with the new value (optionally carrying `isUndo: true`) when the backend is reachable, and on success replaces the stored entry with the server-returned item. When the backend is unreachable, the flipped state SHALL persist locally and the check SHALL be enqueued for replay. On failure while online, the repository SHALL roll back only the mutated field (`isChecked`) on the current stored entry — not a full item snapshot — so fields merged concurrently by realtime events are preserved, and SHALL surface the error to the caller.
+The items repository SHALL expose a check mutation that optimistically flips the item's `isChecked` value in the local database immediately, sends `PATCH /api/v1/items/:itemId` with the new value (optionally carrying `isUndo: true`) when the backend is reachable, and on success replaces the stored entry with the server-returned item. When the backend is unreachable, the flipped state SHALL persist locally and the check SHALL be enqueued for replay. On failure while online, the repository SHALL roll back only the mutated field (`isChecked`) on the current stored entry — not a full item snapshot — so fields merged concurrently by realtime events are preserved, and SHALL surface the error to the caller.
 
 #### Scenario: Optimistic flip is visible before the PATCH settles
 - **WHEN** the user checks an item while online

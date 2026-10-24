@@ -36,7 +36,7 @@ class DeviceIdInterceptorTest {
     fun `post carries device id header`() {
         server.enqueue(MockResponse().setResponseCode(200))
         val request = Request.Builder()
-            .url(server.url("/api/shops"))
+            .url(server.url("/api/v1/shops"))
             .post("{}".toRequestBody())
             .build()
 
@@ -49,7 +49,7 @@ class DeviceIdInterceptorTest {
     fun `patch carries device id header`() {
         server.enqueue(MockResponse().setResponseCode(200))
         val request = Request.Builder()
-            .url(server.url("/api/items/1"))
+            .url(server.url("/api/v1/items/1"))
             .patch("{}".toRequestBody())
             .build()
 
@@ -62,7 +62,7 @@ class DeviceIdInterceptorTest {
     fun `delete carries device id header`() {
         server.enqueue(MockResponse().setResponseCode(204))
         val request = Request.Builder()
-            .url(server.url("/api/items/1"))
+            .url(server.url("/api/v1/items/1"))
             .delete()
             .build()
 
@@ -75,7 +75,7 @@ class DeviceIdInterceptorTest {
     fun `get omits device id header`() {
         server.enqueue(MockResponse().setResponseCode(200))
         val request = Request.Builder()
-            .url(server.url("/api/shops"))
+            .url(server.url("/api/v1/shops"))
             .get()
             .build()
 
@@ -89,7 +89,7 @@ class DeviceIdInterceptorTest {
         server.enqueue(MockResponse().setResponseCode(200))
         server.enqueue(MockResponse().setResponseCode(200))
         val request = Request.Builder()
-            .url(server.url("/api/shops"))
+            .url(server.url("/api/v1/shops"))
             .post("{}".toRequestBody())
             .build()
 
@@ -111,7 +111,7 @@ class DeviceIdInterceptorTest {
             .addInterceptor(DeviceIdInterceptor(fakeStore, "https://api.example.com/"))
             .build()
         val request = Request.Builder()
-            .url(otherServer.url("/api/shops"))
+            .url(otherServer.url("/api/v1/shops"))
             .post("{}".toRequestBody())
             .build()
 

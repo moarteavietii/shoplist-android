@@ -88,4 +88,13 @@ Troubleshooting:
 
 This project is managed with [OpenSpec](https://github.com/Fission-AI/OpenSpec) using the `spec-driven` schema. Feature work follows the flow: create a branch → propose a change (`/opsx-propose`) → implement (`/opsx-apply`) → archive with spec sync (`/opsx-archive`). See `AGENTS.md` for the full conventions.
 
-The migration from the shoppinglist web frontend is **complete** — the app is at feature parity. `docs/ROADMAP.md` and `docs/MIGRATION_PLAN.md` are kept as historical references (contracts, decisions log, traceability matrix).
+The migration from the shoppinglist web frontend is **complete** — the app is at feature parity. `docs/ROADMAP.md` is kept as a historical record.
+
+## API Contract
+
+The backend publishes a machine-readable contract that is the source of truth for endpoint paths, payload shapes, and the SSE event catalog:
+
+- **REST:** live OpenAPI 3.1 at `GET /openapi.json` (prod is behind Cloudflare Access; use the dev backend at `http://127.0.0.1:3005/openapi.json`).
+- **SSE:** AsyncAPI document at `apps/backend/asyncapi.yaml` in the web repo.
+
+All REST routes are versioned under `/api/v1` (SSE subscribe URLs included). After changing the server, verify the app still matches: diff the OpenAPI paths/schemas against `app/src/main/java/eu/pascariu/shoppinglist/data/api/` and `data/model/`, and smoke-test the SSE streams against the dev backend (`curl -N http://127.0.0.1:3005/api/v1/lists/1/subscribe`).

@@ -7,7 +7,7 @@ Consume the backend's two Server-Sent Events streams (items and shops) so the ap
 ## Requirements
 
 ### Requirement: The app subscribes to the items SSE stream
-The app SHALL open a Server-Sent Events connection to `GET /api/lists/:listId/subscribe` for the active list, sending the same authentication headers as REST requests. The connection SHALL be opened when the app enters the foreground (visible state) and closed when it leaves it. Until list switching exists, the app subscribes to a single hardcoded list id fixed at DI wiring time (`DEFAULT_LIST_ID` in `RealtimeClient`).
+The app SHALL open a Server-Sent Events connection to `GET /api/v1/lists/:listId/subscribe` for the active list, sending the same authentication headers as REST requests. The connection SHALL be opened when the app enters the foreground (visible state) and closed when it leaves it. Until list switching exists, the app subscribes to a single hardcoded list id fixed at DI wiring time (`DEFAULT_LIST_ID` in `RealtimeClient`).
 
 #### Scenario: Stream opens while app is visible
 - **WHEN** the app becomes visible and the items stream is not connected
@@ -22,7 +22,7 @@ The app SHALL open a Server-Sent Events connection to `GET /api/lists/:listId/su
 - **THEN** both SSE streams are closed and any scheduled reconnect attempts are cancelled, so no SSE traffic runs while backgrounded
 
 ### Requirement: The app subscribes to the shops SSE stream
-The app SHALL open a second, independent Server-Sent Events connection to `GET /api/shops/subscribe`, with the same authentication headers and lifecycle behavior as the items stream.
+The app SHALL open a second, independent Server-Sent Events connection to `GET /api/v1/shops/subscribe`, with the same authentication headers and lifecycle behavior as the items stream.
 
 #### Scenario: Both streams run concurrently
 - **WHEN** the app is visible

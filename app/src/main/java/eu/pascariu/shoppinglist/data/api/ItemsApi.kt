@@ -13,15 +13,15 @@ import retrofit2.http.Path
 
 interface ItemsApi {
 
-    @GET("api/lists/{listId}/items")
+    @GET("api/v1/lists/{listId}/items")
     suspend fun listItems(@Path("listId") listId: Long): List<Item>
 
-    @POST("api/lists/{listId}/items")
+    @POST("api/v1/lists/{listId}/items")
     suspend fun createItem(@Path("listId") listId: Long, @Body body: CreateItemRequest): Item
 
-    @PATCH("api/items/{itemId}")
+    @PATCH("api/v1/items/{itemId}")
     suspend fun updateItem(@Path("itemId") itemId: Long, @Body body: UpdateItemRequest): Item
 
-    @DELETE("api/items/{itemId}")
+    @DELETE("api/v1/items/{itemId}")
     suspend fun deleteItem(@Path("itemId") itemId: Long): Response<Unit>
 }

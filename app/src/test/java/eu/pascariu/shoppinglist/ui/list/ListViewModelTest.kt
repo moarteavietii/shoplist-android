@@ -359,14 +359,14 @@ class ListViewModelTest {
         val checkRequest = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(checkRequest)
         assertEquals("PATCH", checkRequest!!.method)
-        assertEquals("/api/items/10", checkRequest.path)
+        assertEquals("/api/v1/items/10", checkRequest.path)
         val checkBody = checkRequest.body.readUtf8()
         assertTrue(checkBody.contains("\"isChecked\":true"))
         assertFalse(checkBody.contains("isUndo"))
         val undoRequest = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(undoRequest)
         assertEquals("PATCH", undoRequest!!.method)
-        assertEquals("/api/items/10", undoRequest.path)
+        assertEquals("/api/v1/items/10", undoRequest.path)
         assertTrue(undoRequest.body.readUtf8().contains("\"isUndo\":true"))
         awaitUntil { !viewModel.uiState.value.showUndoBar }
     }
@@ -519,7 +519,7 @@ class ListViewModelTest {
         val recorded = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(recorded)
         assertEquals("POST", recorded!!.method)
-        assertEquals("/api/lists/1/items", recorded.path)
+        assertEquals("/api/v1/lists/1/items", recorded.path)
         val body = recorded.body.readUtf8()
         assertTrue(body.contains("\"name\":\"Eggs\""))
         assertTrue(body.contains("\"visibleIn\":[1,2]"))
@@ -803,7 +803,7 @@ class ListViewModelTest {
         val recorded = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(recorded)
         assertEquals("PATCH", recorded!!.method)
-        assertEquals("/api/items/11", recorded.path)
+        assertEquals("/api/v1/items/11", recorded.path)
         assertTrue(recorded.body.readUtf8().contains("\"name\":\"Crackers\""))
         awaitUntil { viewModel.uiState.value.editItemModal == null }
         assertEquals("Crackers", viewModel.uiState.value.items.first { it.id == 11L }.name)
@@ -841,7 +841,7 @@ class ListViewModelTest {
         val recorded = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(recorded)
         assertEquals("PATCH", recorded!!.method)
-        assertEquals("/api/items/11", recorded.path)
+        assertEquals("/api/v1/items/11", recorded.path)
         val body = recorded.body.readUtf8()
         assertFalse(body.contains("\"name\""))
         assertTrue(body.contains("\"visibleIn\":[1,2]"))
@@ -987,7 +987,7 @@ class ListViewModelTest {
         val recorded = server.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(recorded)
         assertEquals("DELETE", recorded!!.method)
-        assertEquals("/api/items/11", recorded.path)
+        assertEquals("/api/v1/items/11", recorded.path)
         awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
         assertNull(viewModel.uiState.value.deleteConfirmItem)
     }
@@ -1938,7 +1938,7 @@ class ListViewModelTest {
 
         val recorded = server.takeRequest(5, TimeUnit.SECONDS)!!
         assertEquals("PATCH", recorded.method)
-        assertEquals("/api/items/10", recorded.path)
+        assertEquals("/api/v1/items/10", recorded.path)
         val body = recorded.body.readUtf8()
         assertTrue(body.contains("\"orderMap\""))
         assertTrue(body.contains("\"1\":\"a2\""))

@@ -84,7 +84,7 @@ class ShopsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("GET", recorded.method)
-        assertEquals("/api/shops", recorded.path)
+        assertEquals("/api/v1/shops", recorded.path)
         assertEquals(listOf(4L, 3L, 2L), repository.shops.first().map { it.id })
     }
 
@@ -99,7 +99,7 @@ class ShopsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("POST", recorded.method)
-        assertEquals("/api/shops", recorded.path)
+        assertEquals("/api/v1/shops", recorded.path)
         assertTrue(recorded.body.readUtf8().contains("\"name\":\"Global\""))
         assertEquals(1L, created.id)
         assertEquals(listOf(1L, 3L), repository.shops.first().map { it.id })
@@ -116,7 +116,7 @@ class ShopsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("PATCH", recorded.method)
-        assertEquals("/api/shops/2", recorded.path)
+        assertEquals("/api/v1/shops/2", recorded.path)
         assertTrue(recorded.body.readUtf8().contains("\"name\":\"Global\""))
         assertEquals("Global", renamed.name)
         assertEquals(listOf(2L), repository.shops.first().map { it.id })
@@ -133,7 +133,7 @@ class ShopsRepositoryMockWebServerTest {
 
         val recorded = server.takeRequest()
         assertEquals("DELETE", recorded.method)
-        assertEquals("/api/shops/2", recorded.path)
+        assertEquals("/api/v1/shops/2", recorded.path)
         assertTrue(repository.shops.first().isEmpty())
     }
 
