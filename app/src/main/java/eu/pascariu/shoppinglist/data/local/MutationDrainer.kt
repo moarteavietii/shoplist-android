@@ -66,8 +66,7 @@ class MutationDrainer @Inject constructor(
                     when {
                         response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
                         response.code() == 404 -> Unit
-                        response.code() == 403 -> return ReplayOutcome.NETWORK_ERROR
-                        else -> return ReplayOutcome.DROPPED
+                        else -> return ReplayOutcome.NETWORK_ERROR
                     }
                 }
                 is MutationPayload.ItemCheck -> {
@@ -90,8 +89,7 @@ class MutationDrainer @Inject constructor(
                     when {
                         response.isSuccessful || response.code() == 404 ->
                             shopsRepository.applyDeleted(payload.shopId)
-                        response.code() == 403 -> return ReplayOutcome.NETWORK_ERROR
-                        else -> return ReplayOutcome.DROPPED
+                        else -> return ReplayOutcome.NETWORK_ERROR
                     }
                 }
             }
