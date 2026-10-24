@@ -9,7 +9,6 @@ import eu.pascariu.shoppinglist.data.local.MutationDrainer
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
@@ -25,18 +24,17 @@ class RealtimeLifecycle @Inject constructor(
             val owner = ProcessLifecycleOwner.get()
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 connectivityMonitor.start()
-                var drainJob: Job? = null
+                val drainLauncher = SingleDrainLauncher(scope) {
+                    try {
+                        drainer.drainAll()
+                    } finally {
+                        syncManager.refetchAll()
+                    }
+                }
                 val connectivityJob = launch {
                     connectivityMonitor.connectivity.collect { state ->
                         if (state == BackendConnectivity.REACHABLE) {
-                            drainJob?.cancel()
-                            drainJob = launch {
-                                try {
-                                    drainer.drainAll()
-                                } finally {
-                                    syncManager.refetchAll()
-                                }
-                            }
+                            drainLauncher.launchOrSkip()
                         }
                     }
                 }
@@ -45,10 +43,28 @@ class RealtimeLifecycle @Inject constructor(
                     awaitCancellation()
                 } finally {
                     connectivityJob.cancel()
-                    drainJob?.cancel()
+                    drainLauncher.cancel()
                     syncManager.stop()
                 }
             }
         }
     }
+}
+
+internal class SingleDrainLauncher(
+    private val scope: CoroutineScope,
+    private val drainAll: suspend () -> Unit,
+) {
+    private var job: kotlinx.coroutines.Job? = null
+
+    fun launchOrSkip() {
+        if (job?.isActive == true) return
+        job = scope.launch { drainAll() }
+    }
+
+    fun cancel() {
+        job?.cancel()
+    }
+
+    fun isActive(): Boolean = job?.isActive == true
 }
