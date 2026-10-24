@@ -53,15 +53,22 @@ class MutationDrainerTest {
 
     @Test
     fun `drain sends mutations in enqueue order and empties the queue`() = runTest {
-        val itemsApi = RecordingItemsApi()
+        val itemsApi = RecordingItemsApi().apply {
+            listedItems = listOf(sampleItem(id = 1), sampleItem(id = 2))
+        }
+        val itemDao = FakeItemDao()
         val queue = queue()
+        val repository = ItemsRepository(itemsApi, itemDao, queue, testScope)
+        repository.refetch(listId = 1)
         queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
         queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
 
-        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+        drainer(itemsApi = itemsApi, queue = queue, itemsRepository = repository).drainAll()
 
         assertEquals(listOf(1L, 2L), itemsApi.checkedItemIds)
         assertEquals(0, queue.listAll().size)
+        assertTrue(itemDao.getById(1L)!!.isChecked)
+        assertTrue(itemDao.getById(2L)!!.isChecked)
     }
 
     @Test
@@ -322,8 +329,9 @@ private class RecordingItemsApi : ItemsApi {
     var checkErrorCode: Int? = null
     var deleteErrorCode: Int? = null
     var createdItem: Item? = null
+    var listedItems: List<Item> = emptyList()
 
-    override suspend fun listItems(listId: Long): List<Item> = emptyList()
+    override suspend fun listItems(listId: Long): List<Item> = listedItems
 
     override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
         return requireNotNull(createdItem)
