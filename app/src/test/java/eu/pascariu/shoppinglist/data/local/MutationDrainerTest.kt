@@ -38,9 +38,9 @@ class MutationDrainerTest {
     ): MutationDrainer = MutationDrainer(
         queue = queue,
         itemsApi = itemsApi,
-        shopsApi = FakeShopsApi(),
+        shopsApi = RecordingShopsApi(),
         itemsRepository = itemsRepository,
-        shopsRepository = ShopsRepository(FakeShopsApi(), FakeShopDao(), queue, testScope),
+        shopsRepository = ShopsRepository(RecordingShopsApi(), FakeShopDao(), queue, testScope),
         json = json,
         ioDispatcher = Dispatchers.Unconfined,
     )
@@ -98,6 +98,53 @@ class MutationDrainerTest {
     }
 
     @Test
+    fun `item delete 404 drops the mutation and continues draining`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 404 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
+    fun `item delete transient server error keeps the mutation queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 500 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
+    fun `shop delete transient server error keeps the mutation queued`() = runTest {
+        val shopsApi = RecordingShopsApi().apply { deleteErrorCode = 502 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ShopDelete(shopId = 1))
+
+        val drainer = MutationDrainer(
+            queue = queue,
+            itemsApi = RecordingItemsApi(),
+            shopsApi = shopsApi,
+            itemsRepository = ItemsRepository(RecordingItemsApi(), FakeItemDao(), queue, testScope),
+            shopsRepository = ShopsRepository(shopsApi, FakeShopDao(), queue, testScope),
+            json = json,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        drainer.drainAll()
+
+        assertEquals(1, queue.listAll().size)
+        assertEquals(1, shopsApi.deleteCalls)
+    }
+
+    @Test
     fun `successful item create remaps the placeholder row and follow-ups`() = runTest {
         val itemsApi = RecordingItemsApi().apply { createdItem = sampleItem(id = 77) }
         val itemDao = FakeItemDao()
@@ -134,8 +181,10 @@ private fun sampleItem(id: Long, isChecked: Boolean): Item = sampleItem(id).copy
 private class RecordingItemsApi : ItemsApi {
     val checkedItemIds = mutableListOf<Long>()
     var updateCalls = 0
+    var deleteCalls = 0
     var checkError: IOException? = null
     var checkErrorCode: Int? = null
+    var deleteErrorCode: Int? = null
     var createdItem: Item? = null
 
     override suspend fun listItems(listId: Long): List<Item> = emptyList()
@@ -154,10 +203,17 @@ private class RecordingItemsApi : ItemsApi {
         return sampleItem(id = itemId, isChecked = body.isChecked ?: false)
     }
 
-    override suspend fun deleteItem(itemId: Long): Response<Unit> = Response.success(Unit)
+    override suspend fun deleteItem(itemId: Long): Response<Unit> {
+        deleteCalls++
+        deleteErrorCode?.let { code -> return Response.error(code, okhttp3.ResponseBody.create(null, "")) }
+        return Response.success(Unit)
+    }
 }
 
-private class FakeShopsApi : ShopsApi {
+private class RecordingShopsApi : ShopsApi {
+    var deleteCalls = 0
+    var deleteErrorCode: Int? = null
+
     override suspend fun listShops(): List<Shop> = emptyList()
     override suspend fun createShop(body: CreateShopRequest): Shop {
         throw AssertionError("not expected in this test")
@@ -166,6 +222,8 @@ private class FakeShopsApi : ShopsApi {
         throw AssertionError("not expected in this test")
     }
     override suspend fun deleteShop(shopId: Long): Response<Unit> {
-        throw AssertionError("not expected in this test")
+        deleteCalls++
+        deleteErrorCode?.let { code -> return Response.error(code, okhttp3.ResponseBody.create(null, "")) }
+        return Response.success(Unit)
     }
 }
