@@ -16,7 +16,7 @@ class MutationKindConverter {
 @Database(
     entities = [ItemEntity::class, ShopEntity::class, PendingMutation::class],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 @TypeConverters(MutationKindConverter::class)
 abstract class ShoplistDatabase : RoomDatabase() {

@@ -14,6 +14,10 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 val defaultDevBaseUrl = "http://192.168.0.141:3005"
 val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
 val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
