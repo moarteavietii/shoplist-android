@@ -62,16 +62,6 @@ sealed class MutationPayload {
     ) : MutationPayload()
 }
 
-fun MutationKind.payloadOf(json: Json, payloadJson: String): MutationPayload = when (this) {
-    MutationKind.ITEM_CREATE -> payloadJson.let { json.decodeFromString<MutationPayload.ItemCreate>(it) }
-    MutationKind.ITEM_UPDATE -> payloadJson.let { json.decodeFromString<MutationPayload.ItemUpdate>(it) }
-    MutationKind.ITEM_DELETE -> payloadJson.let { json.decodeFromString<MutationPayload.ItemDelete>(it) }
-    MutationKind.ITEM_CHECK -> payloadJson.let { json.decodeFromString<MutationPayload.ItemCheck>(it) }
-    MutationKind.SHOP_CREATE -> payloadJson.let { json.decodeFromString<MutationPayload.ShopCreate>(it) }
-    MutationKind.SHOP_RENAME -> payloadJson.let { json.decodeFromString<MutationPayload.ShopRename>(it) }
-    MutationKind.SHOP_DELETE -> payloadJson.let { json.decodeFromString<MutationPayload.ShopDelete>(it) }
-}
-
 fun MutationPayload.toJson(json: Json): String = when (this) {
     is MutationPayload.ItemCreate -> json.encodeToString(MutationPayload.serializer(), this)
     is MutationPayload.ItemUpdate -> json.encodeToString(MutationPayload.serializer(), this)
