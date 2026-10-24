@@ -25,19 +25,14 @@ class RealtimeLifecycle @Inject constructor(
             val owner = ProcessLifecycleOwner.get()
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 connectivityMonitor.start()
-                var drainJob: Job? = null
+                val drainController = ConnectivityDrainController(
+                    scope = this,
+                    drainer = drainer,
+                    syncManager = syncManager,
+                )
                 val connectivityJob = launch {
                     connectivityMonitor.connectivity.collect { state ->
-                        if (state == BackendConnectivity.REACHABLE) {
-                            drainJob?.cancel()
-                            drainJob = launch {
-                                try {
-                                    drainer.drainAll()
-                                } finally {
-                                    syncManager.refetchAll()
-                                }
-                            }
-                        }
+                        drainController.onConnectivity(state)
                     }
                 }
                 try {
@@ -45,10 +40,41 @@ class RealtimeLifecycle @Inject constructor(
                     awaitCancellation()
                 } finally {
                     connectivityJob.cancel()
-                    drainJob?.cancel()
+                    drainController.cancelDrain()
                     syncManager.stop()
                 }
             }
         }
+    }
+}
+
+class ConnectivityDrainController(
+    private val scope: CoroutineScope,
+    private val drainer: MutationDrainer,
+    private val syncManager: RealtimeSyncManager,
+) {
+    private var drainJob: Job? = null
+
+    fun onConnectivity(state: BackendConnectivity) {
+        when (state) {
+            BackendConnectivity.REACHABLE -> relaunchDrain()
+            BackendConnectivity.UNREACHABLE -> cancelDrain()
+        }
+    }
+
+    fun relaunchDrain() {
+        drainJob?.cancel()
+        drainJob = scope.launch {
+            try {
+                drainer.drainAll()
+            } finally {
+                syncManager.refetchAll()
+            }
+        }
+    }
+
+    fun cancelDrain() {
+        drainJob?.cancel()
+        drainJob = null
     }
 }
