@@ -74,6 +74,7 @@ class ListViewModelTest {
     private lateinit var themeRepository: ThemeRepository
     private lateinit var expiryTick: MutableStateFlow<Long>
     private lateinit var fakeSyncManager: FakeRealtimeSyncManager
+    private lateinit var connectivityFlow: MutableStateFlow<BackendConnectivity>
     private lateinit var viewModel: ListViewModel
 
     private val json = Json
@@ -132,10 +133,11 @@ class ListViewModelTest {
         )
         expiryTick = MutableStateFlow(System.currentTimeMillis())
         fakeSyncManager = FakeRealtimeSyncManager()
+        connectivityFlow = MutableStateFlow(BackendConnectivity.REACHABLE)
         viewModel = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
-            connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+            connectivity = connectivityFlow,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
             themeRepository = themeRepository,
@@ -232,6 +234,17 @@ class ListViewModelTest {
         assertEquals(listOf("Milk", "Bread"), state.items.map { it.name })
         assertEquals("Global", state.watermarkName)
         assertFalse(state.showUndoBar)
+    }
+
+    @Test
+    fun `refresh while offline does not hit the network or set an error`() = runTest(testDispatcher) {
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertEquals(0, server.requestCount)
+        assertNull(viewModel.uiState.value.errorMessage)
     }
 
     @Test
@@ -1402,7 +1415,7 @@ class ListViewModelTest {
         val instance = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
-            connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+            connectivity = connectivityFlow,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
             themeRepository = themeRepository,
