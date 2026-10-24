@@ -105,7 +105,7 @@ class RealtimeLifecycleTest {
         itemsApi.gate.complete(Unit)
         advanceUntilIdle()
 
-        assertEquals(2, mutationQueue.listAll().size)
+        assertEquals(0, mutationQueue.listAll().size)
         assertEquals(2, itemsApi.updateCalls)
     }
 
@@ -120,13 +120,17 @@ class RealtimeLifecycleTest {
         controller.launchOrSkipDrain()
         advanceUntilIdle()
         assertEquals(1, itemsApi.updateCalls)
-        assertEquals(0, mutationQueue.listAll().size)
 
         mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
         controller.onConnectivity(BackendConnectivity.REACHABLE)
         advanceUntilIdle()
 
         assertEquals(1, itemsApi.updateCalls)
+        assertEquals(2, mutationQueue.listAll().size)
+
+        itemsApi.gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(2, itemsApi.updateCalls)
         assertEquals(0, mutationQueue.listAll().size)
     }
 
