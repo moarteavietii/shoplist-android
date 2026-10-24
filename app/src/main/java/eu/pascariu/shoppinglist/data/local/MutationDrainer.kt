@@ -63,10 +63,11 @@ class MutationDrainer @Inject constructor(
                 }
                 is MutationPayload.ItemDelete -> {
                     val response = itemsApi.deleteItem(payload.itemId)
-                    if (response.isSuccessful) {
-                        itemsRepository.applyDeleted(payload.itemId)
-                    } else if (response.code() != 404) {
-                        return ReplayOutcome.DROPPED
+                    when {
+                        response.isSuccessful -> itemsRepository.applyDeleted(payload.itemId)
+                        response.code() == 404 -> Unit
+                        response.code() == 403 -> return ReplayOutcome.NETWORK_ERROR
+                        else -> return ReplayOutcome.DROPPED
                     }
                 }
                 is MutationPayload.ItemCheck -> {
@@ -86,10 +87,12 @@ class MutationDrainer @Inject constructor(
                 }
                 is MutationPayload.ShopDelete -> {
                     val response = shopsApi.deleteShop(payload.shopId)
-                    if (!response.isSuccessful && response.code() != 404) {
-                        return ReplayOutcome.DROPPED
+                    when {
+                        response.isSuccessful || response.code() == 404 ->
+                            shopsRepository.applyDeleted(payload.shopId)
+                        response.code() == 403 -> return ReplayOutcome.NETWORK_ERROR
+                        else -> return ReplayOutcome.DROPPED
                     }
-                    shopsRepository.applyDeleted(payload.shopId)
                 }
             }
             ReplayOutcome.SUCCESS
@@ -98,7 +101,7 @@ class MutationDrainer @Inject constructor(
         } catch (error: Exception) {
             if (error is retrofit2.HttpException) {
                 when (error.code()) {
-                    404, 409, 403 -> ReplayOutcome.DROPPED
+                    404, 409 -> ReplayOutcome.DROPPED
                     else -> ReplayOutcome.NETWORK_ERROR
                 }
             } else {
