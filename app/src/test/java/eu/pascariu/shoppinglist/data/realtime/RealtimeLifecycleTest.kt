@@ -76,7 +76,7 @@ class RealtimeLifecycleTest {
         mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
         mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
 
-        controller.relaunchDrain()
+        controller.launchOrSkipDrain()
         advanceUntilIdle()
         assertEquals(1, itemsApi.updateCalls)
 
@@ -89,7 +89,7 @@ class RealtimeLifecycleTest {
     }
 
     @Test
-    fun `duplicate reachable relaunch cancels the previous drain`() = runTest {
+    fun `duplicate reachable while drain is running does not cancel it`() = runTest {
         val connectivity = MutableStateFlow(BackendConnectivity.REACHABLE)
         val itemsApi = GatedItemsApi()
         val mutationQueue = queue(connectivity)
@@ -97,7 +97,7 @@ class RealtimeLifecycleTest {
         mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
         mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
 
-        controller.relaunchDrain()
+        controller.launchOrSkipDrain()
         advanceUntilIdle()
         assertEquals(1, itemsApi.updateCalls)
 
@@ -105,8 +105,29 @@ class RealtimeLifecycleTest {
         itemsApi.gate.complete(Unit)
         advanceUntilIdle()
 
+        assertEquals(2, mutationQueue.listAll().size)
+        assertEquals(2, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `reachable after drain finished starts a new drain`() = runTest {
+        val connectivity = MutableStateFlow(BackendConnectivity.REACHABLE)
+        val itemsApi = GatedItemsApi()
+        val mutationQueue = queue(connectivity)
+        val controller = controller(this, itemsApi, mutationQueue)
+        mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+
+        controller.launchOrSkipDrain()
+        advanceUntilIdle()
+        assertEquals(1, itemsApi.updateCalls)
         assertEquals(0, mutationQueue.listAll().size)
-        assertEquals(3, itemsApi.updateCalls)
+
+        mutationQueue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+        controller.onConnectivity(BackendConnectivity.REACHABLE)
+        advanceUntilIdle()
+
+        assertEquals(1, itemsApi.updateCalls)
+        assertEquals(0, mutationQueue.listAll().size)
     }
 
     @Test

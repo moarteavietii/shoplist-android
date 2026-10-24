@@ -9,6 +9,7 @@ import eu.pascariu.shoppinglist.data.local.MutationDrainer
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
@@ -24,18 +25,14 @@ class RealtimeLifecycle @Inject constructor(
             val owner = ProcessLifecycleOwner.get()
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 connectivityMonitor.start()
-                val drainLauncher = SingleDrainLauncher(scope) {
-                    try {
-                        drainer.drainAll()
-                    } finally {
-                        syncManager.refetchAll()
-                    }
-                }
+                val drainController = ConnectivityDrainController(
+                    scope = this,
+                    drainer = drainer,
+                    syncManager = syncManager,
+                )
                 val connectivityJob = launch {
                     connectivityMonitor.connectivity.collect { state ->
-                        if (state == BackendConnectivity.REACHABLE) {
-                            drainLauncher.launchOrSkip()
-                        }
+                        drainController.onConnectivity(state)
                     }
                 }
                 try {
@@ -43,7 +40,7 @@ class RealtimeLifecycle @Inject constructor(
                     awaitCancellation()
                 } finally {
                     connectivityJob.cancel()
-                    drainLauncher.cancel()
+                    drainController.cancelDrain()
                     syncManager.stop()
                 }
             }
@@ -51,20 +48,33 @@ class RealtimeLifecycle @Inject constructor(
     }
 }
 
-internal class SingleDrainLauncher(
+class ConnectivityDrainController(
     private val scope: CoroutineScope,
-    private val drainAll: suspend () -> Unit,
+    private val drainer: MutationDrainer,
+    private val syncManager: RealtimeSyncManager,
 ) {
-    private var job: kotlinx.coroutines.Job? = null
+    private var drainJob: Job? = null
 
-    fun launchOrSkip() {
-        if (job?.isActive == true) return
-        job = scope.launch { drainAll() }
+    fun onConnectivity(state: BackendConnectivity) {
+        when (state) {
+            BackendConnectivity.REACHABLE -> launchOrSkipDrain()
+            BackendConnectivity.UNREACHABLE -> cancelDrain()
+        }
     }
 
-    fun cancel() {
-        job?.cancel()
+    fun launchOrSkipDrain() {
+        if (drainJob?.isActive == true) return
+        drainJob = scope.launch {
+            try {
+                drainer.drainAll()
+            } finally {
+                syncManager.refetchAll()
+            }
+        }
     }
 
-    fun isActive(): Boolean = job?.isActive == true
+    fun cancelDrain() {
+        drainJob?.cancel()
+        drainJob = null
+    }
 }
