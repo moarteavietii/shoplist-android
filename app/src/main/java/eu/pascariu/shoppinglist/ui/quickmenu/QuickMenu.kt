@@ -1,4 +1,4 @@
-package eu.pascariu.shoppinglist.ui.widgetstack
+package eu.pascariu.shoppinglist.ui.quickmenu
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,10 +8,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,11 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
-import androidx.compose.material.icons.filled.ViewWeek
+import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -56,7 +59,7 @@ import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 
-enum class WidgetStackControl {
+enum class QuickMenuControl {
     VIEW_SWITCHER,
     SETTINGS,
     SORT_MODE,
@@ -76,20 +79,32 @@ fun deriveSortModeLedState(sortModeEnabled: Boolean, order: SortOrder): SortMode
     }
 
 @Composable
-fun LedDot(filled: Boolean, modifier: Modifier = Modifier) {
+fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
     val colors = LocalShoplistColors.current
-    Box(
-        modifier = modifier
-            .size(6.dp)
-            .background(
-                color = if (filled) colors.ledOn else colors.ledOff,
-                shape = CircleShape,
-            ),
-    )
+    Box(modifier = modifier.size(10.dp), contentAlignment = Alignment.Center) {
+        if (filled) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(colors.ledOn.copy(alpha = 0.35f), CircleShape),
+            )
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(colors.ledOn, CircleShape),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .border(1.5.dp, colors.ledOff, CircleShape),
+            )
+        }
+    }
 }
 
 @Composable
-fun WidgetStack(
+fun QuickMenu(
     isDrawerOpen: Boolean,
     isExpanded: Boolean,
     isSearchExpanded: Boolean,
@@ -97,7 +112,7 @@ fun WidgetStack(
     isSortModeEnabled: Boolean,
     sortOrder: SortOrder,
     globalUncheckedCount: Int,
-    onControlTapped: (WidgetStackControl) -> Unit,
+    onControlTapped: (QuickMenuControl) -> Unit,
     onSortOrderSelected: (SortOrder) -> Unit,
     onExpandedChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -129,7 +144,10 @@ fun WidgetStack(
     Box(modifier = modifier.then(collapseOnSwipeUp)) {
         Column(
             horizontalAlignment = Alignment.End,
-            modifier = Modifier.background(colors.surface, shapes.medium),
+            modifier = Modifier
+                .shadow(elevation = 4.dp, shape = shapes.medium)
+                .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
+                .padding(6.dp),
         ) {
             Box {
                 Row(
@@ -138,17 +156,11 @@ fun WidgetStack(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (isExpanded) "Collapse widget stack" else "Expand widget stack",
+                        contentDescription = if (isExpanded) "Collapse quick menu" else "Expand quick menu",
                         tint = colors.contentMuted,
                         modifier = Modifier
                             .minimumInteractiveComponentSize()
                             .graphicsLayer(rotationZ = chevronRotation),
-                    )
-                }
-                if (globalUncheckedCount > 0) {
-                    SwitcherBadge(
-                        count = globalUncheckedCount,
-                        modifier = Modifier.align(Alignment.TopEnd),
                     )
                 }
             }
@@ -157,19 +169,27 @@ fun WidgetStack(
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
-                Column(horizontalAlignment = Alignment.End) {
-                    WidgetStackControl.entries.forEach { control ->
-                        val ledState = if (control == WidgetStackControl.SORT_MODE) {
-                            deriveSortModeLedState(sortModeEnabled = isSortModeEnabled, order = sortOrder)
-                        } else {
-                            null
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    QuickMenuControl.entries.forEach { control ->
+                        val ledState = when (control) {
+                            QuickMenuControl.SORT_MODE ->
+                                deriveSortModeLedState(sortModeEnabled = isSortModeEnabled, order = sortOrder)
+                            QuickMenuControl.SEARCH ->
+                                if (isSearchExpanded) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+                            QuickMenuControl.CHECKED_ITEMS_TOGGLE ->
+                                if (isShowingCheckedItems) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+                            else -> null
                         }
-                        if (control == WidgetStackControl.SORT_MODE) {
+                        if (control == QuickMenuControl.SORT_MODE) {
                             Box {
-                                WidgetStackControlRow(
+                                QuickMenuControlButton(
                                     control = control,
                                     isActive = isSortModeEnabled || sortOrder == SortOrder.ALPHABETICAL,
                                     ledState = ledState,
+                                    badgeCount = null,
                                     onTapped = { onControlTapped(control) },
                                     onLongPressed = { sortOrderSelectorOpen = true },
                                 )
@@ -184,15 +204,20 @@ fun WidgetStack(
                                 )
                             }
                         } else {
-                            WidgetStackControlRow(
+                            QuickMenuControlButton(
                                 control = control,
                                 isActive = when (control) {
-                                    WidgetStackControl.VIEW_SWITCHER -> isDrawerOpen
-                                    WidgetStackControl.SEARCH -> isSearchExpanded
-                                    WidgetStackControl.CHECKED_ITEMS_TOGGLE -> isShowingCheckedItems
+                                    QuickMenuControl.VIEW_SWITCHER -> isDrawerOpen
+                                    QuickMenuControl.SEARCH -> isSearchExpanded
+                                    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> isShowingCheckedItems
                                     else -> false
                                 },
                                 ledState = ledState,
+                                badgeCount = if (control == QuickMenuControl.VIEW_SWITCHER) {
+                                    globalUncheckedCount.takeIf { it > 0 }
+                                } else {
+                                    null
+                                },
                                 onTapped = { onControlTapped(control) },
                                 onLongPressed = null,
                             )
@@ -215,21 +240,24 @@ private fun SwitcherBadge(count: Int, modifier: Modifier = Modifier) {
         color = colors.background,
         modifier = modifier
             .background(colors.ledOn, RoundedCornerShape(8.dp))
+            .border(2.dp, colors.surface, RoundedCornerShape(8.dp))
             .padding(horizontal = 4.dp, vertical = 1.dp)
             .semantics { contentDescription = "$count unchecked items" },
     )
 }
 
 @Composable
-private fun WidgetStackControlRow(
-    control: WidgetStackControl,
+private fun QuickMenuControlButton(
+    control: QuickMenuControl,
     isActive: Boolean,
     ledState: SortModeLedState?,
+    badgeCount: Int?,
     onTapped: () -> Unit,
     onLongPressed: (() -> Unit)?,
 ) {
     val colors = LocalShoplistColors.current
-    val rowModifier = if (onLongPressed != null) {
+    val shapes = LocalShoplistShapes.current
+    val buttonModifier = if (onLongPressed != null) {
         Modifier.combinedClickable(
             role = Role.Button,
             onClick = onTapped,
@@ -238,39 +266,56 @@ private fun WidgetStackControlRow(
     } else {
         Modifier.clickable(role = Role.Button, onClick = onTapped)
     }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = rowModifier
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+    Box(
+        modifier = buttonModifier
+            .size(40.dp)
+            .background(
+                color = if (isActive) colors.surface else colors.chrome,
+                shape = shapes.small,
+            )
+            .border(1.dp, colors.border, shapes.small),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = control.icon(),
             contentDescription = control.contentDescription(),
-            tint = if (isActive) colors.ledOn else colors.contentMuted,
-            modifier = Modifier.minimumInteractiveComponentSize(),
+            tint = if (isActive) colors.content else colors.contentFaint,
+            modifier = Modifier.size(20.dp),
         )
         when (ledState) {
-            SortModeLedState.FILLED -> LedDot(filled = true)
-            SortModeLedState.HOLLOW -> LedDot(filled = false)
+            SortModeLedState.FILLED -> CornerLedDot(
+                filled = true,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+            SortModeLedState.HOLLOW -> CornerLedDot(
+                filled = false,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
             SortModeLedState.NONE, null -> Unit
+        }
+        if (badgeCount != null) {
+            SwitcherBadge(
+                count = badgeCount,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
         }
     }
 }
 
-private fun WidgetStackControl.icon(): ImageVector = when (this) {
-    WidgetStackControl.VIEW_SWITCHER -> Icons.Filled.ViewWeek
-    WidgetStackControl.SETTINGS -> Icons.Filled.Settings
-    WidgetStackControl.SORT_MODE -> Icons.Filled.Sort
-    WidgetStackControl.CHECKED_ITEMS_TOGGLE -> Icons.Filled.Visibility
-    WidgetStackControl.SEARCH -> Icons.Filled.Search
+private fun QuickMenuControl.icon(): ImageVector = when (this) {
+    QuickMenuControl.VIEW_SWITCHER -> Icons.Filled.Store
+    QuickMenuControl.SETTINGS -> Icons.Filled.Settings
+    QuickMenuControl.SORT_MODE -> Icons.Filled.Sort
+    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Filled.Visibility
+    QuickMenuControl.SEARCH -> Icons.Filled.Search
 }
 
-private fun WidgetStackControl.contentDescription(): String = when (this) {
-        WidgetStackControl.VIEW_SWITCHER -> "View switcher"
-        WidgetStackControl.SETTINGS -> "Settings"
-        WidgetStackControl.SORT_MODE -> "Sort mode"
-        WidgetStackControl.CHECKED_ITEMS_TOGGLE -> "Checked items toggle"
-        WidgetStackControl.SEARCH -> "Search"
+private fun QuickMenuControl.contentDescription(): String = when (this) {
+        QuickMenuControl.VIEW_SWITCHER -> "View switcher"
+        QuickMenuControl.SETTINGS -> "Settings"
+        QuickMenuControl.SORT_MODE -> "Sort mode"
+        QuickMenuControl.CHECKED_ITEMS_TOGGLE -> "Checked items toggle"
+        QuickMenuControl.SEARCH -> "Search"
     }
 
 private const val SWIPE_COLLAPSE_THRESHOLD_PX = 24f
@@ -296,8 +341,9 @@ private fun SortOrderSelector(
     ) {
         Column(
             modifier = Modifier
-                .background(colors.surface, shapes.medium)
                 .shadow(elevation = 12.dp, shape = shapes.medium)
+                .background(colors.surface, shapes.medium)
+                .border(1.dp, colors.border, shapes.medium)
                 .padding(vertical = 6.dp),
         ) {
             SortOrder.entries.forEach { order ->
@@ -311,16 +357,35 @@ private fun SortOrderSelector(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    LedDot(filled = order == selected)
+                    Icon(
+                        imageVector = order.icon(),
+                        contentDescription = null,
+                        tint = if (order == selected) colors.ledOn else colors.contentMuted,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Text(
                         text = order.label(),
                         style = typography.body,
                         color = if (order == selected) colors.ledOn else colors.content,
                     )
+                    if (order == selected) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Selected",
+                            tint = colors.ledOn,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun SortOrder.icon(): ImageVector = when (this) {
+    SortOrder.MANUAL -> Icons.Filled.Sort
+    SortOrder.ALPHABETICAL -> Icons.Filled.SortByAlpha
+    SortOrder.FREQUENCY -> Icons.Filled.LocalFireDepartment
 }
 
 private fun SortOrder.label(): String = when (this) {

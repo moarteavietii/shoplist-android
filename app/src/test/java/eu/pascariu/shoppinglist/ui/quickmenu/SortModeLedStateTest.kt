@@ -1,4 +1,4 @@
-package eu.pascariu.shoppinglist.ui.widgetstack
+package eu.pascariu.shoppinglist.ui.quickmenu
 
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import org.junit.Assert.assertEquals

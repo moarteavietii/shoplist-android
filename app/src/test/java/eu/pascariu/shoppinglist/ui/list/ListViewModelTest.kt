@@ -1565,29 +1565,29 @@ class ListViewModelTest {
     fun `widget stack expand state persists and is restored on a new view model`() = runTest(testDispatcher) {
         loadFixtures()
 
-        viewModel.onWidgetStackExpandedChanged(true)
+        viewModel.onQuickMenuExpandedChanged(true)
         advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.isWidgetStackExpanded)
+        assertTrue(viewModel.uiState.value.isQuickMenuExpanded)
 
         val restarted = newViewModel()
         advanceUntilIdle()
 
-        assertTrue(restarted.uiState.value.isWidgetStackExpanded)
+        assertTrue(restarted.uiState.value.isQuickMenuExpanded)
     }
 
     @Test
     fun `widget stack collapse persists`() = runTest(testDispatcher) {
         loadFixtures()
 
-        viewModel.onWidgetStackExpandedChanged(true)
+        viewModel.onQuickMenuExpandedChanged(true)
         advanceUntilIdle()
-        viewModel.onWidgetStackExpandedChanged(false)
+        viewModel.onQuickMenuExpandedChanged(false)
         advanceUntilIdle()
 
         val restarted = newViewModel()
         advanceUntilIdle()
 
-        assertFalse(restarted.uiState.value.isWidgetStackExpanded)
+        assertFalse(restarted.uiState.value.isQuickMenuExpanded)
     }
 
     @Test

@@ -70,7 +70,7 @@ import eu.pascariu.shoppinglist.ui.settings.SettingsViewModel
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
-import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStack
+import eu.pascariu.shoppinglist.ui.quickmenu.QuickMenu
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -229,17 +229,17 @@ fun ListScreen(
                     }
                 }
 
-                WidgetStack(
+                QuickMenu(
                     isDrawerOpen = state.drawerOpen,
-                    isExpanded = state.isWidgetStackExpanded,
+                    isExpanded = state.isQuickMenuExpanded,
                     isSearchExpanded = state.searchExpanded,
                     isShowingCheckedItems = state.showChecked,
                     isSortModeEnabled = state.sortModeEnabled,
                     sortOrder = state.sortOrder,
                     globalUncheckedCount = state.drawerShops.firstOrNull { it.isGlobal }?.uncheckedCount ?: 0,
-                    onControlTapped = viewModel::onWidgetStackControlTapped,
+                    onControlTapped = viewModel::onQuickMenuControlTapped,
                     onSortOrderSelected = viewModel::onSortOrderChanged,
-                    onExpandedChanged = viewModel::onWidgetStackExpandedChanged,
+                    onExpandedChanged = viewModel::onQuickMenuExpandedChanged,
                     modifier = Modifier.align(Alignment.TopEnd),
                 )
             }

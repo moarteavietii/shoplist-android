@@ -18,7 +18,7 @@ import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoConfig
 import eu.pascariu.shoppinglist.data.undo.UndoEntry
-import eu.pascariu.shoppinglist.ui.widgetstack.WidgetStackControl
+import eu.pascariu.shoppinglist.ui.quickmenu.QuickMenuControl
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.fuzzyMatch
 import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
@@ -100,14 +100,14 @@ class ListViewModel @Inject constructor(
         viewModelScope.launch {
             listPreferences.isReady.first { it }
             restoreActiveView()
-            val widgetStackExpanded = listPreferences.widgetStackExpanded.value
+            val quickMenuExpanded = listPreferences.quickMenuExpanded.value
             val searchExpanded = listPreferences.searchExpanded.value
             val showChecked = listPreferences.showChecked.value
             val sortModeEnabled = listPreferences.sortModeEnabled.value
             val sortOrder = listPreferences.sortOrder.value
             localState.update {
                 it.copy(
-                    isWidgetStackExpanded = widgetStackExpanded,
+                    isQuickMenuExpanded = quickMenuExpanded,
                     searchExpanded = searchExpanded,
                     showChecked = showChecked,
                     sortModeEnabled = sortModeEnabled,
@@ -584,20 +584,20 @@ class ListViewModel @Inject constructor(
         }
     }
 
-    fun onWidgetStackExpandedChanged(expanded: Boolean) {
-        localState.update { it.copy(isWidgetStackExpanded = expanded) }
+    fun onQuickMenuExpandedChanged(expanded: Boolean) {
+        localState.update { it.copy(isQuickMenuExpanded = expanded) }
         viewModelScope.launch {
-            listPreferences.setWidgetStackExpanded(expanded)
+            listPreferences.setQuickMenuExpanded(expanded)
         }
     }
 
-    fun onWidgetStackControlTapped(control: WidgetStackControl) {
+    fun onQuickMenuControlTapped(control: QuickMenuControl) {
         when (control) {
-            WidgetStackControl.VIEW_SWITCHER -> onDrawerToggled()
-            WidgetStackControl.SETTINGS -> onSettingsDrawerToggled()
-            WidgetStackControl.SORT_MODE -> onSortModeToggled()
-            WidgetStackControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
-            WidgetStackControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
+            QuickMenuControl.VIEW_SWITCHER -> onDrawerToggled()
+            QuickMenuControl.SETTINGS -> onSettingsDrawerToggled()
+            QuickMenuControl.SORT_MODE -> onSortModeToggled()
+            QuickMenuControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
+            QuickMenuControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
         }
     }
 
@@ -773,7 +773,7 @@ class ListViewModel @Inject constructor(
             items = sorted,
             watermarkName = activeName,
             activeViewId = activeViewId,
-            isWidgetStackExpanded = local.isWidgetStackExpanded,
+            isQuickMenuExpanded = local.isQuickMenuExpanded,
             sortModeEnabled = local.sortModeEnabled,
             sortOrder = local.sortOrder,
             dragEnabled = dragEnabled,
@@ -862,7 +862,7 @@ class ListViewModel @Inject constructor(
         val activeViewId: Long? = null,
         val drawerOpen: Boolean = false,
         val settingsDrawerOpen: Boolean = false,
-        val isWidgetStackExpanded: Boolean = false,
+        val isQuickMenuExpanded: Boolean = false,
         val postSaveSignal: PostSaveSignal? = null,
         val addItemModal: AddItemUiState? = null,
         val editItemModal: EditItemUiState? = null,

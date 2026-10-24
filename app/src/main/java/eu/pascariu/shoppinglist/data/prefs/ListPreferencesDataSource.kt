@@ -28,7 +28,7 @@ class ListPreferencesDataSource(
 ) {
 
     private val expanded = MutableStateFlow(false)
-    val widgetStackExpanded: StateFlow<Boolean> = expanded.asStateFlow()
+    val quickMenuExpanded: StateFlow<Boolean> = expanded.asStateFlow()
 
     private val activeShop = MutableStateFlow<Long?>(null)
     val activeShopId: StateFlow<Long?> = activeShop.asStateFlow()
@@ -56,7 +56,7 @@ class ListPreferencesDataSource(
                     emit(emptyPreferences())
                 }
                 .first()
-            expanded.value = prefs[KEY_WIDGET_STACK_EXPANDED] ?: false
+            expanded.value = prefs[KEY_QUICK_MENU_EXPANDED] ?: false
             activeShop.value = prefs[KEY_ACTIVE_SHOP_ID]
             searchExpandedFlow.value = prefs[KEY_SEARCH_EXPANDED] ?: false
             showCheckedFlow.value = prefs[KEY_SHOW_CHECKED] ?: true
@@ -66,9 +66,9 @@ class ListPreferencesDataSource(
         }
     }
 
-    suspend fun setWidgetStackExpanded(isExpanded: Boolean) {
+    suspend fun setQuickMenuExpanded(isExpanded: Boolean) {
         update(expanded, isExpanded) { prefs, value ->
-            prefs[KEY_WIDGET_STACK_EXPANDED] = value
+            prefs[KEY_QUICK_MENU_EXPANDED] = value
         }
     }
 
@@ -125,7 +125,7 @@ class ListPreferencesDataSource(
 
     private companion object {
         const val TAG = "ListPreferences"
-        val KEY_WIDGET_STACK_EXPANDED = booleanPreferencesKey("widget_stack_expanded")
+        val KEY_QUICK_MENU_EXPANDED = booleanPreferencesKey("quick_menu_expanded")
         val KEY_ACTIVE_SHOP_ID = longPreferencesKey("active_shop_id")
         val KEY_SEARCH_EXPANDED = booleanPreferencesKey("search_expanded")
         val KEY_SHOW_CHECKED = booleanPreferencesKey("show_checked")
