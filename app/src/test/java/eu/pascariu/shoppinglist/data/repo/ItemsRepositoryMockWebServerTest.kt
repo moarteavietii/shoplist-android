@@ -1,9 +1,16 @@
 package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.local.FakeItemDao
+import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runCurrent
@@ -31,6 +38,12 @@ class ItemsRepositoryMockWebServerTest {
     private lateinit var server: MockWebServer
     private lateinit var repository: ItemsRepository
 
+    private fun offlineAwareQueue(): MutationQueue = MutationQueue(
+        dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
     @Before
     fun setUp() {
         server = MockWebServer()
@@ -44,7 +57,7 @@ class ItemsRepositoryMockWebServerTest {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(ItemsApi::class.java)
-        repository = ItemsRepository(api)
+        repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), CoroutineScope(Dispatchers.Unconfined))
     }
 
     @After

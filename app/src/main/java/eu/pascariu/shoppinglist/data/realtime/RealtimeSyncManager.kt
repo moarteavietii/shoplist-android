@@ -63,7 +63,7 @@ class RealtimeSyncManager @Inject constructor(
         realtimeClient.stop()
     }
 
-    private suspend fun refetchAll() {
+    suspend fun refetchAll() {
         try {
             itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
         } catch (error: CancellationException) {

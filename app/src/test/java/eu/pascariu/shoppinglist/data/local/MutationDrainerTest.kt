@@ -1,0 +1,454 @@
+package eu.pascariu.shoppinglist.data.local
+
+import eu.pascariu.shoppinglist.data.api.ItemsApi
+import eu.pascariu.shoppinglist.data.api.ShopsApi
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.model.CreateItemRequest
+import eu.pascariu.shoppinglist.data.model.CreateShopRequest
+import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.data.model.RenameShopRequest
+import eu.pascariu.shoppinglist.data.model.Shop
+import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import eu.pascariu.shoppinglist.data.repo.ItemsRepository
+import eu.pascariu.shoppinglist.data.repo.ShopsRepository
+import java.io.IOException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
+import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
+
+class MutationDrainerTest {
+
+    private val testScope = CoroutineScope(Dispatchers.Unconfined)
+    private val json = Json { ignoreUnknownKeys = true }
+    private var drainJob: Job? = null
+
+    private fun queue(dao: FakePendingMutationDao = FakePendingMutationDao()): MutationQueue =
+        MutationQueue(dao, MutableStateFlow(BackendConnectivity.REACHABLE), json)
+
+    private fun drainer(
+        itemsApi: ItemsApi,
+        queue: MutationQueue,
+        itemsRepository: ItemsRepository = ItemsRepository(itemsApi, FakeItemDao(), queue, testScope),
+    ): MutationDrainer = MutationDrainer(
+        queue = queue,
+        itemsApi = itemsApi,
+        shopsApi = RecordingShopsApi(),
+        itemsRepository = itemsRepository,
+        shopsRepository = ShopsRepository(RecordingShopsApi(), FakeShopDao(), queue, testScope),
+        json = json,
+        ioDispatcher = Dispatchers.Unconfined,
+    )
+
+    @Test
+    fun `drain sends mutations in enqueue order and empties the queue`() = runTest {
+        val itemsApi = RecordingItemsApi().apply {
+            listedItems = listOf(sampleItem(id = 1), sampleItem(id = 2))
+        }
+        val itemDao = FakeItemDao()
+        val queue = queue()
+        val repository = ItemsRepository(itemsApi, itemDao, queue, testScope)
+        repository.refetch(listId = 1)
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue, itemsRepository = repository).drainAll()
+
+        assertEquals(listOf(1L, 2L), itemsApi.checkedItemIds)
+        assertEquals(0, queue.listAll().size)
+        assertTrue(itemDao.getById(1L)!!.isChecked)
+        assertTrue(itemDao.getById(2L)!!.isChecked)
+    }
+
+    @Test
+    fun `network error stops the drain and keeps remaining mutations`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkError = IOException("offline") }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+    }
+
+    @Test
+    fun `drainAll returns true when the queue is empty`() = runTest {
+        val drained = drainer(itemsApi = RecordingItemsApi(), queue = queue()).drainAll()
+
+        assertTrue(drained)
+    }
+
+    @Test
+    fun `drainAll returns true after draining every mutation`() = runTest {
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+
+        val drained = drainer(itemsApi = RecordingItemsApi(), queue = queue).drainAll()
+
+        assertTrue(drained)
+        assertEquals(0, queue.listAll().size)
+    }
+
+    @Test
+    fun `drainAll returns false when a network error stops the drain`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkError = IOException("offline") }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        val drained = drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertFalse(drained)
+        assertEquals(2, queue.listAll().size)
+    }
+
+    @Test
+    fun `drainAll returns false when a 401 stops the drain`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        val drained = drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertFalse(drained)
+        assertEquals(2, queue.listAll().size)
+    }
+
+    @Test
+    fun `409 drops the mutation and continues draining`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 409 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        val drainer = drainer(itemsApi = itemsApi, queue = queue)
+        drainer.drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(2, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `403 auth failure stops the drain and keeps mutations queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 403 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `401 auth failure stops the drain and keeps mutations queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(2, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `401 on queued delete keeps the mutation instead of dropping it`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 401 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(1, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
+    fun `replayed item create reuses the same clientId after a failed attempt`() = runTest {
+        val itemsApi = RecordingItemsApi().apply {
+            createError = IOException("connection lost")
+            createdItem = sampleItem(id = 7)
+        }
+        val queue = queue()
+        queue.enqueue(
+            MutationPayload.ItemCreate(
+                listId = 1,
+                placeholderId = -1L,
+                request = CreateItemRequest(name = "Milk", clientId = "client-id-1"),
+            ),
+        )
+
+        val drainer = drainer(itemsApi = itemsApi, queue = queue)
+        assertFalse(drainer.drainAll())
+
+        itemsApi.createError = null
+        drainer.drainAll()
+
+        assertEquals(listOf("client-id-1", "client-id-1"), itemsApi.createClientIds)
+        assertEquals(0, queue.listAll().size)
+    }
+
+    @Test
+    fun `replayed shop create reuses the same clientId after a failed attempt`() = runTest {
+        val shopsApi = RecordingShopsApi().apply {
+            createError = IOException("connection lost")
+            createdShop = sampleShop(id = 7)
+        }
+        val queue = queue()
+        queue.enqueue(
+            MutationPayload.ShopCreate(
+                placeholderId = -1L,
+                request = CreateShopRequest(name = "Lidl", clientId = "client-id-2"),
+            ),
+        )
+
+        val itemsApi = RecordingItemsApi()
+        val drainer = MutationDrainer(
+            queue = queue,
+            itemsApi = itemsApi,
+            shopsApi = shopsApi,
+            itemsRepository = ItemsRepository(itemsApi, FakeItemDao(), queue, testScope),
+            shopsRepository = ShopsRepository(shopsApi, FakeShopDao(), queue, testScope),
+            json = json,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        assertFalse(drainer.drainAll())
+
+        shopsApi.createError = null
+        drainer.drainAll()
+
+        assertEquals(listOf("client-id-2", "client-id-2"), shopsApi.createClientIds)
+        assertEquals(0, queue.listAll().size)
+    }
+
+    @Test
+    fun `cancellation after successful replay still removes the mutation from the queue`() = runTest {
+        val itemsApi = RecordingItemsApi()
+        val dao = object : FakePendingMutationDao() {
+            override suspend fun deleteById(mutationId: Long) {
+                drainJob?.cancel()
+                yield()
+                super.deleteById(mutationId)
+            }
+        }
+        val queue = queue(dao)
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        val drainer = drainer(itemsApi = itemsApi, queue = queue)
+
+        drainJob = launch { drainer.drainAll() }
+        drainJob?.join()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(1, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `item delete 404 drops the mutation and continues draining`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 404 }
+        val queue = queue()
+        val itemDao = FakeItemDao()
+        itemDao.upsert(sampleItem(id = 1).toEntity())
+        val repository = ItemsRepository(itemsApi, itemDao, queue, testScope)
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue, itemsRepository = repository).drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+        assertNull(itemDao.getById(1L))
+    }
+
+    @Test
+    fun `422 validation failure drops the mutation and continues draining`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { checkErrorCode = 422 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 1, isChecked = true))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = 2, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(2, itemsApi.updateCalls)
+    }
+
+    @Test
+    fun `item delete transient server error keeps the mutation queued`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { deleteErrorCode = 500 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemDelete(itemId = 1))
+
+        drainer(itemsApi = itemsApi, queue = queue).drainAll()
+
+        assertEquals(1, queue.listAll().size)
+        assertEquals(1, itemsApi.deleteCalls)
+    }
+
+    @Test
+    fun `shop delete transient server error keeps the mutation queued`() = runTest {
+        val shopsApi = RecordingShopsApi().apply { deleteErrorCode = 502 }
+        val queue = queue()
+        queue.enqueue(MutationPayload.ShopDelete(shopId = 1))
+
+        val drainer = MutationDrainer(
+            queue = queue,
+            itemsApi = RecordingItemsApi(),
+            shopsApi = shopsApi,
+            itemsRepository = ItemsRepository(RecordingItemsApi(), FakeItemDao(), queue, testScope),
+            shopsRepository = ShopsRepository(shopsApi, FakeShopDao(), queue, testScope),
+            json = json,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        drainer.drainAll()
+
+        assertEquals(1, queue.listAll().size)
+        assertEquals(1, shopsApi.deleteCalls)
+    }
+
+    @Test
+    fun `successful item create remaps the placeholder row and follow-ups`() = runTest {
+        val itemsApi = RecordingItemsApi().apply { createdItem = sampleItem(id = 77) }
+        val itemDao = FakeItemDao()
+        val repository = ItemsRepository(itemsApi, itemDao, queue(), testScope)
+        itemDao.upsert(sampleItem(id = -1).toEntity())
+        val queue = queue()
+        queue.enqueue(MutationPayload.ItemCreate(listId = 1, placeholderId = -1, request = CreateItemRequest(name = "Milk")))
+        queue.enqueue(MutationPayload.ItemCheck(itemId = -1, isChecked = true))
+
+        drainer(itemsApi = itemsApi, queue = queue, itemsRepository = repository).drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(77L, itemDao.getById(77L)?.id)
+        assertNull(itemDao.getById(-1))
+    }
+
+    @Test
+    fun `successful shop create remaps the placeholder row and follow-ups`() = runTest {
+        val shopsApi = RecordingShopsApi().apply { createdShop = sampleShop(id = 55) }
+        val shopDao = FakeShopDao()
+        val queue = queue()
+        val shopsRepository = ShopsRepository(shopsApi, shopDao, queue, testScope)
+        shopDao.upsert(sampleShop(id = -1).toEntity())
+        queue.enqueue(MutationPayload.ShopCreate(placeholderId = -1, request = CreateShopRequest(name = "Lidl")))
+        queue.enqueue(MutationPayload.ShopRename(shopId = -1, request = RenameShopRequest(name = "Lidl Mega")))
+        queue.enqueue(MutationPayload.ShopDelete(shopId = -1))
+
+        MutationDrainer(
+            queue = queue,
+            itemsApi = RecordingItemsApi(),
+            shopsApi = shopsApi,
+            itemsRepository = ItemsRepository(RecordingItemsApi(), FakeItemDao(), queue, testScope),
+            shopsRepository = shopsRepository,
+            json = json,
+            ioDispatcher = Dispatchers.Unconfined,
+        ).drainAll()
+
+        assertEquals(0, queue.listAll().size)
+        assertEquals(listOf(55L), shopsApi.renamedShopIds)
+        assertEquals(1, shopsApi.deleteCalls)
+        assertNull(shopDao.getById(55L))
+        assertNull(shopDao.getById(-1))
+    }
+}
+
+private fun sampleItem(id: Long): Item = Item(
+    id = id,
+    listId = 1,
+    name = "Milk",
+    isChecked = false,
+    orderMap = emptyMap(),
+    quantity = 1,
+    isTemporary = false,
+    checkCount = 0,
+    expiresAt = null,
+    createdAt = "2026-10-22T10:00:00.000Z",
+    visibleIn = listOf(1L),
+)
+
+private fun sampleItem(id: Long, isChecked: Boolean): Item = sampleItem(id).copy(isChecked = isChecked)
+
+private class RecordingItemsApi : ItemsApi {
+    val checkedItemIds = mutableListOf<Long>()
+    val createClientIds = mutableListOf<String?>()
+    var updateCalls = 0
+    var deleteCalls = 0
+    var checkError: IOException? = null
+    var checkErrorCode: Int? = null
+    var deleteErrorCode: Int? = null
+    var createError: IOException? = null
+    var createdItem: Item? = null
+    var listedItems: List<Item> = emptyList()
+
+    override suspend fun listItems(listId: Long): List<Item> = listedItems
+
+    override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
+        createClientIds.add(body.clientId)
+        createError?.let { throw it }
+        return requireNotNull(createdItem)
+    }
+
+    override suspend fun updateItem(itemId: Long, body: UpdateItemRequest): Item {
+        updateCalls++
+        if (body.isChecked != null) checkedItemIds.add(itemId)
+        checkError?.let { throw it }
+        checkErrorCode?.let { code ->
+            throw HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))
+        }
+        return sampleItem(id = itemId, isChecked = body.isChecked ?: false)
+    }
+
+    override suspend fun deleteItem(itemId: Long): Response<Unit> {
+        deleteCalls++
+        deleteErrorCode?.let { code -> return Response.error(code, okhttp3.ResponseBody.create(null, "")) }
+        return Response.success(Unit)
+    }
+}
+
+private class RecordingShopsApi : ShopsApi {
+    val createClientIds = mutableListOf<String?>()
+    var deleteCalls = 0
+    var deleteErrorCode: Int? = null
+    var renameCalls = 0
+    var renamedShopIds = mutableListOf<Long>()
+    var createError: IOException? = null
+    var createdShop: Shop? = null
+
+    override suspend fun listShops(): List<Shop> = emptyList()
+    override suspend fun createShop(body: CreateShopRequest): Shop {
+        createClientIds.add(body.clientId)
+        createError?.let { throw it }
+        return requireNotNull(createdShop)
+    }
+    override suspend fun renameShop(shopId: Long, body: RenameShopRequest): Shop {
+        renameCalls++
+        renamedShopIds.add(shopId)
+        return sampleShop(id = shopId, name = body.name)
+    }
+    override suspend fun deleteShop(shopId: Long): Response<Unit> {
+        deleteCalls++
+        deleteErrorCode?.let { code -> return Response.error(code, okhttp3.ResponseBody.create(null, "")) }
+        return Response.success(Unit)
+    }
+}
+
+private fun sampleShop(id: Long, name: String = "Shop"): Shop = Shop(
+    id = id,
+    name = name,
+    createdAt = "2026-10-22T10:00:00.000Z",
+)

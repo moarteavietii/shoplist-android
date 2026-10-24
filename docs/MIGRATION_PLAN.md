@@ -25,7 +25,7 @@ Build a native Android (Kotlin + Compose) client for the existing shoppinglist b
 | Base URL | Prod: `https://shoppinglist.pascariu.eu` · Dev: `devBaseUrl` in gitignored `local.properties` (fallback `http://192.168.0.141:3005`, the workstation LAN IP) | Dev URL is machine-local so the LAN IP never lands in git; the fallback is the workstation LAN IP (believed DHCP-reserved; alternative: Bonjour `http://<macname>.local:3005`) since the user tests on a physical device. Debug builds also permit cleartext to `10.0.2.2` for emulator use. |
 | Background power | No network while backgrounded | SSE + any polling stop when the app is not visible (`repeatOnLifecycle(STARTED)`); on foreground, reconnect + full refetch. Revisit only if notifications are added. |
 | Pull-to-refresh | Dropped | SSE + refetch-on-reconnect (network drops and foregrounding) is the freshness mechanism. Revisit only if realtime proves unreliable. |
-| Local database | None initially | In-memory repository cache; server is truth. Room arrives with offline support (roadmap item 8). |
+| Local database | Room (persistent local store) | Items, shops, and the pending-mutation queue live in Room; repositories expose Room-backed `Flow`s. Server is truth on refetch. Done — `offline-support` (archived 2026-10-24). |
 | Themes | Rethink: small curated set | The web app's 14 themes are too many / too similar. Selection discussed when the themes item starts. WCAG AA contrast enforced by unit tests. |
 | Undo history | Device-local, ported verbatim | 50 entries, 30-min TTL, stale-entry validation, `isUndo: true` PATCH semantics. |
 | PWA features | Dropped | Service worker, install prompt, theme-color, reload toast — natively irrelevant. |

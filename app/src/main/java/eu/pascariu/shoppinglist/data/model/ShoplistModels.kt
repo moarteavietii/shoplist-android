@@ -48,6 +48,7 @@ data class CreateItemRequest(
     val orderMap: OrderMap? = null,
     val quantity: Int? = null,
     val isTemporary: Boolean? = null,
+    val clientId: String? = null,
 )
 
 @Serializable
@@ -64,6 +65,7 @@ data class UpdateItemRequest(
 @Serializable
 data class CreateShopRequest(
     val name: String,
+    val clientId: String? = null,
 )
 
 @Serializable

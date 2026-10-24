@@ -2,12 +2,24 @@ package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.config.FeatureConfig
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.local.FakeItemDao
+import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.MutationKind
+import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import java.io.IOException
 import java.time.Instant
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,10 +28,29 @@ import retrofit2.Response
 
 class ItemsRepositoryTest {
 
+    private val testScope = CoroutineScope(Dispatchers.Unconfined)
+
+    @After
+    fun tearDown() {
+        testScope.cancel()
+    }
+
+    private fun offlineAwareQueue(): MutationQueue = MutationQueue(
+        dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
+    private fun queueWith(dao: FakePendingMutationDao): MutationQueue = MutationQueue(
+        dao = dao,
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
     @Test
     fun `first fetch populates cache and later reads are served from it`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
 
         repository.refetch(listId = 1)
 
@@ -30,7 +61,7 @@ class ItemsRepositoryTest {
     @Test
     fun `refetch replaces cache wholesale`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         api.itemsForFetch = listOf(sampleItems().first().copy(name = "Refreshed"))
@@ -43,7 +74,7 @@ class ItemsRepositoryTest {
     @Test
     fun `404 on fetch surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.listError = httpException(404)
 
@@ -54,9 +85,23 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `failed refetch of another list keeps cache and cached list id unchanged`() = runTest {
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
+        repository.refetch(listId = 1)
+        api.listError = httpException(404)
+
+        val thrown = runCatching { repository.refetch(listId = 2) }
+
+        assertTrue(thrown.exceptionOrNull() is HttpException)
+        assertEquals(sampleItems(), repository.items.first())
+        assertEquals(1L, repository.cachedListIdFlow.first())
+    }
+
+    @Test
     fun `create adds server-returned item to cache`() = runTest {
         val api = FakeItemsApi(itemsForFetch = emptyList())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val created = sampleItems().first()
 
@@ -65,14 +110,15 @@ class ItemsRepositoryTest {
         repository.create(listId = 1, request)
 
         assertEquals(1L, api.lastCreateListId)
-        assertEquals(request, api.lastCreateRequest)
+        assertEquals(request.copy(clientId = api.lastCreateRequest?.clientId), api.lastCreateRequest)
+        assertTrue(api.lastCreateRequest?.clientId != null)
         assertEquals(listOf(created), repository.items.first())
     }
 
     @Test
     fun `create is idempotent when SSE event already added the item`() = runTest {
         val api = FakeItemsApi(itemsForFetch = emptyList())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val created = sampleItems().first()
 
@@ -86,7 +132,7 @@ class ItemsRepositoryTest {
     @Test
     fun `update replaces cached entry with server state`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val updated = sampleItems().first().copy(isChecked = true)
 
@@ -102,7 +148,7 @@ class ItemsRepositoryTest {
     @Test
     fun `updateDetails applies name and visibility to cache before the patch settles`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: List<Item>? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value }
@@ -119,7 +165,7 @@ class ItemsRepositoryTest {
     @Test
     fun `updateDetails failure restores the previous cached item`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.updateError = httpException(500)
 
@@ -132,7 +178,7 @@ class ItemsRepositoryTest {
     @Test
     fun `updateDetails failure does not clobber a newer remote state that arrived mid-flight`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.onUpdate = {
             repository.applyUpdated(sampleItems().first().copy(isChecked = true))
@@ -149,7 +195,7 @@ class ItemsRepositoryTest {
     @Test
     fun `updateDetails of an item absent from cache fails without a patch`() = runTest {
         val api = FakeItemsApi(itemsForFetch = emptyList())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         val thrown = runCatching { repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers")) }
@@ -162,7 +208,7 @@ class ItemsRepositoryTest {
     fun `checking a temporary item stamps an optimistic expiry`() = runTest {
         val temporaryItem = sampleItems().first().copy(isTemporary = true, expiresAt = null)
         val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -186,7 +232,7 @@ class ItemsRepositoryTest {
             expiresAt = "2026-10-23T10:00:00Z",
         )
         val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -208,7 +254,7 @@ class ItemsRepositoryTest {
             expiresAt = "2026-10-23T10:00:00Z",
         )
         val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.updateError = httpException(500)
 
@@ -221,7 +267,7 @@ class ItemsRepositoryTest {
     @Test
     fun `checking a permanent item leaves expiry untouched`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -242,7 +288,7 @@ class ItemsRepositoryTest {
             expiresAt = "2026-10-23T10:00:00Z",
         )
         val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -260,7 +306,7 @@ class ItemsRepositoryTest {
     fun `updateDetails temporary on while checked stamps an optimistic expiry`() = runTest {
         val checkedItem = sampleItems().first().copy(isChecked = true)
         val api = FakeItemsApi(itemsForFetch = listOf(checkedItem))
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -282,7 +328,7 @@ class ItemsRepositoryTest {
     @Test
     fun `updateDetails temporary on while unchecked does not stamp an expiry`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -298,7 +344,7 @@ class ItemsRepositoryTest {
     @Test
     fun `updateDetails folds quantity into the optimistic copy`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         var cacheDuringPatch: Item? = null
         api.onUpdate = { cacheDuringPatch = repository.items.value.single() }
@@ -320,7 +366,7 @@ class ItemsRepositoryTest {
             expiresAt = "2026-10-23T10:00:00Z",
         )
         val api = FakeItemsApi(itemsForFetch = listOf(temporaryItem))
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.updateError = httpException(500)
 
@@ -338,7 +384,7 @@ class ItemsRepositoryTest {
     @Test
     fun `create for a different list leaves cache untouched`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         api.createdItem = sampleItems().first().copy(id = 7, listId = 2)
@@ -351,7 +397,7 @@ class ItemsRepositoryTest {
     @Test
     fun `update of item from another list leaves cache untouched`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val otherListItem = sampleItems().first().copy(id = 7, listId = 2)
 
@@ -364,7 +410,7 @@ class ItemsRepositoryTest {
     @Test
     fun `update of item absent from cache inserts it`() = runTest {
         val api = FakeItemsApi(itemsForFetch = emptyList())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val updated = sampleItems().first().copy(isChecked = true)
 
@@ -377,7 +423,7 @@ class ItemsRepositoryTest {
     @Test
     fun `refetching another list retargets the cache`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val otherListItems = listOf(sampleItems().first().copy(id = 9, listId = 2))
 
@@ -391,7 +437,7 @@ class ItemsRepositoryTest {
     @Test
     fun `delete removes cached entry`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         repository.delete(itemId = 42L)
@@ -404,7 +450,7 @@ class ItemsRepositoryTest {
     @Test
     fun `409 on create surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.createError = httpException(409)
 
@@ -415,9 +461,104 @@ class ItemsRepositoryTest {
     }
 
     @Test
+    fun `create falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = emptyList())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.createIoError = IOException("backend unreachable")
+
+        val created = repository.create(listId = 1, CreateItemRequest(name = "Milk"))
+
+        assertTrue(created.id < 0)
+        assertEquals(listOf(created), repository.items.first())
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_CREATE, queued.kind)
+    }
+
+    @Test
+    fun `update falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val updated = repository.update(itemId = 42L, UpdateItemRequest(name = "Crackers"))
+
+        assertEquals("Crackers", updated.name)
+        assertEquals("Crackers", repository.items.first().single().name)
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_UPDATE, queued.kind)
+    }
+
+    @Test
+    fun `delete falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.deleteIoError = IOException("backend unreachable")
+
+        repository.delete(itemId = 42L)
+
+        assertTrue(repository.items.first().isEmpty())
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_DELETE, queued.kind)
+    }
+
+    @Test
+    fun `setChecked falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val checked = repository.setChecked(itemId = 42L, isChecked = true)
+
+        assertTrue(checked.isChecked)
+        assertTrue(repository.items.first().single().isChecked)
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_CHECK, queued.kind)
+    }
+
+    @Test
+    fun `updateDetails falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val updated = repository.updateDetails(itemId = 42L, UpdateItemRequest(name = "Crackers"))
+
+        assertEquals("Crackers", updated.name)
+        assertEquals("Crackers", repository.items.first().single().name)
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_UPDATE, queued.kind)
+    }
+
+    @Test
+    fun `reorder falls back to the mutation queue on a network error`() = runTest {
+        val mutationDao = FakePendingMutationDao()
+        val api = FakeItemsApi(itemsForFetch = sampleItems())
+        val repository = ItemsRepository(api, FakeItemDao(), queueWith(mutationDao), testScope)
+        repository.refetch(listId = 1)
+        api.updateIoError = IOException("backend unreachable")
+
+        val reordered = repository.reorder(itemId = 42L, viewId = 2, newKey = "a1")
+
+        assertEquals("a1", reordered.orderMap["2"])
+        assertEquals("a1", repository.items.first().single().orderMap["2"])
+        val queued = mutationDao.listAll().single()
+        assertEquals(MutationKind.ITEM_UPDATE, queued.kind)
+    }
+
+    @Test
     fun `422 on update surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.updateError = httpException(422)
 
@@ -430,7 +571,7 @@ class ItemsRepositoryTest {
     @Test
     fun `404 on delete surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         api.deleteResponse = Response.error(404, okhttp3.ResponseBody.create(null, ""))
 
@@ -443,7 +584,7 @@ class ItemsRepositoryTest {
     @Test
     fun `applyCreated appends an item that is not cached`() = runTest {
         val api = FakeItemsApi(itemsForFetch = emptyList())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val created = sampleItems().first()
 
@@ -455,7 +596,7 @@ class ItemsRepositoryTest {
     @Test
     fun `applyCreated for an already-cached id leaves the cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         repository.applyCreated(sampleItems().first())
@@ -466,7 +607,7 @@ class ItemsRepositoryTest {
     @Test
     fun `applyUpdated replaces a cached entry whose payload differs`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
         val updated = sampleItems().first().copy(isChecked = true)
 
@@ -478,7 +619,7 @@ class ItemsRepositoryTest {
     @Test
     fun `applyUpdated for an absent id leaves the cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         repository.applyUpdated(sampleItems().first().copy(id = 99, isChecked = true))
@@ -489,7 +630,7 @@ class ItemsRepositoryTest {
     @Test
     fun `applyUpdated with an identical payload leaves the cache unchanged`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         repository.applyUpdated(sampleItems().first())
@@ -500,7 +641,7 @@ class ItemsRepositoryTest {
     @Test
     fun `applyDeleted removes a cached id and ignores an absent one`() = runTest {
         val api = FakeItemsApi(itemsForFetch = sampleItems())
-        val repository = ItemsRepository(api)
+        val repository = ItemsRepository(api, FakeItemDao(), offlineAwareQueue(), testScope)
         repository.refetch(listId = 1)
 
         repository.applyDeleted(itemId = 999L)
@@ -534,6 +675,9 @@ private class FakeItemsApi(
     var listError: HttpException? = null
     var createError: HttpException? = null
     var updateError: HttpException? = null
+    var createIoError: IOException? = null
+    var updateIoError: IOException? = null
+    var deleteIoError: IOException? = null
     var createdItem: Item? = null
     var updatedItem: Item? = null
     var deleted = false
@@ -543,7 +687,7 @@ private class FakeItemsApi(
     var lastUpdateItemId: Long? = null
     var lastUpdateRequest: UpdateItemRequest? = null
     var lastDeleteItemId: Long? = null
-    var onUpdate: (() -> Unit)? = null
+    var onUpdate: (suspend () -> Unit)? = null
 
     override suspend fun listItems(listId: Long): List<Item> {
         listCalls++
@@ -554,6 +698,7 @@ private class FakeItemsApi(
     override suspend fun createItem(listId: Long, body: CreateItemRequest): Item {
         lastCreateListId = listId
         lastCreateRequest = body
+        createIoError?.let { throw it }
         createError?.let { throw it }
         return requireNotNull(createdItem)
     }
@@ -562,6 +707,7 @@ private class FakeItemsApi(
         lastUpdateItemId = itemId
         lastUpdateRequest = body
         onUpdate?.invoke()
+        updateIoError?.let { throw it }
         updateError?.let { throw it }
         return requireNotNull(updatedItem)
     }
@@ -569,6 +715,7 @@ private class FakeItemsApi(
     override suspend fun deleteItem(itemId: Long): Response<Unit> {
         deleted = true
         lastDeleteItemId = itemId
+        deleteIoError?.let { throw it }
         return deleteResponse
     }
 }

@@ -3,6 +3,7 @@ package eu.pascariu.shoppinglist.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.Shop
@@ -36,7 +37,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +54,7 @@ import kotlinx.coroutines.sync.withLock
 class ListViewModel @Inject constructor(
     private val itemsRepository: ItemsRepository,
     private val shopsRepository: ShopsRepository,
+    private val connectivity: @JvmSuppressWildcards StateFlow<BackendConnectivity>,
     private val undoHistoryStore: UndoHistoryStore,
     private val listPreferences: ListPreferencesDataSource,
     private val themeRepository: ThemeRepository,
@@ -60,6 +65,11 @@ class ListViewModel @Inject constructor(
     private val localState = MutableStateFlow(LocalUiState())
     private val _uiState = MutableStateFlow(ListUiState())
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
+
+    val isOffline: StateFlow<Boolean> =
+        connectivity
+            .map { it == BackendConnectivity.UNREACHABLE }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _changeToast = MutableStateFlow<ChangeToast?>(null)
     val changeToast: StateFlow<ChangeToast?> = _changeToast.asStateFlow()
@@ -115,6 +125,16 @@ class ListViewModel @Inject constructor(
                 showChangeToasts(labelBatch.map { it.text })
             }
         }
+        viewModelScope.launch {
+            var previous = connectivity.value
+            connectivity.collect { state ->
+                val wasUnreachable = previous == BackendConnectivity.UNREACHABLE
+                previous = state
+                if (wasUnreachable && state == BackendConnectivity.REACHABLE) {
+                    refresh()
+                }
+            }
+        }
     }
 
     private fun showChangeToasts(texts: List<String>) {
@@ -160,6 +180,9 @@ class ListViewModel @Inject constructor(
     }
 
     fun refresh() {
+        if (connectivity.value == BackendConnectivity.UNREACHABLE) {
+            return
+        }
         viewModelScope.launch {
             try {
                 itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
@@ -512,9 +535,9 @@ class ListViewModel @Inject constructor(
             localState.update { it.copy(deleteConfirmItem = null) }
             return
         }
-        itemsRepository.applyDeleted(item.id)
         localState.update { it.copy(deleteConfirmItem = null) }
         viewModelScope.launch {
+            itemsRepository.applyDeleted(item.id)
             try {
                 itemsRepository.delete(item.id)
                 localState.update { it.copy(errorMessage = null) }
@@ -524,7 +547,7 @@ class ListViewModel @Inject constructor(
                 if (e is HttpException && e.code() == 404) {
                     localState.update { it.copy(errorMessage = null) }
                 } else {
-                    itemsRepository.applyRestored(item, previousIndex)
+                    itemsRepository.applyRestored(item)
                     localState.update {
                         it.copy(errorMessage = "Couldn't delete the item")
                     }

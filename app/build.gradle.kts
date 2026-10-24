@@ -14,6 +14,10 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 val defaultDevBaseUrl = "http://192.168.0.141:3005"
 val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
 val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
@@ -177,11 +181,16 @@ dependencies {
     implementation(libs.camera.view)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.reorderable)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.room.testing)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.hilt.android.testing)

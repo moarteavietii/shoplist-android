@@ -52,9 +52,10 @@ Replace the XML/AppCompat scaffold with the real foundation:
 - Palettes ported as Compose color schemes, hex-faithful to the web CSS; WCAG AA contrast enforced by unit tests ✅
 - Settings drawer hosting the theme picker + change-toasts toggle ✅ (done — `theme-system`; Android spec: `settings-drawer`)
 
-## 8. Offline support
+## 8. Offline support ✅ (done — `offline-support`, archived 2026-10-24)
 
-- Local persistence (Room) + mutation queue so the app works without connectivity
-- Sync strategy: reconcile queued mutations with server state and SSE on reconnect
-- Conflicts: server remains source of truth; last-write-wins or per-field merge, decided at spec time
+- Local persistence (Room) + persisted mutation queue so the app works without connectivity ✅
+- Sync strategy: drain queue → full refetch on reconnect (network restored or foregrounded); SSE merges into Room ✅
+- Conflicts: server remains source of truth (server wins on replay conflict; non-retryable failures dropped) ✅
+- Stale refresh errors auto-clear on reconnect (`clear-refresh-error-on-reconnect`, archived 2026-10-24) ✅
 - Depends on: data layer (2), realtime sync (3)

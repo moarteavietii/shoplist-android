@@ -1,11 +1,20 @@
 package eu.pascariu.shoppinglist.data.repo
 
 import eu.pascariu.shoppinglist.data.api.ShopsApi
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.FakeShopDao
+import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateShopRequest
 import eu.pascariu.shoppinglist.data.model.RenameShopRequest
 import eu.pascariu.shoppinglist.data.model.Shop
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,10 +23,18 @@ import retrofit2.Response
 
 class ShopsRepositoryTest {
 
+    private val testScope = CoroutineScope(Dispatchers.Unconfined)
+
+    private fun offlineAwareQueue(): MutationQueue = MutationQueue(
+        dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
+
     @Test
     fun `first fetch populates cache ordered Global first then A to Z`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), supermarket(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
 
         repository.refetch()
 
@@ -30,7 +47,7 @@ class ShopsRepositoryTest {
     @Test
     fun `refetch replaces cache wholesale`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         api.shopsForFetch = listOf(shop(9, "Zoo"))
@@ -42,13 +59,14 @@ class ShopsRepositoryTest {
     @Test
     fun `create re-sorts cache Global first then A to Z`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         api.createdShop = shop(3, "Alpine")
         repository.create("Alpine")
 
-        assertEquals(CreateShopRequest(name = "Alpine"), api.lastCreateRequest)
+        assertEquals(CreateShopRequest(name = "Alpine", clientId = api.lastCreateRequest?.clientId), api.lastCreateRequest)
+        assertTrue(api.lastCreateRequest?.clientId != null)
         assertEquals(
             listOf("Global", "Alpine", "Bakery"),
             repository.shops.first().map { it.name },
@@ -58,7 +76,7 @@ class ShopsRepositoryTest {
     @Test
     fun `rename re-sorts cache`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), supermarket(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         api.renamedShop = shop(1, "Zoo")
@@ -75,7 +93,7 @@ class ShopsRepositoryTest {
     @Test
     fun `delete removes cached entry`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         repository.delete(shopId = 1)
@@ -88,7 +106,7 @@ class ShopsRepositoryTest {
     @Test
     fun `409 on create surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
         api.createError = httpException(409)
 
@@ -101,7 +119,7 @@ class ShopsRepositoryTest {
     @Test
     fun `422 on rename surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
         api.renameError = httpException(422)
 
@@ -114,7 +132,7 @@ class ShopsRepositoryTest {
     @Test
     fun `403 on delete surfaces error and leaves cache unchanged`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
         api.deleteResponse = Response.error(403, okhttp3.ResponseBody.create(null, ""))
 
@@ -127,7 +145,7 @@ class ShopsRepositoryTest {
     @Test
     fun `applyCreated appends and re-sorts`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         repository.applyCreated(shop(3, "Alpine"))
@@ -141,7 +159,7 @@ class ShopsRepositoryTest {
     @Test
     fun `applyCreated for an already-cached id leaves the cache unchanged`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         repository.applyCreated(bakery())
@@ -152,7 +170,7 @@ class ShopsRepositoryTest {
     @Test
     fun `applyUpdated replaces a changed shop and re-sorts`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), supermarket(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         repository.applyUpdated(shop(1, "Zoo"))
@@ -166,7 +184,7 @@ class ShopsRepositoryTest {
     @Test
     fun `applyUpdated with an identical payload leaves the cache unchanged`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         repository.applyUpdated(bakery())
@@ -177,7 +195,7 @@ class ShopsRepositoryTest {
     @Test
     fun `applyDeleted removes a cached id and ignores an absent one`() = runTest {
         val api = FakeShopsApi(shopsForFetch = listOf(bakery(), supermarket(), global()))
-        val repository = ShopsRepository(api)
+        val repository = ShopsRepository(api, FakeShopDao(), offlineAwareQueue(), testScope)
         repository.refetch()
 
         repository.applyDeleted(shopId = 999L)
@@ -191,6 +209,26 @@ class ShopsRepositoryTest {
             listOf("Global", "Supermarket"),
             repository.shops.first().map { it.name },
         )
+    }
+
+    @Test
+    fun `concurrent offline creates get distinct placeholder ids`() = runTest {
+        val api = FakeShopsApi(shopsForFetch = emptyList())
+        val repository = ShopsRepository(
+            api,
+            FakeShopDao(),
+            MutationQueue(FakePendingMutationDao(), MutableStateFlow(BackendConnectivity.UNREACHABLE), Json { ignoreUnknownKeys = true }),
+            testScope,
+        )
+        repository.refetch()
+
+        val created = (1..8).map { index ->
+            async { repository.create("Shop $index") }
+        }.map { it.await() }
+
+        val ids = created.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue(ids.all { it < 0 })
     }
 }
 

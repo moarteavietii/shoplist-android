@@ -5,6 +5,11 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import eu.pascariu.shoppinglist.data.api.ItemsApi
 import eu.pascariu.shoppinglist.data.api.ShopsApi
+import eu.pascariu.shoppinglist.data.connectivity.BackendConnectivity
+import eu.pascariu.shoppinglist.data.local.FakeItemDao
+import eu.pascariu.shoppinglist.data.local.FakePendingMutationDao
+import eu.pascariu.shoppinglist.data.local.MutationQueue
+import eu.pascariu.shoppinglist.data.local.FakeShopDao
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.prefs.ListPreferencesDataSource
 import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
@@ -69,9 +74,16 @@ class ListViewModelTest {
     private lateinit var themeRepository: ThemeRepository
     private lateinit var expiryTick: MutableStateFlow<Long>
     private lateinit var fakeSyncManager: FakeRealtimeSyncManager
+    private lateinit var connectivityFlow: MutableStateFlow<BackendConnectivity>
     private lateinit var viewModel: ListViewModel
 
     private val json = Json
+
+    private fun offlineAwareQueue(): MutationQueue = MutationQueue(
+        dao = FakePendingMutationDao(),
+        connectivity = MutableStateFlow(BackendConnectivity.REACHABLE),
+        json = Json { ignoreUnknownKeys = true },
+    )
 
     @Before
     fun setUp() {
@@ -84,8 +96,18 @@ class ListViewModelTest {
             .baseUrl(server.url("/"))
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        itemsRepository = ItemsRepository(retrofit.create(ItemsApi::class.java))
-        shopsRepository = ShopsRepository(retrofit.create(ShopsApi::class.java))
+        itemsRepository = ItemsRepository(
+            retrofit.create(ItemsApi::class.java),
+            FakeItemDao(),
+            offlineAwareQueue(),
+            CoroutineScope(testDispatcher + Job()),
+        )
+        shopsRepository = ShopsRepository(
+            retrofit.create(ShopsApi::class.java),
+            FakeShopDao(),
+            offlineAwareQueue(),
+            CoroutineScope(testDispatcher + Job()),
+        )
         undoHistoryStore = UndoHistoryStore(
             dataStore = PreferenceDataStoreFactory.create(scope = storeScope) {
                 dataStoreFile
@@ -111,9 +133,11 @@ class ListViewModelTest {
         )
         expiryTick = MutableStateFlow(System.currentTimeMillis())
         fakeSyncManager = FakeRealtimeSyncManager()
+        connectivityFlow = MutableStateFlow(BackendConnectivity.REACHABLE)
         viewModel = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
+            connectivity = connectivityFlow,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
             themeRepository = themeRepository,
@@ -210,6 +234,53 @@ class ListViewModelTest {
         assertEquals(listOf("Milk", "Bread"), state.items.map { it.name })
         assertEquals("Global", state.watermarkName)
         assertFalse(state.showUndoBar)
+    }
+
+    @Test
+    fun `refresh while offline does not hit the network or set an error`() = runTest(testDispatcher) {
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertEquals(0, server.requestCount)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `failed refresh retries on reconnect and clears error on success`() = runTest(testDispatcher) {
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+        advanceUntilIdle()
+
+        server.enqueue(MockResponse().setResponseCode(500))
+        connectivityFlow.value = BackendConnectivity.REACHABLE
+        awaitUntil { viewModel.uiState.value.errorMessage != null }
+        assertEquals("Couldn't refresh the list", viewModel.uiState.value.errorMessage)
+
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"))
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+        advanceUntilIdle()
+        connectivityFlow.value = BackendConnectivity.REACHABLE
+        awaitUntil { viewModel.uiState.value.errorMessage == null }
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun `reconnect without prior failure does not duplicate the initial refresh`() = runTest(testDispatcher) {
+        enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
+        enqueueShopList(shopJson(1, "Global"))
+        viewModel.refresh()
+        awaitUntil { shopsRepository.shops.value.isNotEmpty() && itemsRepository.items.value.isNotEmpty() }
+        assertEquals(2, server.requestCount)
+
+        connectivityFlow.value = BackendConnectivity.UNREACHABLE
+        advanceUntilIdle()
+        connectivityFlow.value = BackendConnectivity.REACHABLE
+        advanceUntilIdle()
+
+        assertEquals(2, server.requestCount)
+        assertNull(viewModel.uiState.value.errorMessage)
     }
 
     @Test
@@ -1016,6 +1087,7 @@ class ListViewModelTest {
         awaitUntil { viewModel.uiState.value.editItemModal?.name == "Crackers" }
 
         itemsRepository.applyDeleted(11L)
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
         viewModel.onEditItemSave()
         advanceUntilIdle()
 
@@ -1030,6 +1102,7 @@ class ListViewModelTest {
         awaitUntil { viewModel.uiState.value.editItemModal != null }
 
         itemsRepository.applyDeleted(11L)
+        awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
         viewModel.onEditItemDeleteTapped()
         advanceUntilIdle()
 
@@ -1378,6 +1451,7 @@ class ListViewModelTest {
         val instance = ListViewModel(
             itemsRepository = itemsRepository,
             shopsRepository = shopsRepository,
+            connectivity = connectivityFlow,
             undoHistoryStore = undoHistoryStore,
             listPreferences = listPreferences,
             themeRepository = themeRepository,
