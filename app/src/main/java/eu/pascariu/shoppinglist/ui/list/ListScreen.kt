@@ -298,7 +298,7 @@ fun ListScreen(
                 exit = fadeOut() + shrinkVertically(),
             ) {
                 Text(
-                    text = "Offline — changes are queued",
+                    text = "Offline — changes will be queued",
                     style = typography.label,
                     color = colors.ledOn,
                     modifier = Modifier
