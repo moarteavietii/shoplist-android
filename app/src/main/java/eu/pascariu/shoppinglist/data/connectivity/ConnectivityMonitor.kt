@@ -44,14 +44,6 @@ class ConnectivityMonitor @Inject constructor(
             }
     }
 
-    fun confirmReachable() {
-        _connectivity.value = BackendConnectivity.REACHABLE
-    }
-
-    fun confirmUnreachable() {
-        _connectivity.value = BackendConnectivity.UNREACHABLE
-    }
-
     private fun updateState() {
         _connectivity.value =
             if (availabilityTracker.hasAvailableNetwork() || hasValidatedActiveNetwork()) {
