@@ -49,7 +49,27 @@ val mockCloudflare: Boolean = if (localPropertiesFile.asFile.exists()) {
     providers.fileContents(localPropertiesFile).asText
         .map { text ->
             val properties = Properties().apply { text.reader().use { load(it) } }
-            properties.getProperty("mockCloudflare")?.toBoolean() ?: false
+            properties.keys
+                .map { it.toString() }
+                .firstOrNull { it.equals("mockCloudflare", ignoreCase = true) && it != "mockCloudflare" }
+                ?.let { key ->
+                    logger.warn(
+                        "local.properties has '$key' but the expected key is 'mockCloudflare' " +
+                            "(keys are case-sensitive); the mock flag is OFF"
+                    )
+                }
+            when (val raw = properties.getProperty("mockCloudflare")?.trim()?.lowercase()) {
+                null, "" -> false
+                "true" -> true
+                "false" -> false
+                else -> {
+                    logger.warn(
+                        "local.properties 'mockCloudflare=$raw' is not a valid boolean " +
+                            "(expected true or false); treating as false"
+                    )
+                    false
+                }
+            }
         }
         .get()
 } else {
