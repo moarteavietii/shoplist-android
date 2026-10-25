@@ -184,8 +184,8 @@ fun QuickMenu(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .shadow(elevation = 4.dp, shape = QuickMenuContainerShape)
-                .background(colors.surface.copy(alpha = 0.95f), QuickMenuContainerShape)
+                .shadow(elevation = 4.dp, shape = shapes.medium)
+                .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
                 .padding(4.dp),
         ) {
             Box(
@@ -417,8 +417,6 @@ private fun QuickMenuControl.contentDescription(): String = when (this) {
     }
 
 private const val SWIPE_COLLAPSE_THRESHOLD_PX = 24f
-
-private val QuickMenuContainerShape = RoundedCornerShape(12.dp)
 
 @Composable
 private fun SortOrderSelector(
