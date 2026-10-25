@@ -91,6 +91,7 @@ class CredentialEntryViewModel @Inject constructor(
 
     fun submit() {
         val state = _uiState.value
+        if (state.isSaving) return
         if (state.clientId.isBlank() || state.clientSecret.isBlank()) {
             _uiState.update { it.copy(error = "Both client id and secret are required", errorKind = CredentialErrorKind.Validation) }
             return
