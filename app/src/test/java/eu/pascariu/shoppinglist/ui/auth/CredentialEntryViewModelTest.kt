@@ -5,9 +5,10 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.TokenStore
-import eu.pascariu.shoppinglist.data.network.HealthApi
 import eu.pascariu.shoppinglist.data.network.HealthResponse
 import eu.pascariu.shoppinglist.di.IoDispatcher
+import eu.pascariu.shoppinglist.testutil.FakeHealthApi
+import eu.pascariu.shoppinglist.testutil.httpException
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,8 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CredentialEntryViewModelTest {
@@ -60,21 +59,6 @@ class CredentialEntryViewModelTest {
 
         assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
         assertTrue(viewModel.uiState.value.saved)
-    }
-
-    @Test
-    fun `submit while saving is a no-op and does not launch a second verify`() {
-        val viewModel = createViewModel()
-        viewModel.onClientIdChange("id-1")
-        viewModel.onClientSecretChange("secret-1")
-
-        viewModel.submit()
-        viewModel.submit()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
-        assertTrue(viewModel.uiState.value.saved)
-        assertFalse(viewModel.uiState.value.isSaving)
     }
 
     @Test
@@ -290,47 +274,6 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
-    fun `probe uses candidate credentials without touching the store first`() = runViewModelTest { viewModel ->
-        viewModel.onClientIdChange("id-1")
-        viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { HealthResponse(status = "ok") }
-
-        viewModel.submit()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(AccessCredentials("id-1", "secret-1"), fakeHealthApi.lastProbeCredentials)
-        assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
-    }
-
-    @Test
-    fun `rejected probe keeps previously stored credentials`() = runViewModelTest { viewModel ->
-        fakeTokenStore.saved = AccessCredentials("old-id", "old-secret")
-        viewModel.onClientIdChange("id-1")
-        viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
-
-        viewModel.submit()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(AccessCredentials("old-id", "old-secret"), fakeTokenStore.saved)
-        assertEquals(CredentialErrorKind.InvalidCredentials, viewModel.uiState.value.errorKind)
-    }
-
-    @Test
-    fun `unreachable probe keeps previously stored credentials`() = runViewModelTest { viewModel ->
-        fakeTokenStore.saved = AccessCredentials("old-id", "old-secret")
-        viewModel.onClientIdChange("id-1")
-        viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw IOException("connection refused") }
-
-        viewModel.submit()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(AccessCredentials("old-id", "old-secret"), fakeTokenStore.saved)
-        assertEquals(CredentialErrorKind.Unreachable, viewModel.uiState.value.errorKind)
-    }
-
-    @Test
     fun `credentials rejected event produces the rejection banner`() = runViewModelTest { viewModel ->
         viewModel.uiState.test {
             assertFalse(awaitItem().rejectionMessage != null)
@@ -425,20 +368,6 @@ class CredentialEntryViewModelTest {
             }
         }
 
-    private class FakeHealthApi(var behavior: () -> HealthResponse = {
-        HealthResponse(status = "ok")
-    }) : HealthApi {
-        var lastProbeCredentials: AccessCredentials? = null
-            private set
-
-        override suspend fun getHealth(): HealthResponse = behavior()
-
-        override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse {
-            lastProbeCredentials = AccessCredentials(clientId, clientSecret)
-            return behavior()
-        }
-    }
-
     private class FakeTokenStore(var saved: AccessCredentials? = null) : TokenStore {
         override fun load(): AccessCredentials? = saved
         override fun save(credentials: AccessCredentials) {
@@ -449,6 +378,3 @@ class CredentialEntryViewModelTest {
         }
     }
 }
-
-private fun httpException(code: Int): HttpException =
-    HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))

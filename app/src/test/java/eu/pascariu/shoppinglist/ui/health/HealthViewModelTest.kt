@@ -2,8 +2,8 @@ package eu.pascariu.shoppinglist.ui.health
 
 import eu.pascariu.shoppinglist.data.health.HealthRepository
 import eu.pascariu.shoppinglist.data.health.HealthStatus
-import eu.pascariu.shoppinglist.data.network.HealthApi
 import eu.pascariu.shoppinglist.data.network.HealthResponse
+import eu.pascariu.shoppinglist.testutil.FakeHealthApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -62,10 +62,4 @@ class HealthViewModelTest {
 
         assertEquals(HealthStatus.Healthy(message = "ok"), viewModel.healthStatus.value)
     }
-}
-
-private class FakeHealthApi(var behavior: () -> HealthResponse) : HealthApi {
-    override suspend fun getHealth(): HealthResponse = behavior()
-
-    override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse = behavior()
 }

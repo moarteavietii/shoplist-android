@@ -8,6 +8,7 @@ import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateShopRequest
 import eu.pascariu.shoppinglist.data.model.RenameShopRequest
 import eu.pascariu.shoppinglist.data.model.Shop
+import eu.pascariu.shoppinglist.testutil.httpException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -241,9 +242,6 @@ private fun shop(id: Long, name: String) = Shop(
 private fun bakery() = shop(1, "Bakery")
 private fun supermarket() = shop(2, "Supermarket")
 private fun global() = shop(4, "Global")
-
-private fun httpException(code: Int): HttpException =
-    HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))
 
 private class FakeShopsApi(
     var shopsForFetch: List<Shop>,

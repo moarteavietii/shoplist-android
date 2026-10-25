@@ -2,13 +2,13 @@ package eu.pascariu.shoppinglist.data.health
 
 import eu.pascariu.shoppinglist.data.network.HealthApi
 import eu.pascariu.shoppinglist.data.network.HealthResponse
+import eu.pascariu.shoppinglist.testutil.FakeHealthApi
+import eu.pascariu.shoppinglist.testutil.httpException
 import java.io.IOException
 import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 class HealthRepositoryTest {
 
@@ -57,14 +57,3 @@ class HealthRepositoryTest {
         assertEquals(HealthStatus.Unreachable(reason = "backend unreachable"), result)
     }
 }
-
-private class FakeHealthApi(
-    private val behavior: () -> HealthResponse,
-) : HealthApi {
-    override suspend fun getHealth(): HealthResponse = behavior()
-
-    override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse = behavior()
-}
-
-private fun httpException(code: Int): HttpException =
-    HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))
