@@ -86,6 +86,23 @@ fun deriveSortModeLedState(sortModeEnabled: Boolean, order: SortOrder): SortMode
         -> SortModeLedState.NONE
     }
 
+fun deriveControlLedState(
+    control: QuickMenuControl,
+    isSearchExpanded: Boolean,
+    isShowingCheckedItems: Boolean,
+    isSortModeEnabled: Boolean,
+    sortOrder: SortOrder,
+): SortModeLedState? =
+    when (control) {
+        QuickMenuControl.SORT_MODE ->
+            deriveSortModeLedState(sortModeEnabled = isSortModeEnabled, order = sortOrder)
+        QuickMenuControl.SEARCH ->
+            if (isSearchExpanded) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+        QuickMenuControl.CHECKED_ITEMS_TOGGLE ->
+            if (isShowingCheckedItems) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+        else -> null
+    }
+
 @Composable
 fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
     val colors = LocalShoplistColors.current
@@ -206,15 +223,13 @@ fun QuickMenu(
                     horizontalAlignment = Alignment.End,
                 ) {
                     QuickMenuControl.entries.forEach { control ->
-                        val ledState = when (control) {
-                            QuickMenuControl.SORT_MODE ->
-                                deriveSortModeLedState(sortModeEnabled = isSortModeEnabled, order = sortOrder)
-                            QuickMenuControl.SEARCH ->
-                                if (isSearchExpanded) SortModeLedState.FILLED else SortModeLedState.HOLLOW
-                            QuickMenuControl.CHECKED_ITEMS_TOGGLE ->
-                                if (isShowingCheckedItems) SortModeLedState.FILLED else SortModeLedState.HOLLOW
-                            else -> null
-                        }
+                        val ledState = deriveControlLedState(
+                            control = control,
+                            isSearchExpanded = isSearchExpanded,
+                            isShowingCheckedItems = isShowingCheckedItems,
+                            isSortModeEnabled = isSortModeEnabled,
+                            sortOrder = sortOrder,
+                        )
                         if (control == QuickMenuControl.SORT_MODE) {
                             Box {
                                 QuickMenuControlButton(
