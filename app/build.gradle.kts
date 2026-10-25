@@ -120,7 +120,12 @@ fun requireReleaseSigningConfig() {
 }
 
 gradle.taskGraph.whenReady {
-    if (allTasks.any { it.project.path == ":app" && it.name.contains("Release") }) {
+    val buildsReleaseArtifact = allTasks.any { task ->
+        task.project.path == ":app" &&
+            (task.name.startsWith("assemble") || task.name.startsWith("bundle")) &&
+            task.name.endsWith("Release")
+    }
+    if (buildsReleaseArtifact) {
         requireReleaseSigningConfig()
     }
 }
