@@ -158,7 +158,8 @@ fun ListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing),
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 12.dp),
     ) {
         Column(
             modifier = Modifier
@@ -240,7 +241,9 @@ fun ListScreen(
                     onControlTapped = viewModel::onQuickMenuControlTapped,
                     onSortOrderSelected = viewModel::onSortOrderChanged,
                     onExpandedChanged = viewModel::onQuickMenuExpandedChanged,
-                    modifier = Modifier.align(Alignment.TopEnd),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp),
                 )
             }
 

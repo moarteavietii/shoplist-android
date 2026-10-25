@@ -20,3 +20,10 @@
 - [x] 3.1 `./gradlew assembleDebug test` green
 - [x] 3.2 `./gradlew lint` clean
 - [x] 3.3 Device smoke test: menu renders as card stack, badge on view switcher, corner LEDs, selector with icons; collapse/expand and swipe-to-collapse still work
+
+## 4. Visual polish (user feedback)
+
+- [x] 4.1 Remove tap ripple/graying from chevron, control buttons, and selector rows (indication = null)
+- [x] 4.2 Center the control buttons in the menu instead of right-aligning them
+- [x] 4.3 Soften button borders (alpha on border color)
+- [x] 4.4 Move the widget down ~1% of screen height and stop sticking it to the right edge via app-wide horizontal padding (minimal at bottom)

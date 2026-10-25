@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -143,7 +144,7 @@ fun QuickMenu(
 
     Box(modifier = modifier.then(collapseOnSwipeUp)) {
         Column(
-            horizontalAlignment = Alignment.End,
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .shadow(elevation = 4.dp, shape = shapes.medium)
                 .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
@@ -152,7 +153,11 @@ fun QuickMenu(
             Box {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable(role = Role.Button) { onExpandedChanged(!isExpanded) },
+                    modifier = Modifier.clickable(
+                        role = Role.Button,
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { onExpandedChanged(!isExpanded) },
                 ) {
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
@@ -257,14 +262,22 @@ private fun QuickMenuControlButton(
 ) {
     val colors = LocalShoplistColors.current
     val shapes = LocalShoplistShapes.current
+    val noIndication = remember { MutableInteractionSource() }
     val buttonModifier = if (onLongPressed != null) {
         Modifier.combinedClickable(
             role = Role.Button,
             onClick = onTapped,
             onLongClick = onLongPressed,
+            indication = null,
+            interactionSource = noIndication,
         )
     } else {
-        Modifier.clickable(role = Role.Button, onClick = onTapped)
+        Modifier.clickable(
+            role = Role.Button,
+            onClick = onTapped,
+            indication = null,
+            interactionSource = noIndication,
+        )
     }
     Box(
         modifier = buttonModifier
@@ -273,7 +286,7 @@ private fun QuickMenuControlButton(
                 color = if (isActive) colors.surface else colors.chrome,
                 shape = shapes.small,
             )
-            .border(1.dp, colors.border, shapes.small),
+            .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.small),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -352,6 +365,8 @@ private fun SortOrderSelector(
                     modifier = Modifier
                         .clickable(
                             role = Role.Button,
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
                             onClick = { onSelected(order) },
                         )
                         .padding(horizontal = 16.dp, vertical = 12.dp),
