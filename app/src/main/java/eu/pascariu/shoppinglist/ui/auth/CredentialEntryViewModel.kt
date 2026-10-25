@@ -110,6 +110,9 @@ class CredentialEntryViewModel @Inject constructor(
     private fun verifyAndSave(credentials: AccessCredentials) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, errorKind = null) }
+            // Probed with explicit credentials before saving: the auth interceptor
+            // only injects CF headers from the store, so the store is written
+            // only after the probe verifies the credentials.
             when (probeCredentials(credentials)) {
                 ProbeOutcome.Verified -> {
                     withContext(ioDispatcher) {
