@@ -22,15 +22,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sort
-import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material.icons.filled.Store
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.outlined.SortByAlpha
+import androidx.compose.material.icons.outlined.Store
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -41,9 +41,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
@@ -52,6 +56,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import kotlin.math.roundToInt
@@ -87,13 +92,22 @@ fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
-                    .background(colors.ledOn.copy(alpha = 0.35f), CircleShape),
+                    .background(colors.ledOn.copy(alpha = 0.4f), CircleShape)
+                    .blur(3.dp),
             )
             Box(
                 modifier = Modifier
                     .size(6.dp)
                     .background(colors.ledOn, CircleShape),
-            )
+                contentAlignment = Alignment.TopStart,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 1.dp, top = 1.dp)
+                        .size(2.dp)
+                        .background(Color.White.copy(alpha = 0.7f), CircleShape),
+                )
+            }
         } else {
             Box(
                 modifier = Modifier
@@ -147,7 +161,7 @@ fun QuickMenu(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .shadow(elevation = 4.dp, shape = shapes.medium)
-                .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
+                .background(colors.surface, shapes.medium)
                 .padding(6.dp),
         ) {
             Box {
@@ -164,7 +178,7 @@ fun QuickMenu(
                         contentDescription = if (isExpanded) "Collapse quick menu" else "Expand quick menu",
                         tint = colors.contentMuted,
                         modifier = Modifier
-                            .minimumInteractiveComponentSize()
+                            .size(40.dp)
                             .graphicsLayer(rotationZ = chevronRotation),
                     )
                 }
@@ -241,12 +255,17 @@ private fun SwitcherBadge(count: Int, modifier: Modifier = Modifier) {
 
     Text(
         text = count.toString(),
-        style = typography.label,
+        style = typography.ledDot.copy(
+            fontFamily = FontFamily.Default,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+        ),
         color = colors.background,
         modifier = modifier
             .background(colors.ledOn, RoundedCornerShape(8.dp))
             .border(2.dp, colors.surface, RoundedCornerShape(8.dp))
-            .padding(horizontal = 4.dp, vertical = 1.dp)
+            .padding(horizontal = 5.dp, vertical = 2.dp)
             .semantics { contentDescription = "$count unchecked items" },
     )
 }
@@ -298,11 +317,15 @@ private fun QuickMenuControlButton(
         when (ledState) {
             SortModeLedState.FILLED -> CornerLedDot(
                 filled = true,
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 2.dp, end = 2.dp),
             )
             SortModeLedState.HOLLOW -> CornerLedDot(
                 filled = false,
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 2.dp, end = 2.dp),
             )
             SortModeLedState.NONE, null -> Unit
         }
@@ -316,11 +339,11 @@ private fun QuickMenuControlButton(
 }
 
 private fun QuickMenuControl.icon(): ImageVector = when (this) {
-    QuickMenuControl.VIEW_SWITCHER -> Icons.Filled.Store
-    QuickMenuControl.SETTINGS -> Icons.Filled.Settings
-    QuickMenuControl.SORT_MODE -> Icons.Filled.Sort
-    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Filled.Visibility
-    QuickMenuControl.SEARCH -> Icons.Filled.Search
+    QuickMenuControl.VIEW_SWITCHER -> Icons.Outlined.Store
+    QuickMenuControl.SETTINGS -> Icons.Outlined.Settings
+    QuickMenuControl.SORT_MODE -> Icons.Outlined.Sort
+    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Outlined.Visibility
+    QuickMenuControl.SEARCH -> Icons.Outlined.Search
 }
 
 private fun QuickMenuControl.contentDescription(): String = when (this) {
@@ -385,7 +408,7 @@ private fun SortOrderSelector(
                     )
                     if (order == selected) {
                         Icon(
-                            imageVector = Icons.Filled.Check,
+                            imageVector = Icons.Outlined.Check,
                             contentDescription = "Selected",
                             tint = colors.ledOn,
                             modifier = Modifier.size(16.dp),
@@ -398,9 +421,9 @@ private fun SortOrderSelector(
 }
 
 private fun SortOrder.icon(): ImageVector = when (this) {
-    SortOrder.MANUAL -> Icons.Filled.Sort
-    SortOrder.ALPHABETICAL -> Icons.Filled.SortByAlpha
-    SortOrder.FREQUENCY -> Icons.Filled.LocalFireDepartment
+    SortOrder.MANUAL -> Icons.Outlined.Sort
+    SortOrder.ALPHABETICAL -> Icons.Outlined.SortByAlpha
+    SortOrder.FREQUENCY -> Icons.Outlined.LocalFireDepartment
 }
 
 private fun SortOrder.label(): String = when (this) {
