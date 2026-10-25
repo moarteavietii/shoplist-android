@@ -769,6 +769,12 @@ class ListViewModel @Inject constructor(
             globalShop != null -> globalShop.name
             else -> GLOBAL_VIEW_NAME
         }
+        val editItemModal = local.editItemModal?.let { modal ->
+            items.firstOrNull { it.id == modal.itemId }
+                ?.takeIf { it.checkCount != modal.checkCount }
+                ?.let { modal.copy(checkCount = it.checkCount) }
+                ?: modal
+        }
         val uncheckedCounts = deriveUncheckedCountByShop(liveItems, shops)
         val drawerShops = buildDrawerShops(
             shops = shops,
@@ -797,7 +803,7 @@ class ListViewModel @Inject constructor(
             canUndo = undoEntries.isNotEmpty(),
             isUndoInFlight = local.isUndoInFlight,
             addItemModal = local.addItemModal,
-            editItemModal = local.editItemModal,
+            editItemModal = editItemModal,
             deleteConfirmItem = local.deleteConfirmItem,
             shopModal = local.shopModal,
             postSaveSignal = local.postSaveSignal,

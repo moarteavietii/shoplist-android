@@ -744,6 +744,24 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `edit modal check count refreshes while modal is open`() = runTest(testDispatcher) {
+        loadFixtures()
+
+        viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal != null }
+        assertEquals(0, viewModel.uiState.value.editItemModal?.checkCount)
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 11, name = "Bread", isChecked = true, checkCount = 7)),
+        )
+
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 11L })
+        awaitUntil { viewModel.uiState.value.editItemModal?.checkCount == 7 }
+    }
+
+    @Test
     fun `edit modal title change and view toggle update state`() = runTest(testDispatcher) {
         loadFixtures()
         viewModel.onItemLongPressed(viewModel.uiState.value.items.first { it.id == 11L })
