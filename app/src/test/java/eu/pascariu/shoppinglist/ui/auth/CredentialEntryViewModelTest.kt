@@ -324,6 +324,16 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `shown after rejection sets the banner without any event`() {
+        val viewModel = createViewModel()
+
+        viewModel.onShownAfterRejection()
+
+        assertEquals(CredentialEntryViewModel.REJECTION_MESSAGE, viewModel.uiState.value.rejectionMessage)
+        assertFalse(viewModel.uiState.value.saved)
+    }
+
+    @Test
     fun `editing a field clears the rejection banner`() = runViewModelTest { viewModel ->
         authEventBus.emit(AuthEvent.CredentialsRejected)
         testDispatcher.scheduler.advanceUntilIdle()

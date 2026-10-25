@@ -38,6 +38,7 @@ import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 @Composable
 fun CredentialEntryScreen(
     onCredentialsSaved: () -> Unit,
+    shownAfterRejection: Boolean = false,
     viewModel: CredentialEntryViewModel = hiltViewModel(),
 ) {
     val colors = LocalShoplistColors.current
@@ -45,6 +46,12 @@ fun CredentialEntryScreen(
     val shapes = LocalShoplistShapes.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var isScanning by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (shownAfterRejection) {
+            viewModel.onShownAfterRejection()
+        }
+    }
 
     LaunchedEffect(state.saved) {
         if (state.saved) {
