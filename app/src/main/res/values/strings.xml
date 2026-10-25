@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">shoplist-android</string>
     <string name="offline_chip_label">Offline — changes will be queued</string>
+    <string name="toast_refresh_failure">Couldn\'t refresh the list</string>
+    <string name="toast_move_failure">Couldn\'t move the item</string>
+    <string name="toast_save_failure">Couldn\'t save the item</string>
+    <string name="toast_delete_failure">Couldn\'t delete the item</string>
+    <string name="toast_manual_sort_checked_items">Checked items stay visible while manual sorting is engaged</string>
 </resources>

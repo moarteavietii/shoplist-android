@@ -61,6 +61,7 @@ class ListViewModel @Inject constructor(
     private val listPreferences: ListPreferencesDataSource,
     private val themeRepository: ThemeRepository,
     private val realtimeSyncManager: RealtimeSyncManagerContract,
+    private val stringProvider: ListStringProvider,
     @ExpiryTicker expiryTicker: StateFlow<Long>,
 ) : ViewModel() {
 
@@ -204,7 +205,7 @@ class ListViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                showToast("Couldn't refresh the list", ToastSeverity.Danger)
+                showToast(stringProvider.refreshFailure, ToastSeverity.Danger)
             }
         }
     }
@@ -266,7 +267,7 @@ class ListViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                showToast("Couldn't move the item", ToastSeverity.Danger)
+                showToast(stringProvider.moveFailure, ToastSeverity.Danger)
             }
         }
     }
@@ -419,7 +420,7 @@ class ListViewModel @Inject constructor(
                 throw e
             } catch (_: Exception) {
                 isCreateInFlight = false
-                showToast("Couldn't save the item", ToastSeverity.Danger)
+                showToast(stringProvider.saveFailure, ToastSeverity.Danger)
                 return@launch
             }
             isCreateInFlight = false
@@ -539,7 +540,7 @@ class ListViewModel @Inject constructor(
                         editItemModal = null,
                     )
                 }
-                showToast("Couldn't save the item", ToastSeverity.Danger)
+                showToast(stringProvider.saveFailure, ToastSeverity.Danger)
             } finally {
                 isUpdateInFlight = false
             }
@@ -576,7 +577,7 @@ class ListViewModel @Inject constructor(
                     // Item already gone server-side; nothing to report.
                 } else {
                     itemsRepository.applyRestored(item)
-                    showToast("Couldn't delete the item", ToastSeverity.Danger)
+                    showToast(stringProvider.deleteFailure, ToastSeverity.Danger)
                 }
             }
         }
@@ -623,7 +624,7 @@ class ListViewModel @Inject constructor(
                     localState.value.sortOrder == SortOrder.MANUAL
                 if (isManualSortEngaged) {
                     showToast(
-                        "Checked items stay visible while manual sorting is engaged",
+                        stringProvider.manualSortCheckedItemsNotice,
                         ToastSeverity.Danger,
                     )
                 } else {
