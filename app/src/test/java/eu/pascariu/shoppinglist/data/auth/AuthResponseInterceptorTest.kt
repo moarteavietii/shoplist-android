@@ -111,11 +111,13 @@ class AuthResponseInterceptorTest {
     fun `emits nothing on success`() = runTest {
         mockWebServer.enqueue(MockResponse().setResponseCode(200))
 
-        buildClient().newCall(Request.Builder().url(mockWebServer.url("/health")).build())
-            .execute()
-            .close()
+        authEventBus.events.test {
+            buildClient().newCall(Request.Builder().url(mockWebServer.url("/health")).build())
+                .execute()
+                .close()
 
-        assertNull(authEventBus.events.replayCache.firstOrNull())
+            expectNoEvents()
+        }
     }
 
     @Test
@@ -129,7 +131,6 @@ class AuthResponseInterceptorTest {
         authEventBus.events.test {
             buildClient().newCall(request).execute().close()
 
-            assertEquals(0, authEventBus.events.replayCache.size)
             expectNoEvents()
         }
         assertEquals(AccessCredentials(clientId = "id", clientSecret = "secret"), tokenStore.load())
@@ -200,7 +201,6 @@ class AuthResponseInterceptorTest {
         authEventBus.events.test {
             client.newCall(request).execute().close()
 
-            assertEquals(0, authEventBus.events.replayCache.size)
             expectNoEvents()
         }
         assertEquals(AccessCredentials(clientId = "id", clientSecret = "secret"), tokenStore.load())
