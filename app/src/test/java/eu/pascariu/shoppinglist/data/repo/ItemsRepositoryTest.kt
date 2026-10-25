@@ -10,6 +10,7 @@ import eu.pascariu.shoppinglist.data.local.MutationQueue
 import eu.pascariu.shoppinglist.data.model.CreateItemRequest
 import eu.pascariu.shoppinglist.data.model.Item
 import eu.pascariu.shoppinglist.data.model.UpdateItemRequest
+import eu.pascariu.shoppinglist.testutil.httpException
 import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -719,6 +720,3 @@ private class FakeItemsApi(
         return deleteResponse
     }
 }
-
-private fun httpException(code: Int): HttpException =
-    HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))

@@ -5,9 +5,10 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.TokenStore
-import eu.pascariu.shoppinglist.data.network.HealthApi
 import eu.pascariu.shoppinglist.data.network.HealthResponse
 import eu.pascariu.shoppinglist.di.IoDispatcher
+import eu.pascariu.shoppinglist.testutil.FakeHealthApi
+import eu.pascariu.shoppinglist.testutil.httpException
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,8 +23,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CredentialEntryViewModelTest {
@@ -369,12 +368,6 @@ class CredentialEntryViewModelTest {
             }
         }
 
-    private class FakeHealthApi(var behavior: () -> HealthResponse = {
-        HealthResponse(status = "ok")
-    }) : HealthApi {
-        override suspend fun getHealth(): HealthResponse = behavior()
-    }
-
     private class FakeTokenStore(var saved: AccessCredentials? = null) : TokenStore {
         override fun load(): AccessCredentials? = saved
         override fun save(credentials: AccessCredentials) {
@@ -385,6 +378,3 @@ class CredentialEntryViewModelTest {
         }
     }
 }
-
-private fun httpException(code: Int): HttpException =
-    HttpException(Response.error<Any>(code, okhttp3.ResponseBody.create(null, "")))
