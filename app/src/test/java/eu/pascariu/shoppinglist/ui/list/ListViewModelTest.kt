@@ -461,6 +461,51 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `isUndoInFlight goes true while undo response is pending then false`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.canUndo }
+        assertFalse(viewModel.uiState.value.isUndoInFlight)
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = false))
+                .setBodyDelay(300, TimeUnit.MILLISECONDS),
+        )
+        viewModel.onUndoTapped()
+        awaitUntil { viewModel.uiState.value.isUndoInFlight }
+
+        awaitUntil { !viewModel.uiState.value.isUndoInFlight }
+        awaitUntil { !viewModel.uiState.value.canUndo }
+    }
+
+    @Test
+    fun `isUndoInFlight clears even when undo fails`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.canUndo }
+
+        server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
+        viewModel.onUndoTapped()
+        awaitUntil { viewModel.uiState.value.isUndoInFlight }
+        awaitUntil { !viewModel.uiState.value.isUndoInFlight }
+
+        assertTrue(viewModel.uiState.value.canUndo)
+        assertEquals(1, undoHistoryStore.entries.value.size)
+    }
+
+    @Test
     fun `add affordance opens modal with query prefilled and all views selected`() = runTest(testDispatcher) {
         loadFixtures()
 
