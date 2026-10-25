@@ -9,6 +9,8 @@ class FakeHealthApi(var behavior: () -> HealthResponse = {
     HealthResponse(status = "ok")
 }) : HealthApi {
     override suspend fun getHealth(): HealthResponse = behavior()
+
+    override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse = behavior()
 }
 
 fun httpException(code: Int): HttpException =
