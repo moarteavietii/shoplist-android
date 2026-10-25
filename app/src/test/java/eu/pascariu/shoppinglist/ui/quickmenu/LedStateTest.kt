@@ -4,12 +4,12 @@ import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class SortModeLedStateTest {
+class LedStateTest {
 
     @Test
     fun `manual order with sort mode on shows filled dot`() {
         assertEquals(
-            SortModeLedState.FILLED,
+            LedState.FILLED,
             deriveSortModeLedState(sortModeEnabled = true, order = SortOrder.MANUAL),
         )
     }
@@ -17,7 +17,7 @@ class SortModeLedStateTest {
     @Test
     fun `manual order with sort mode off shows hollow dot`() {
         assertEquals(
-            SortModeLedState.HOLLOW,
+            LedState.HOLLOW,
             deriveSortModeLedState(sortModeEnabled = false, order = SortOrder.MANUAL),
         )
     }
@@ -25,7 +25,7 @@ class SortModeLedStateTest {
     @Test
     fun `alphabetical order shows no dot`() {
         assertEquals(
-            SortModeLedState.NONE,
+            LedState.NONE,
             deriveSortModeLedState(sortModeEnabled = true, order = SortOrder.ALPHABETICAL),
         )
     }
@@ -33,7 +33,7 @@ class SortModeLedStateTest {
     @Test
     fun `frequency order shows no dot`() {
         assertEquals(
-            SortModeLedState.NONE,
+            LedState.NONE,
             deriveSortModeLedState(sortModeEnabled = false, order = SortOrder.FREQUENCY),
         )
     }
@@ -41,7 +41,7 @@ class SortModeLedStateTest {
     @Test
     fun `search control led follows search expanded state`() {
         assertEquals(
-            SortModeLedState.FILLED,
+            LedState.FILLED,
             deriveControlLedState(
                 control = QuickMenuControl.SEARCH,
                 isSearchExpanded = true,
@@ -51,7 +51,7 @@ class SortModeLedStateTest {
             ),
         )
         assertEquals(
-            SortModeLedState.HOLLOW,
+            LedState.HOLLOW,
             deriveControlLedState(
                 control = QuickMenuControl.SEARCH,
                 isSearchExpanded = false,
@@ -65,7 +65,7 @@ class SortModeLedStateTest {
     @Test
     fun `checked items control led follows checked items state`() {
         assertEquals(
-            SortModeLedState.FILLED,
+            LedState.FILLED,
             deriveControlLedState(
                 control = QuickMenuControl.CHECKED_ITEMS_TOGGLE,
                 isSearchExpanded = false,
@@ -75,7 +75,7 @@ class SortModeLedStateTest {
             ),
         )
         assertEquals(
-            SortModeLedState.HOLLOW,
+            LedState.HOLLOW,
             deriveControlLedState(
                 control = QuickMenuControl.CHECKED_ITEMS_TOGGLE,
                 isSearchExpanded = false,
@@ -89,7 +89,7 @@ class SortModeLedStateTest {
     @Test
     fun `sort mode control led delegates to sort mode derivation`() {
         assertEquals(
-            SortModeLedState.FILLED,
+            LedState.FILLED,
             deriveControlLedState(
                 control = QuickMenuControl.SORT_MODE,
                 isSearchExpanded = false,
@@ -99,7 +99,7 @@ class SortModeLedStateTest {
             ),
         )
         assertEquals(
-            SortModeLedState.NONE,
+            LedState.NONE,
             deriveControlLedState(
                 control = QuickMenuControl.SORT_MODE,
                 isSearchExpanded = false,
