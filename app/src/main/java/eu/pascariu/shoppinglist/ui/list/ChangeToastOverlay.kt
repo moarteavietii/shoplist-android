@@ -31,8 +31,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.pascariu.shoppinglist.data.realtime.ToastSeverity
@@ -106,7 +105,10 @@ private fun ToastContent(
                 }
                 .shadow(elevation = TOAST_SHADOW_ELEVATION, shape = TOAST_PILL_SHAPE)
                 .background(colors.surfaceInverse, TOAST_PILL_SHAPE)
-                .clickable { currentOnDismissed(toast.id) }
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = "Dismiss notification",
+                ) { currentOnDismissed(toast.id) }
                 .pointerInput(toast.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -144,9 +146,6 @@ private fun ToastContent(
                 color = colors.contentInverse,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics {
-                    contentDescription = "notification pill"
-                },
             )
         }
     }
