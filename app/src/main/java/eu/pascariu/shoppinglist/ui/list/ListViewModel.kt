@@ -186,6 +186,12 @@ class ListViewModel @Inject constructor(
         }
     }
 
+    private fun clearFailureToast() {
+        if (_changeToast.value?.severity == ToastSeverity.Danger) {
+            dismissChangeToast()
+        }
+    }
+
     fun refresh() {
         if (connectivity.value == BackendConnectivity.UNREACHABLE) {
             return
@@ -194,6 +200,7 @@ class ListViewModel @Inject constructor(
             try {
                 itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
                 shopsRepository.refetch()
+                clearFailureToast()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -255,6 +262,7 @@ class ListViewModel @Inject constructor(
             try {
                 val newKey = dropKeyForIndex(orderedKeys = orderedKeys, dropIndex = clampedDropIndex)
                 itemsRepository.reorder(itemId = item.id, viewId = viewId, newKey = newKey)
+                clearFailureToast()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -417,6 +425,7 @@ class ListViewModel @Inject constructor(
                 return@launch
             }
             isCreateInFlight = false
+            clearFailureToast()
             localState.update {
                 it.copy(
                     searchQuery = "",
@@ -523,6 +532,7 @@ class ListViewModel @Inject constructor(
                     ),
                 )
                 localState.update { it.copy(editItemModal = null) }
+                clearFailureToast()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -560,6 +570,7 @@ class ListViewModel @Inject constructor(
             itemsRepository.applyDeleted(item.id)
             try {
                 itemsRepository.delete(item.id)
+                clearFailureToast()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

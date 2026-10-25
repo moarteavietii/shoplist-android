@@ -280,12 +280,16 @@ class ListViewModelTest {
         enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
         enqueueShopList(shopJson(1, "Global"))
         connectivityFlow.value = BackendConnectivity.UNREACHABLE
-        advanceUntilIdle()
+        runCurrent()
         connectivityFlow.value = BackendConnectivity.REACHABLE
-        awaitUntil { server.requestCount == 3 }
-        viewModel.onToastSwipedDismissed(viewModel.changeToast.value?.id ?: -1L)
+        val deadline = System.currentTimeMillis() + 5_000
+        while (server.requestCount < 3 && System.currentTimeMillis() < deadline) {
+            runCurrent()
+            Thread.sleep(10)
+        }
         runCurrent()
         assertEquals(3, server.requestCount)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
