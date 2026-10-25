@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +30,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SortByAlpha
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -48,8 +48,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
@@ -74,6 +72,7 @@ enum class QuickMenuControl {
     SORT_MODE,
     CHECKED_ITEMS_TOGGLE,
     SEARCH,
+    UNDO,
 }
 
 enum class LedState { FILLED, HOLLOW, NONE }
@@ -146,6 +145,8 @@ fun QuickMenu(
     isSortModeEnabled: Boolean,
     sortOrder: SortOrder,
     globalUncheckedCount: Int,
+    canUndo: Boolean,
+    isUndoInFlight: Boolean = false,
     onControlTapped: (QuickMenuControl) -> Unit,
     onSortOrderSelected: (SortOrder) -> Unit,
     onExpandedChanged: (Boolean) -> Unit,
@@ -177,36 +178,42 @@ fun QuickMenu(
 
     Box(modifier = modifier.then(collapseOnSwipeUp)) {
         Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .shadow(elevation = 4.dp, shape = shapes.medium)
                 .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
-                .padding(6.dp),
+                .padding(4.dp),
         ) {
-            Canvas(
+            Box(
                 modifier = Modifier
-                    .minimumInteractiveComponentSize()
                     .clickable(
                         role = Role.Button,
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() },
                     ) { onExpandedChanged(!isExpanded) }
+                    .minimumInteractiveComponentSize()
                     .size(40.dp)
+                    .background(colors.chrome, shapes.medium)
+                    .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.medium)
                     .graphicsLayer(rotationZ = chevronRotation)
                     .semantics {
                         contentDescription =
                             if (isExpanded) "Collapse quick menu" else "Expand quick menu"
                     },
+                contentAlignment = Alignment.Center,
             ) {
-                val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                val inset = 14.dp.toPx()
-                val midY = size.height / 2
-                val path = Path().apply {
-                    moveTo(inset, midY - 2.dp.toPx())
-                    lineTo(size.width / 2, midY + 2.dp.toPx())
-                    lineTo(size.width - inset, midY - 2.dp.toPx())
+                Canvas(modifier = Modifier.size(40.dp)) {
+                    val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                    val inset = 14.dp.toPx()
+                    val midY = size.height / 2
+                    val path = Path().apply {
+                        moveTo(inset, midY - 2.dp.toPx())
+                        lineTo(size.width / 2, midY + 2.dp.toPx())
+                        lineTo(size.width - inset, midY - 2.dp.toPx())
+                    }
+                    drawPath(path, color = colors.contentMuted, style = stroke)
                 }
-                drawPath(path, color = colors.contentMuted, style = stroke)
             }
             AnimatedVisibility(
                 visible = isExpanded,
@@ -214,7 +221,7 @@ fun QuickMenu(
                 exit = fadeOut() + shrinkVertically(),
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalAlignment = Alignment.End,
                 ) {
                     QuickMenuControl.entries.forEach { control ->
@@ -243,6 +250,22 @@ fun QuickMenu(
                                         onSortOrderSelected(order)
                                     },
                                     onDismiss = { sortOrderSelectorOpen = false },
+                                )
+                            }
+                        } else if (control == QuickMenuControl.UNDO) {
+                            AnimatedVisibility(
+                                visible = canUndo,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically(),
+                            ) {
+                                QuickMenuControlButton(
+                                    control = control,
+                                    isActive = false,
+                                    ledState = ledState,
+                                    badgeCount = null,
+                                    onTapped = { onControlTapped(control) },
+                                    onLongPressed = null,
+                                    disabled = isUndoInFlight,
                                 )
                             }
                         } else {
@@ -278,12 +301,7 @@ private fun SwitcherBadge(count: Int, modifier: Modifier = Modifier) {
 
     Text(
         text = count.toString(),
-        style = typography.ledDot.copy(
-            fontFamily = FontFamily.Default,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
-            lineHeight = 10.sp,
-        ),
+        style = typography.micro,
         color = colors.background,
         modifier = modifier
             .background(colors.ledOn, RoundedCornerShape(8.dp))
@@ -301,12 +319,14 @@ private fun QuickMenuControlButton(
     badgeCount: Int?,
     onTapped: () -> Unit,
     onLongPressed: (() -> Unit)?,
+    disabled: Boolean = false,
 ) {
     val colors = LocalShoplistColors.current
     val shapes = LocalShoplistShapes.current
     val noIndication = remember { MutableInteractionSource() }
     val buttonModifier = if (onLongPressed != null) {
         Modifier.combinedClickable(
+            enabled = !disabled,
             role = Role.Button,
             onClick = onTapped,
             onLongClick = onLongPressed,
@@ -315,6 +335,7 @@ private fun QuickMenuControlButton(
         )
     } else {
         Modifier.clickable(
+            enabled = !disabled,
             role = Role.Button,
             onClick = onTapped,
             indication = null,
@@ -339,15 +360,19 @@ private fun QuickMenuControlButton(
             .size(40.dp)
             .background(
                 color = if (isActive) colors.surface else colors.chrome,
-                shape = shapes.small,
+                shape = shapes.medium,
             )
-            .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.small),
+            .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.medium),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = control.icon(),
             contentDescription = control.contentDescription(),
-            tint = if (isActive) colors.content else colors.contentFaint,
+            tint = when {
+                disabled -> colors.contentFaint.copy(alpha = 0.5f)
+                isActive -> colors.content
+                else -> colors.contentFaint
+            },
             modifier = Modifier.size(20.dp),
         )
         if (ledState == LedState.FILLED || ledState == LedState.HOLLOW) {
@@ -373,6 +398,7 @@ private fun QuickMenuControl.icon(): ImageVector = when (this) {
     QuickMenuControl.SORT_MODE -> Icons.Outlined.SwapVert
     QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Outlined.Check
     QuickMenuControl.SEARCH -> Icons.Outlined.Search
+    QuickMenuControl.UNDO -> Icons.Outlined.Undo
 }
 
 private fun QuickMenuControl.contentDescription(): String = when (this) {
@@ -381,6 +407,7 @@ private fun QuickMenuControl.contentDescription(): String = when (this) {
         QuickMenuControl.SORT_MODE -> "Sort mode"
         QuickMenuControl.CHECKED_ITEMS_TOGGLE -> "Checked items toggle"
         QuickMenuControl.SEARCH -> "Search"
+        QuickMenuControl.UNDO -> "Undo last action"
     }
 
 private const val SWIPE_COLLAPSE_THRESHOLD_PX = 24f

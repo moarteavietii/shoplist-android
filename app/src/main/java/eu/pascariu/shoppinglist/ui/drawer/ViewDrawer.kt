@@ -1,14 +1,17 @@
 package eu.pascariu.shoppinglist.ui.drawer
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +26,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -50,16 +54,17 @@ fun ViewDrawer(
 
     DrawerShell(visible = visible, onDismiss = onDismiss, modifier = modifier) {
         Text(
-            text = "Views",
-            style = typography.label,
-            color = colors.contentMuted,
-            modifier = Modifier.padding(bottom = 8.dp),
+            text = "Shops",
+            style = typography.title,
+            color = colors.content,
+            modifier = Modifier.padding(bottom = 16.dp),
         )
 
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             shops.forEach { shop ->
                 DrawerShopRow(
@@ -70,17 +75,7 @@ fun ViewDrawer(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Add shop",
-            style = typography.label,
-            color = colors.ledOn,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(role = Role.Button) { onAddShop() }
-                .padding(vertical = 12.dp),
-        )
+        AddShopButton(onClick = onAddShop)
     }
 }
 
@@ -92,57 +87,92 @@ private fun DrawerShopRow(
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
-    val shapes = LocalShoplistShapes.current
+    val cardShape = LocalShoplistShapes.current.medium
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button) { onSelected() }
-            .padding(vertical = 10.dp, horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = shop.name,
-            style = typography.body,
-            color = if (shop.isActive) colors.ledOn else colors.content,
-            modifier = Modifier.weight(1f),
-        )
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, if (shop.isActive) colors.accent else colors.border, cardShape)
+                .background(if (shop.isActive) colors.accent else colors.surface, cardShape)
+                .clickable(role = Role.Button) { onSelected() }
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = shop.name,
+                style = typography.body,
+                color = if (shop.isActive) colors.background else colors.content,
+                modifier = Modifier.weight(1f),
+            )
 
-        UncheckedCountBadge(count = shop.uncheckedCount)
+            if (shop.uncheckedCount > 0) {
+                UncheckedCountBadge(count = shop.uncheckedCount, isActive = shop.isActive)
+            } else if (shop.uncheckedCount == 0) {
+                Text(
+                    text = "0",
+                    style = typography.micro,
+                    color = colors.contentFaint,
+                )
+            }
+        }
 
         if (!shop.isGlobal) {
-            Icon(
-                imageVector = Icons.Filled.Edit,
-                contentDescription = "Edit ${shop.name}",
-                tint = colors.contentMuted,
+            Box(
                 modifier = Modifier
-                    .minimumInteractiveComponentSize()
+                    .size(36.dp)
+                    .border(1.dp, colors.border, cardShape)
                     .clickable(role = Role.Button) { onEdit() },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Edit ${shop.name}",
+                    tint = colors.content,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun UncheckedCountBadge(count: Int) {
+private fun UncheckedCountBadge(count: Int, isActive: Boolean) {
     val colors = LocalShoplistColors.current
-    val typography = LocalShoplistTypography.current
-    val shapes = LocalShoplistShapes.current
+    val badgeShape = LocalShoplistShapes.current.medium
+    val badgeStyle = LocalShoplistTypography.current.micro.copy(lineHeight = 14.sp)
 
     Text(
         text = count.toString(),
-        style = typography.label,
-        color = if (count > 0) colors.background else colors.contentMuted,
+        style = badgeStyle,
+        color = if (isActive) colors.accentDeep else colors.background,
         modifier = Modifier
-            .then(
-                if (count > 0) {
-                    Modifier.background(colors.ledOn, shapes.small)
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .background(if (isActive) colors.background else colors.accentDeep, badgeShape)
+            .padding(horizontal = 4.dp)
             .semantics { contentDescription = "$count unchecked items" },
     )
+}
+
+@Composable
+private fun AddShopButton(onClick: () -> Unit) {
+    val colors = LocalShoplistColors.current
+    val typography = LocalShoplistTypography.current
+    val buttonShape = LocalShoplistShapes.current.medium
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .height(48.dp)
+            .border(1.dp, colors.border, buttonShape)
+            .clickable(role = Role.Button) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = "+", style = typography.title, color = colors.content)
+    }
 }

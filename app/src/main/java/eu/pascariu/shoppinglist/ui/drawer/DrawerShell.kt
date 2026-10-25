@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
@@ -57,8 +58,10 @@ fun DrawerShell(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
+                    .padding(bottom = 16.dp)
                     .width(280.dp)
                     .swipeLeftToClose(isEnabled = true, onClose = onDismiss)
+                    .shadow(elevation = 12.dp, shape = shapes.large)
                     .background(colors.surface, shapes.large)
                     .padding(16.dp),
             ) {

@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
 @HiltViewModel
 class ListViewModel @Inject constructor(
@@ -79,6 +80,7 @@ class ListViewModel @Inject constructor(
 
     private val inFlightChecks = MutableStateFlow(0)
     private val undoMutex = Mutex()
+    private val undoInFlightGuard = AtomicBoolean(false)
     private var isCreateInFlight = false
     private var isUpdateInFlight = false
     private var nextPostSaveSignalId = 0L
@@ -282,44 +284,57 @@ class ListViewModel @Inject constructor(
     }
 
     fun onUndoTapped() {
+        if (!undoInFlightGuard.compareAndSet(false, true)) return
+        localState.update { it.copy(isUndoInFlight = true) }
         viewModelScope.launch {
-            undoMutex.withLock {
-                val settled = waitForInFlightChecks()
-                if (!settled) return@withLock
-                undoHistoryStore.prune()
-                val entries = undoHistoryStore.entries.value
-                val itemCache = itemsRepository.items.value.associateBy { it.id }
-                for (entry in entries) {
-                    val expired = System.currentTimeMillis() - entry.at >= UndoConfig.TTL.toMillis()
-                    val item = itemCache[entry.itemId]
-                    when {
-                        expired || item == null || item.isChecked != entry.to -> {
-                            undoHistoryStore.removeTop()
-                            continue
-                        }
-                        else -> {
-                            val removed = undoHistoryStore.removeTop()
-                            if (removed == null) return@withLock
-                            try {
-                                inFlightChecks.update { it + 1 }
-                                try {
-                                    itemsRepository.setChecked(
-                                        itemId = entry.itemId,
-                                        isChecked = entry.from,
-                                        isUndo = true,
-                                    )
-                                } finally {
-                                    inFlightChecks.update { it - 1 }
+            try {
+                undoMutex.withLock {
+                    try {
+                        val settled = waitForInFlightChecks()
+                        if (!settled) return@withLock
+                        undoHistoryStore.prune()
+                        val entries = undoHistoryStore.entries.value
+                        val itemCache = itemsRepository.items.value.associateBy { it.id }
+                        for (entry in entries) {
+                            val expired = System.currentTimeMillis() - entry.at >= UndoConfig.TTL.toMillis()
+                            val item = itemCache[entry.itemId]
+                            when {
+                                expired || item == null || item.isChecked != entry.to -> {
+                                    undoHistoryStore.removeTop()
+                                    continue
                                 }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (_: Exception) {
-                                undoHistoryStore.restoreTop(entry)
+                                else -> {
+                                    val removed = undoHistoryStore.removeTop()
+                                    if (removed == null) return@withLock
+                                    try {
+                                        inFlightChecks.update { it + 1 }
+                                        try {
+                                            itemsRepository.setChecked(
+                                                itemId = entry.itemId,
+                                                isChecked = entry.from,
+                                                isUndo = true,
+                                            )
+                                        } finally {
+                                            inFlightChecks.update { it - 1 }
+                                        }
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (_: Exception) {
+                                        undoHistoryStore.restoreTop(entry)
+                                    }
+                                    return@withLock
+                                }
                             }
-                            return@withLock
                         }
+                    } finally {
+                        undoInFlightGuard.set(false)
+                        localState.update { it.copy(isUndoInFlight = false) }
                     }
                 }
+            } catch (e: CancellationException) {
+                undoInFlightGuard.set(false)
+                localState.update { it.copy(isUndoInFlight = false) }
+                throw e
             }
         }
     }
@@ -427,6 +442,7 @@ class ListViewModel @Inject constructor(
                     quantity = item.quantity,
                     originalIsTemporary = item.isTemporary,
                     isTemporary = item.isTemporary,
+                    checkCount = item.checkCount,
                 ),
             )
         }
@@ -598,6 +614,7 @@ class ListViewModel @Inject constructor(
             QuickMenuControl.SORT_MODE -> onSortModeToggled()
             QuickMenuControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
             QuickMenuControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
+            QuickMenuControl.UNDO -> onUndoTapped()
         }
     }
 
@@ -762,6 +779,12 @@ class ListViewModel @Inject constructor(
             globalShop != null -> globalShop.name
             else -> GLOBAL_VIEW_NAME
         }
+        val editItemModal = local.editItemModal?.let { modal ->
+            items.firstOrNull { it.id == modal.itemId }
+                ?.takeIf { it.checkCount != modal.checkCount }
+                ?.let { modal.copy(checkCount = it.checkCount) }
+                ?: modal
+        }
         val uncheckedCounts = deriveUncheckedCountByShop(liveItems, shops)
         val drawerShops = buildDrawerShops(
             shops = shops,
@@ -787,9 +810,10 @@ class ListViewModel @Inject constructor(
             hideChecked = hideChecked,
             filteredItems = filtered,
             showAddAffordance = query.isNotEmpty() && filtered.isEmpty(),
-            showUndoBar = undoEntries.isNotEmpty(),
+            canUndo = undoEntries.isNotEmpty(),
+            isUndoInFlight = local.isUndoInFlight,
             addItemModal = local.addItemModal,
-            editItemModal = local.editItemModal,
+            editItemModal = editItemModal,
             deleteConfirmItem = local.deleteConfirmItem,
             shopModal = local.shopModal,
             postSaveSignal = local.postSaveSignal,
@@ -869,6 +893,7 @@ class ListViewModel @Inject constructor(
         val deleteConfirmItem: Item? = null,
         val shopModal: ShopModalUiState? = null,
         val errorMessage: String? = null,
+        val isUndoInFlight: Boolean = false,
     )
 
     companion object {
