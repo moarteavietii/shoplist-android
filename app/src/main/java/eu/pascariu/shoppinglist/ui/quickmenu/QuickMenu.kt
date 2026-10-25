@@ -93,7 +93,7 @@ fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
-                    .background(colors.ledOn.copy(alpha = 0.4f), CircleShape),
+                    .background(colors.ledOn.copy(alpha = 0.25f), CircleShape),
             )
             Box(
                 modifier = Modifier
