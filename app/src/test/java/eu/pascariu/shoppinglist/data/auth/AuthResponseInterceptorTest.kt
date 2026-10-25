@@ -206,6 +206,25 @@ class AuthResponseInterceptorTest {
     }
 
     @Test
+    fun `emits nothing when redirected to another path on the api host`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse().setResponseCode(302)
+                .setHeader("Location", mockWebServer.url("/api/v1/items").toString())
+        )
+        mockWebServer.enqueue(MockResponse().setResponseCode(200))
+
+        authEventBus.events.test {
+            buildClient().newCall(Request.Builder().url(mockWebServer.url("/api/v1/lists")).build())
+                .execute()
+                .close()
+
+            assertEquals(0, authEventBus.events.replayCache.size)
+            expectNoEvents()
+        }
+        assertEquals(AccessCredentials(clientId = "id", clientSecret = "secret"), tokenStore.load())
+    }
+
+    @Test
     fun `emits nothing when gate redirect is an explicit credential probe`() = runTest {
         val gateHost = "probe.cloudflareaccess.com"
         val gateUrl = mockWebServer.url("/").newBuilder().host(gateHost).build()
