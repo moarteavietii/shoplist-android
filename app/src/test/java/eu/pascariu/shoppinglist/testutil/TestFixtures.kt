@@ -10,9 +10,18 @@ class FakeHealthApi(
     var healthBehavior: () -> HealthResponse = { HealthResponse(status = "ok") },
     var probeBehavior: () -> List<ShopProbeEntry> = { emptyList() },
 ) : HealthApi {
+    var probedClientId: String? = null
+        private set
+    var probedClientSecret: String? = null
+        private set
+
     override suspend fun getHealth(): HealthResponse = healthBehavior()
 
-    override suspend fun probeShops(clientId: String, clientSecret: String): List<ShopProbeEntry> = probeBehavior()
+    override suspend fun probeShops(clientId: String, clientSecret: String): List<ShopProbeEntry> {
+        probedClientId = clientId
+        probedClientSecret = clientSecret
+        return probeBehavior()
+    }
 }
 
 fun httpException(code: Int): HttpException =
