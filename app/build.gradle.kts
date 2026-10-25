@@ -106,17 +106,25 @@ val keystoreFile: File? = keystorePath?.let {
 val hasReleaseSigningConfig = keystoreFile != null && keystorePassword != null && keystoreAlias != null
 
 fun requireReleaseSigningConfig() {
-    if (hasReleaseSigningConfig) return
     val missing = buildList {
         if (keystorePath == null) add("shoplist.release.keystore.path")
         if (keystorePassword == null) add("shoplist.release.keystore.password")
         if (keystoreAlias == null) add("shoplist.release.keystore.alias")
     }
-    throw GradleException(
-        "Release signing configuration is missing. Set the following in " +
-            "local.properties (or ~/.gradle/gradle.properties): ${missing.joinToString()}. " +
-            "Never commit these values or the keystore file."
-    )
+    if (missing.isNotEmpty()) {
+        throw GradleException(
+            "Release signing configuration is missing. Set the following in " +
+                "local.properties (or ~/.gradle/gradle.properties): ${missing.joinToString()}. " +
+                "Never commit these values or the keystore file."
+        )
+    }
+    val keystore = keystoreFile
+    if (keystore != null && !keystore.isFile) {
+        throw GradleException(
+            "Release signing: keystore file not found at '$keystore' " +
+                "(shoplist.release.keystore.path)"
+        )
+    }
 }
 
 gradle.taskGraph.whenReady {
@@ -182,10 +190,6 @@ android {
     signingConfigs {
         if (hasReleaseSigningConfig) {
             val keystore = keystoreFile!!
-            require(keystore.isFile) {
-                "Release signing: keystore file not found at '$keystore' " +
-                    "(shoplist.release.keystore.path)"
-            }
             create("release") {
                 storeFile = keystore
                 storePassword = keystorePassword
