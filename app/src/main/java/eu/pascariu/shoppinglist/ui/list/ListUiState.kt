@@ -10,7 +10,7 @@ data class ListUiState(
     val items: List<Item> = emptyList(),
     val watermarkName: String = "Global",
     val activeViewId: Long? = null,
-    val isWidgetStackExpanded: Boolean = false,
+    val isQuickMenuExpanded: Boolean = false,
     val sortModeEnabled: Boolean = true,
     val sortOrder: SortOrder = SortOrder.MANUAL,
     val dragEnabled: Boolean = false,

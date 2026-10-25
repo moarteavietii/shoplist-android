@@ -55,20 +55,20 @@ class ListPreferencesDataSourceTest {
     }
 
     @Test
-    fun `widget stack expanded defaults to false`() = runTest(testDispatcher) {
+    fun `quick menu expanded defaults to false`() = runTest(testDispatcher) {
         settle()
 
-        assertFalse(dataSource.widgetStackExpanded.value)
+        assertFalse(dataSource.quickMenuExpanded.value)
     }
 
     @Test
-    fun `widget stack expanded round-trips through storage`() = runTest(testDispatcher) {
+    fun `quick menu expanded round-trips through storage`() = runTest(testDispatcher) {
         settle()
 
-        dataSource.setWidgetStackExpanded(true)
+        dataSource.setQuickMenuExpanded(true)
         settle()
 
-        assertTrue(dataSource.widgetStackExpanded.value)
+        assertTrue(dataSource.quickMenuExpanded.value)
     }
 
     @Test
@@ -172,18 +172,18 @@ class ListPreferencesDataSourceTest {
     fun `keys are isolated - writing one does not affect the other`() = runTest(testDispatcher) {
         settle()
 
-        dataSource.setWidgetStackExpanded(true)
+        dataSource.setQuickMenuExpanded(true)
         settle()
         dataSource.setActiveShopId(7L)
         settle()
 
-        assertTrue(dataSource.widgetStackExpanded.value)
+        assertTrue(dataSource.quickMenuExpanded.value)
         assertEquals(7L, dataSource.activeShopId.value)
 
         dataSource.setActiveShopId(null)
         settle()
 
-        assertTrue(dataSource.widgetStackExpanded.value)
+        assertTrue(dataSource.quickMenuExpanded.value)
         assertNull(dataSource.activeShopId.value)
     }
 
@@ -192,7 +192,7 @@ class ListPreferencesDataSourceTest {
         runTest(testDispatcher) {
             settle()
 
-            dataSource.setWidgetStackExpanded(true)
+            dataSource.setQuickMenuExpanded(true)
             dataSource.setActiveShopId(9L)
             dataSource.setSearchExpanded(true)
             dataSource.setShowChecked(false)
@@ -212,7 +212,7 @@ class ListPreferencesDataSourceTest {
             )
             advanceUntilIdle()
 
-            assertTrue(restarted.widgetStackExpanded.value)
+            assertTrue(restarted.quickMenuExpanded.value)
             assertEquals(9L, restarted.activeShopId.value)
             assertTrue(restarted.searchExpanded.value)
             assertFalse(restarted.showChecked.value)
@@ -233,10 +233,10 @@ class ListPreferencesDataSourceTest {
             )
             advanceUntilIdle()
 
-            failing.setWidgetStackExpanded(true)
+            failing.setQuickMenuExpanded(true)
             failing.setActiveShopId(3L)
 
-            assertFalse(failing.widgetStackExpanded.value)
+            assertFalse(failing.quickMenuExpanded.value)
             assertNull(failing.activeShopId.value)
 
             failingScope.cancel()
