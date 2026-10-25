@@ -214,6 +214,28 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `scanned qr payload with blank credentials is rejected`() {
+        val viewModel = createViewModel()
+
+        viewModel.onQrPayloadScanned("""{"clientId":"   ","clientSecret":"scanned-secret"}""")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Unrecognized QR code format", viewModel.uiState.value.error)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `scanned qr payload missing client secret is rejected`() {
+        val viewModel = createViewModel()
+
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id"}""")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Unrecognized QR code format", viewModel.uiState.value.error)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
     fun `scanned qr payload clears stale rejection banner`() {
         val viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
