@@ -56,10 +56,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState != null) {
             credentialsRejected = savedInstanceState.getBoolean(KEY_CREDENTIALS_REJECTED)
-            credentialsMissing = savedInstanceState.getBoolean(KEY_CREDENTIALS_MISSING)
-        } else {
-            credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && tokenStore.load() == null
         }
+        credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && tokenStore.load() == null
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 authEventBus.events.collect {
@@ -105,11 +103,9 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_CREDENTIALS_REJECTED, credentialsRejected)
-        outState.putBoolean(KEY_CREDENTIALS_MISSING, credentialsMissing)
     }
 
     private companion object {
         const val KEY_CREDENTIALS_REJECTED = "credentialsRejected"
-        const val KEY_CREDENTIALS_MISSING = "credentialsMissing"
     }
 }
