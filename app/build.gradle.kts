@@ -89,9 +89,12 @@ val keystoreProperties: Properties? = run {
     if (props.isEmpty) null else props
 }
 
-val keystorePath: String? = keystoreProperties?.getProperty("shoplist.release.keystore.path")
-val keystorePassword: String? = keystoreProperties?.getProperty("shoplist.release.keystore.password")
-val keystoreAlias: String? = keystoreProperties?.getProperty("shoplist.release.keystore.alias")
+fun Properties.nonBlankProperty(key: String): String? =
+    getProperty(key)?.takeIf { it.isNotBlank() }
+
+val keystorePath: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.path")
+val keystorePassword: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.password")
+val keystoreAlias: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.alias")
 
 val keystoreFile: File? = keystorePath?.let {
     val expanded = File(it.replaceFirst("^~", System.getProperty("user.home")))
