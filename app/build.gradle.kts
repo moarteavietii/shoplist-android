@@ -95,6 +95,8 @@ fun Properties.nonBlankProperty(key: String): String? =
 val keystorePath: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.path")
 val keystorePassword: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.password")
 val keystoreAlias: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.alias")
+val keystoreKeyPassword: String? =
+    keystoreProperties?.nonBlankProperty("shoplist.release.keystore.keypassword")
 
 val keystoreFile: File? = keystorePath?.let {
     val expanded = File(it.replaceFirst("^~", System.getProperty("user.home")))
@@ -183,7 +185,7 @@ android {
                 storeFile = keystore
                 storePassword = keystorePassword
                 keyAlias = keystoreAlias
-                keyPassword = keystorePassword
+                keyPassword = keystoreKeyPassword ?: keystorePassword
             }
         }
     }
