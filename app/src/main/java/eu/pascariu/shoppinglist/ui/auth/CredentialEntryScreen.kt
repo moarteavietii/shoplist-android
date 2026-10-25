@@ -115,6 +115,7 @@ fun CredentialEntryScreen(
             onValueChange = viewModel::onClientIdChange,
             label = { Text("Client ID") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
             modifier = Modifier.fillMaxWidth(),
             textStyle = typography.body.copy(color = colors.content),
         )

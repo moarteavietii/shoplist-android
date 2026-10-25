@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import retrofit2.HttpException
 
 enum class CredentialErrorKind {
@@ -37,6 +40,14 @@ data class CredentialEntryUiState(
     val rejectionMessage: String? = null,
     val saved: Boolean = false,
 )
+
+@Serializable
+private data class QrTokenPayload(
+    val clientId: String,
+    val clientSecret: String,
+)
+
+private val qrJson = Json { ignoreUnknownKeys = true }
 
 @HiltViewModel
 class CredentialEntryViewModel @Inject constructor(
@@ -163,6 +174,10 @@ class CredentialEntryViewModel @Inject constructor(
             }
         } catch (error: IOException) {
             ProbeOutcome.Unreachable
+        } catch (error: SerializationException) {
+            // The gate answered with its HTML login page (redirect followed)
+            // instead of JSON: the probe credentials were not accepted.
+            ProbeOutcome.Rejected
         }
 
     private enum class ProbeOutcome {
@@ -172,19 +187,16 @@ class CredentialEntryViewModel @Inject constructor(
         Unreachable,
     }
 
-    private fun parseQrPayload(payload: String): AccessCredentials? {
-        val params = payload.substringAfter("?", "").split('&')
-            .mapNotNull { pair ->
-                val idx = pair.indexOf('=')
-                if (idx <= 0) return@mapNotNull null
-                pair.take(idx) to java.net.URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
-            }
-            .toMap()
-        val clientId = params["id"] ?: return null
-        val clientSecret = params["secret"] ?: return null
-        if (clientId.isBlank() || clientSecret.isBlank()) return null
-        return AccessCredentials(clientId, clientSecret)
-    }
+    private fun parseQrPayload(payload: String): AccessCredentials? =
+        try {
+            val credentials = qrJson.decodeFromString<QrTokenPayload>(payload)
+            if (credentials.clientId.isBlank() || credentials.clientSecret.isBlank()) null
+            else AccessCredentials(credentials.clientId, credentials.clientSecret)
+        } catch (error: SerializationException) {
+            null
+        } catch (error: IllegalArgumentException) {
+            null
+        }
 
     companion object {
         const val INVALID_CREDENTIALS_MESSAGE = "Invalid credentials"

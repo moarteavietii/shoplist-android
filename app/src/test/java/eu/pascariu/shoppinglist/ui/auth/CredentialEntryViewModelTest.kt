@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.SerializationException
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -137,7 +138,7 @@ class CredentialEntryViewModelTest {
     fun `scanned qr payload populates fields without saving`() {
         val viewModel = createViewModel()
 
-        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id","clientSecret":"scanned-secret"}""")
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("scanned-id", viewModel.uiState.value.clientId)
@@ -149,13 +150,26 @@ class CredentialEntryViewModelTest {
     @Test
     fun `scanned qr credentials are only saved after user submits`() {
         val viewModel = createViewModel()
-        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id","clientSecret":"scanned-secret"}""")
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(AccessCredentials("scanned-id", "scanned-secret"), fakeTokenStore.saved)
         assertTrue(viewModel.uiState.value.saved)
+    }
+
+    @Test
+    fun `scanned qr payload with unknown keys is accepted`() {
+        val viewModel = createViewModel()
+
+        viewModel.onQrPayloadScanned(
+            """{"clientId":"scanned-id","clientSecret":"scanned-secret","note":"extra"}"""
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("scanned-id", viewModel.uiState.value.clientId)
+        assertEquals("scanned-secret", viewModel.uiState.value.clientSecret)
     }
 
     @Test
@@ -166,7 +180,7 @@ class CredentialEntryViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(CredentialEntryViewModel.REJECTION_MESSAGE, viewModel.uiState.value.rejectionMessage)
 
-        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id","clientSecret":"scanned-secret"}""")
 
         assertNull(viewModel.uiState.value.rejectionMessage)
     }
@@ -270,6 +284,29 @@ class CredentialEntryViewModelTest {
             assertEquals(CredentialErrorKind.ServerError, serverErrorState.errorKind)
             assertFalse(serverErrorState.isSaving)
             assertFalse(serverErrorState.saved)
+        }
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `probe returning gate html instead of json shows invalid credentials and stores nothing`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = {
+            throw SerializationException(
+                "Unexpected JSON token at offset 0: Expected start of the object '{', but had '<' instead at path: $"
+            )
+        }
+
+        viewModel.uiState.test {
+            viewModel.submit()
+            skipItems(1)
+            assertTrue(awaitItem().isSaving)
+            val rejectedState = awaitItem()
+            assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, rejectedState.error)
+            assertEquals(CredentialErrorKind.InvalidCredentials, rejectedState.errorKind)
+            assertFalse(rejectedState.isSaving)
+            assertFalse(rejectedState.saved)
         }
         assertEquals(null, fakeTokenStore.saved)
     }

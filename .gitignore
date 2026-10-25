@@ -19,3 +19,4 @@ local.properties
 *.jks
 *.keystore
 devicerun.sh
+qr-token.png
