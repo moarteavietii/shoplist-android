@@ -199,6 +199,7 @@ class CredentialEntryViewModelTest {
             assertTrue(awaitItem().isSaving)
             val rejectedState = awaitItem()
             assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, rejectedState.error)
+            assertEquals(CredentialErrorKind.InvalidCredentials, rejectedState.errorKind)
             assertFalse(rejectedState.isSaving)
             assertFalse(rejectedState.saved)
         }
@@ -217,6 +218,7 @@ class CredentialEntryViewModelTest {
             assertTrue(awaitItem().isSaving)
             val rejectedState = awaitItem()
             assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, rejectedState.error)
+            assertEquals(CredentialErrorKind.InvalidCredentials, rejectedState.errorKind)
             assertFalse(rejectedState.isSaving)
         }
         assertEquals(null, fakeTokenStore.saved)
@@ -234,6 +236,7 @@ class CredentialEntryViewModelTest {
             assertTrue(awaitItem().isSaving)
             val unreachableState = awaitItem()
             assertEquals(CredentialEntryViewModel.UNREACHABLE_MESSAGE, unreachableState.error)
+            assertEquals(CredentialErrorKind.Unreachable, unreachableState.errorKind)
             assertFalse(unreachableState.isSaving)
             assertFalse(unreachableState.saved)
         }
@@ -252,6 +255,7 @@ class CredentialEntryViewModelTest {
             assertTrue(awaitItem().isSaving)
             val unreachableState = awaitItem()
             assertEquals(CredentialEntryViewModel.UNREACHABLE_MESSAGE, unreachableState.error)
+            assertEquals(CredentialErrorKind.Unreachable, unreachableState.errorKind)
             assertFalse(unreachableState.isSaving)
         }
         assertEquals(null, fakeTokenStore.saved)

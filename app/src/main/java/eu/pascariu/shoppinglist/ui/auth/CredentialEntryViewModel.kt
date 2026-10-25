@@ -20,11 +20,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 
+enum class CredentialErrorKind {
+    InvalidCredentials,
+    Unreachable,
+    Validation,
+    QrFormat,
+}
+
 data class CredentialEntryUiState(
     val clientId: String = "",
     val clientSecret: String = "",
     val isSaving: Boolean = false,
     val error: String? = null,
+    val errorKind: CredentialErrorKind? = null,
     val rejectionMessage: String? = null,
     val saved: Boolean = false,
 )
@@ -57,23 +65,24 @@ class CredentialEntryViewModel @Inject constructor(
     }
 
     fun onClientIdChange(value: String) {
-        _uiState.update { it.copy(clientId = value, error = null, rejectionMessage = null) }
+        _uiState.update { it.copy(clientId = value, error = null, errorKind = null, rejectionMessage = null) }
     }
 
     fun onClientSecretChange(value: String) {
-        _uiState.update { it.copy(clientSecret = value, error = null, rejectionMessage = null) }
+        _uiState.update { it.copy(clientSecret = value, error = null, errorKind = null, rejectionMessage = null) }
     }
 
     fun onQrPayloadScanned(payload: String) {
         val credentials = parseQrPayload(payload)
         if (credentials == null) {
-            _uiState.update { it.copy(error = "Unrecognized QR code format") }
+            _uiState.update { it.copy(error = "Unrecognized QR code format", errorKind = CredentialErrorKind.QrFormat) }
         } else {
             _uiState.update {
                 it.copy(
                     clientId = credentials.clientId,
                     clientSecret = credentials.clientSecret,
                     error = null,
+                    errorKind = null,
                 )
             }
         }
@@ -82,7 +91,7 @@ class CredentialEntryViewModel @Inject constructor(
     fun submit() {
         val state = _uiState.value
         if (state.clientId.isBlank() || state.clientSecret.isBlank()) {
-            _uiState.update { it.copy(error = "Both client id and secret are required") }
+            _uiState.update { it.copy(error = "Both client id and secret are required", errorKind = CredentialErrorKind.Validation) }
             return
         }
         verifyAndSave(AccessCredentials(state.clientId.trim(), state.clientSecret.trim()))
@@ -94,7 +103,7 @@ class CredentialEntryViewModel @Inject constructor(
 
     private fun verifyAndSave(credentials: AccessCredentials) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, error = null) }
+            _uiState.update { it.copy(isSaving = true, error = null, errorKind = null) }
             withContext(ioDispatcher) {
                 tokenStore.save(credentials)
             }
@@ -107,7 +116,12 @@ class CredentialEntryViewModel @Inject constructor(
                         tokenStore.clear()
                     }
                     _uiState.update {
-                        it.copy(isSaving = false, error = INVALID_CREDENTIALS_MESSAGE, rejectionMessage = null)
+                        it.copy(
+                            isSaving = false,
+                            error = INVALID_CREDENTIALS_MESSAGE,
+                            errorKind = CredentialErrorKind.InvalidCredentials,
+                            rejectionMessage = null,
+                        )
                     }
                 }
                 ProbeOutcome.Unreachable -> {
@@ -115,7 +129,12 @@ class CredentialEntryViewModel @Inject constructor(
                         tokenStore.clear()
                     }
                     _uiState.update {
-                        it.copy(isSaving = false, error = UNREACHABLE_MESSAGE, rejectionMessage = null)
+                        it.copy(
+                            isSaving = false,
+                            error = UNREACHABLE_MESSAGE,
+                            errorKind = CredentialErrorKind.Unreachable,
+                            rejectionMessage = null,
+                        )
                     }
                 }
             }
