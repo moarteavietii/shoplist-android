@@ -56,9 +56,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState != null) {
             credentialsRejected = savedInstanceState.getBoolean(KEY_CREDENTIALS_REJECTED)
-        } else {
-            credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && tokenStore.load() == null
         }
+        credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && tokenStore.load() == null
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 authEventBus.events.collect {
