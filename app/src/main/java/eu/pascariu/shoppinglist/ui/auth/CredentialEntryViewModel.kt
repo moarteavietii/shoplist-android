@@ -108,7 +108,18 @@ class CredentialEntryViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Both client id and secret are required", errorKind = CredentialErrorKind.Validation) }
             return
         }
-        verifyAndSave(AccessCredentials(state.clientId.trim(), state.clientSecret.trim()))
+        val clientId = state.clientId.trim()
+        val clientSecret = state.clientSecret.trim()
+        if (!isHeaderSafe(clientId) || !isHeaderSafe(clientSecret)) {
+            _uiState.update {
+                it.copy(
+                    error = "Credentials must contain only printable ASCII characters",
+                    errorKind = CredentialErrorKind.Validation,
+                )
+            }
+            return
+        }
+        verifyAndSave(AccessCredentials(clientId, clientSecret))
     }
 
     fun onSavedHandled() {
@@ -203,5 +214,8 @@ class CredentialEntryViewModel @Inject constructor(
         const val SERVER_ERROR_MESSAGE = "Server error. Please try again later."
         const val UNREACHABLE_MESSAGE = "Can't reach the server"
         const val REJECTION_MESSAGE = "Your credentials were rejected or the session expired. Please sign in again."
+
+        private fun isHeaderSafe(value: String): Boolean =
+            value.all { it.code in 0x20..0x7e }
     }
 }
