@@ -376,7 +376,7 @@ private fun QuickMenuControlButton(
             imageVector = control.icon(),
             contentDescription = control.contentDescription(),
             tint = when {
-                disabled -> colors.contentFaint.copy(alpha = 0.4f)
+                disabled -> colors.contentFaint.copy(alpha = 0.5f)
                 isActive -> colors.content
                 else -> colors.contentFaint
             },
