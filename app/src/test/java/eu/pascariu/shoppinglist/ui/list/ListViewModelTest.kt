@@ -144,6 +144,7 @@ class ListViewModelTest {
             listPreferences = listPreferences,
             themeRepository = themeRepository,
             realtimeSyncManager = fakeSyncManager,
+            stringProvider = FakeListStringProvider(),
             expiryTicker = expiryTick,
         )
     }
@@ -1599,6 +1600,7 @@ class ListViewModelTest {
             listPreferences = listPreferences,
             themeRepository = themeRepository,
             realtimeSyncManager = fakeSyncManager,
+            stringProvider = FakeListStringProvider(),
             expiryTicker = expiryTick,
         )
         viewModel = instance
@@ -2413,4 +2415,13 @@ private class FakeRealtimeSyncManager : RealtimeSyncManagerContract {
     suspend fun emit(batch: List<String>) {
         labels.emit(batch.map { ChangeToastLabel(it) })
     }
+}
+
+private class FakeListStringProvider : ListStringProvider {
+    override val refreshFailure: String = "Couldn't refresh the list"
+    override val moveFailure: String = "Couldn't move the item"
+    override val saveFailure: String = "Couldn't save the item"
+    override val deleteFailure: String = "Couldn't delete the item"
+    override val manualSortCheckedItemsNotice: String =
+        "Checked items stay visible while manual sorting is engaged"
 }
