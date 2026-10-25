@@ -1562,7 +1562,7 @@ class ListViewModelTest {
     }
 
     @Test
-    fun `widget stack expand state persists and is restored on a new view model`() = runTest(testDispatcher) {
+    fun `quick menu expand state persists and is restored on a new view model`() = runTest(testDispatcher) {
         loadFixtures()
 
         viewModel.onQuickMenuExpandedChanged(true)
@@ -1576,7 +1576,7 @@ class ListViewModelTest {
     }
 
     @Test
-    fun `widget stack collapse persists`() = runTest(testDispatcher) {
+    fun `quick menu collapse persists`() = runTest(testDispatcher) {
         loadFixtures()
 
         viewModel.onQuickMenuExpandedChanged(true)
