@@ -40,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -94,8 +93,7 @@ fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
-                    .background(colors.ledOn.copy(alpha = 0.4f), CircleShape)
-                    .blur(3.dp),
+                    .background(colors.ledOn.copy(alpha = 0.25f), CircleShape),
             )
             Box(
                 modifier = Modifier
