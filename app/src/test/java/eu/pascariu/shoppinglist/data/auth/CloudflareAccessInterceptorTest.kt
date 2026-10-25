@@ -83,6 +83,37 @@ class CloudflareAccessInterceptorTest {
     }
 
     @Test
+    fun `passes through requests that already carry explicit credential headers`() {
+        apiServer.enqueue(MockResponse().setResponseCode(200))
+
+        val request = Request.Builder().url(apiServer.url("/health"))
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_ID, "probe-id")
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET, "probe-secret")
+            .build()
+        buildClient().newCall(request).execute().close()
+
+        val recorded = apiServer.takeRequest()
+        assertEquals("probe-id", recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
+        assertEquals("probe-secret", recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
+    }
+
+    @Test
+    fun `explicit headers are not overwritten by stored credentials`() {
+        fakeTokenStore.saved = AccessCredentials(clientId = "stored-id", clientSecret = "stored-secret")
+        apiServer.enqueue(MockResponse().setResponseCode(200))
+
+        val request = Request.Builder().url(apiServer.url("/health"))
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_ID, "probe-id")
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET, "probe-secret")
+            .build()
+        buildClient().newCall(request).execute().close()
+
+        val recorded = apiServer.takeRequest()
+        assertEquals("probe-id", recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_ID))
+        assertEquals("probe-secret", recorded.getHeader(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET))
+    }
+
+    @Test
     fun `strips credentials for requests to other hosts`() {
         fakeTokenStore.saved = AccessCredentials(clientId = "id-1", clientSecret = "secret-1")
         otherServer.enqueue(MockResponse().setResponseCode(200))

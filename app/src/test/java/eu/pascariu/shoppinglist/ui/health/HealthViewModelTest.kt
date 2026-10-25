@@ -66,4 +66,6 @@ class HealthViewModelTest {
 
 private class FakeHealthApi(var behavior: () -> HealthResponse) : HealthApi {
     override suspend fun getHealth(): HealthResponse = behavior()
+
+    override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse = behavior()
 }

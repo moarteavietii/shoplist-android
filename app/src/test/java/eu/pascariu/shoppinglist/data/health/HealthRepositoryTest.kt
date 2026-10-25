@@ -62,6 +62,8 @@ private class FakeHealthApi(
     private val behavior: () -> HealthResponse,
 ) : HealthApi {
     override suspend fun getHealth(): HealthResponse = behavior()
+
+    override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse = behavior()
 }
 
 private fun httpException(code: Int): HttpException =

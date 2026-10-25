@@ -14,7 +14,13 @@ class MockCloudflareGateImpl(
         if (!mockEnabled) {
             return chain.proceed(chain.request())
         }
-        val credentials = tokenStore.load()
+        val explicitClientId = chain.request().header(CloudflareAccessInterceptor.HEADER_CLIENT_ID)
+        val explicitClientSecret = chain.request().header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET)
+        val credentials = if (explicitClientId != null && explicitClientSecret != null) {
+            AccessCredentials(explicitClientId, explicitClientSecret)
+        } else {
+            tokenStore.load()
+        }
         val request = if (credentials != null) {
             chain.request().newBuilder()
                 .header(CloudflareAccessInterceptor.HEADER_CLIENT_ID, credentials.clientId)
