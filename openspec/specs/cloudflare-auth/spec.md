@@ -48,3 +48,63 @@ The app SHALL make auth skippable per build type: debug builds SHALL use a no-op
 #### Scenario: Release build always authenticates
 - **WHEN** a release build performs a REST call
 - **THEN** the auth interceptor is the real credential-injecting implementation
+
+### Requirement: Debug builds can mock the Cloudflare gate
+Debug builds SHALL provide a mock Cloudflare gate that validates stored credentials against a known fake credential pair before any request reaches the backend. When the credentials match the fake pair, the request SHALL proceed to the backend; otherwise the gate SHALL synthesize a 401 response without performing a network call. The mock gate SHALL be active only when explicitly enabled via a local, gitignored build configuration flag, and SHALL be inert in all other builds.
+
+#### Scenario: Fake credentials allow requests through
+- **WHEN** the mock gate is enabled and the stored credentials match the fake credential pair
+- **THEN** requests proceed to the backend and succeed
+
+#### Scenario: Non-fake credentials are rejected with a synthesized 401
+- **WHEN** the mock gate is enabled and the stored credentials do not match the fake credential pair
+- **THEN** a 401 response is produced without any network call, and the app's standard rejection handling (credential clearing and re-entry) runs as it would in production
+
+#### Scenario: Mock gate is disabled by default
+- **WHEN** the enable flag is not set in a debug build
+- **THEN** the app behaves exactly as before this change (no credential validation, no synthesized responses)
+
+#### Scenario: Release builds never mock
+- **WHEN** a release build performs any request
+- **THEN** the mock gate is a pass-through and no credential validation or response synthesis occurs
+
+### Requirement: Credentials are verified against the server before saving
+The credential entry flow SHALL verify entered credentials against the server before persisting them. Verification SHALL use the same request path production requests use, so the mock gate (when enabled) participates. Every request to the server is Cloudflare-Access-gated, so a successful probe of the health endpoint constitutes valid credential verification. Credentials SHALL NOT be stored before verification succeeds: on rejection, server error, or network failure the credentials SHALL NOT be stored and an error SHALL be shown on the page.
+
+#### Scenario: Valid credentials are saved and the app proceeds
+- **WHEN** the user submits credentials and server verification succeeds
+- **THEN** the credentials are stored encrypted and the app navigates forward
+
+#### Scenario: Invalid credentials show an on-page error
+- **WHEN** the user submits credentials and server verification is rejected (401/403)
+- **THEN** the credentials are not stored and the page displays an invalid-credentials error
+
+#### Scenario: Unreachable server shows a distinct error
+- **WHEN** the user submits credentials and the server cannot be reached
+- **THEN** the credentials are not stored and the page displays a connectivity error distinct from the invalid-credentials error
+
+#### Scenario: Server error shows a distinct error
+- **WHEN** the user submits credentials and server verification fails with an HTTP error other than 401/403 (e.g. 5xx)
+- **THEN** the credentials are not stored and the page displays a server-error message distinct from both the invalid-credentials and connectivity errors
+
+#### Scenario: Credentials are never persisted before verification
+- **WHEN** the user submits credentials and verification fails for any reason (rejection, server error, or network failure)
+- **THEN** no credential material from that submission exists in storage after the failure
+
+### Requirement: Credential entry errors are classified by cause
+The credential entry flow SHALL classify verification failures into distinct error kinds — invalid credentials (401/403), server error (any other HTTP error), and unreachable server (network failure) — and SHALL display a distinct message for each kind on the credential entry page.
+
+#### Scenario: Server error is not reported as a connectivity problem
+- **WHEN** verification fails with an HTTP 5xx response
+- **THEN** the page displays a server-error message and does not display the connectivity error message
+
+#### Scenario: Each error kind has distinct copy
+- **WHEN** verification fails with a 401/403, an HTTP 5xx, or a network failure in turn
+- **THEN** the page displays three different messages, one per failure kind
+
+### Requirement: Rejected sessions show explicit feedback on re-entry
+When the app navigates to the credential entry screen because a request was rejected (401/403), the screen SHALL display an explicit message telling the user their credentials were rejected or the session expired, rather than silently presenting empty fields.
+
+#### Scenario: Bounce-back after rejection shows a message
+- **WHEN** a stored-credential request receives a 401 or 403 and the app returns to the credential entry screen
+- **THEN** the screen shows a session-expired/credentials-rejected message alongside the empty credential fields

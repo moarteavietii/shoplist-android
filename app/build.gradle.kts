@@ -20,29 +20,58 @@ ksp {
 
 val defaultDevBaseUrl = "http://192.168.0.141:3005"
 val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties")
-val devBaseUrl: String = if (localPropertiesFile.asFile.exists()) {
-    providers.fileContents(localPropertiesFile).asText
-        .map { text ->
-            val properties = Properties().apply { text.reader().use { load(it) } }
-            properties.getProperty("devBaseUrl") ?: run {
-                logger.warn(
-                    "local.properties found but 'devBaseUrl' is not set; " +
-                        "falling back to $defaultDevBaseUrl"
-                )
-                defaultDevBaseUrl
-            }
-        }
-        .get()
+val localProperties: Properties? = if (localPropertiesFile.asFile.exists()) {
+    Properties().apply {
+        providers.fileContents(localPropertiesFile).asText.get().reader().use { load(it) }
+    }
 } else {
+    null
+}
+
+val devBaseUrl: String = if (localProperties == null) {
     logger.warn(
         "local.properties not found; debug builds will use $defaultDevBaseUrl. " +
             "Set 'devBaseUrl' in local.properties to override."
     )
     defaultDevBaseUrl
+} else {
+    localProperties.getProperty("devBaseUrl") ?: run {
+        logger.warn(
+            "local.properties found but 'devBaseUrl' is not set; " +
+                "falling back to $defaultDevBaseUrl"
+        )
+        defaultDevBaseUrl
+    }
 }
 
 require(devBaseUrl.none { it == '"' || it == '\\' || it == '<' || it == '>' || it == '&' || it.isWhitespace() }) {
     "devBaseUrl must not contain quotes, backslashes, XML metacharacters, or whitespace"
+}
+
+val mockCloudflare: Boolean = if (localProperties == null) {
+    false
+} else {
+    localProperties.keys
+        .map { it.toString() }
+        .firstOrNull { it.equals("mockCloudflare", ignoreCase = true) && it != "mockCloudflare" }
+        ?.let { key ->
+            logger.warn(
+                "local.properties has '$key' but the expected key is 'mockCloudflare' " +
+                    "(keys are case-sensitive); the mock flag is OFF"
+            )
+        }
+    when (val raw = localProperties.getProperty("mockCloudflare")?.trim()?.lowercase()) {
+        null, "" -> false
+        "true" -> true
+        "false" -> false
+        else -> {
+            logger.warn(
+                "local.properties 'mockCloudflare=$raw' is not a valid boolean " +
+                    "(expected true or false); treating as false"
+            )
+            false
+        }
+    }
 }
 
 val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
@@ -112,6 +141,7 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "BASE_URL", "\"$devBaseUrl\"")
+            buildConfigField("boolean", "MOCK_CLOUDFLARE", mockCloudflare.toString())
         }
         release {
             optimization {

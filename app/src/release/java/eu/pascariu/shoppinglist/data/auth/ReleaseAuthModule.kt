@@ -11,4 +11,7 @@ abstract class ReleaseAuthModule {
 
     @Binds
     abstract fun bindAuthInterceptor(impl: CloudflareAccessInterceptor): AuthInterceptor
+
+    @Binds
+    abstract fun bindMockCloudflareGate(impl: PassThroughMockCloudflareGate): MockCloudflareGate
 }

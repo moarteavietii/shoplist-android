@@ -78,7 +78,10 @@ class MainActivity : ComponentActivity() {
                             .background(colors.chrome),
                     )
                     if (credentialsRejected) {
-                        CredentialEntryScreen(onCredentialsSaved = { credentialsRejected = false })
+                        CredentialEntryScreen(
+                            onCredentialsSaved = { credentialsRejected = false },
+                            shownAfterRejection = true,
+                        )
                     } else {
                         ListScreen()
                     }

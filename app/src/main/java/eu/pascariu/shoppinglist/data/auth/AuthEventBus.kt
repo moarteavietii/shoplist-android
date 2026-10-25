@@ -38,8 +38,12 @@ class AuthResponseInterceptor(
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val response = chain.proceed(chain.request())
-        if (response.code == 401 || response.code == 403) {
+        val request = chain.request()
+        val isExplicitCredentialProbe =
+            request.header(CloudflareAccessInterceptor.HEADER_CLIENT_ID) != null &&
+                request.header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET) != null
+        val response = chain.proceed(request)
+        if (!isExplicitCredentialProbe && (response.code == 401 || response.code == 403)) {
             tokenStore.clear()
             authEventBus.emit(AuthEvent.CredentialsRejected)
         }
