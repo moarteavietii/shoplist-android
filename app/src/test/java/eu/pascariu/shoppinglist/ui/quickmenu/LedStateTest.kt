@@ -87,6 +87,34 @@ class LedStateTest {
     }
 
     @Test
+    fun `checked items control led filled during manual sort with preference off`() {
+        assertEquals(
+            LedState.FILLED,
+            deriveControlLedState(
+                control = QuickMenuControl.CHECKED_ITEMS_TOGGLE,
+                isSearchExpanded = false,
+                isShowingCheckedItems = false,
+                isSortModeEnabled = true,
+                sortOrder = SortOrder.MANUAL,
+            ),
+        )
+    }
+
+    @Test
+    fun `checked items control led hollow when manual sort disengaged and preference off`() {
+        assertEquals(
+            LedState.HOLLOW,
+            deriveControlLedState(
+                control = QuickMenuControl.CHECKED_ITEMS_TOGGLE,
+                isSearchExpanded = false,
+                isShowingCheckedItems = false,
+                isSortModeEnabled = false,
+                sortOrder = SortOrder.ALPHABETICAL,
+            ),
+        )
+    }
+
+    @Test
     fun `sort mode control led delegates to sort mode derivation`() {
         assertEquals(
             LedState.FILLED,

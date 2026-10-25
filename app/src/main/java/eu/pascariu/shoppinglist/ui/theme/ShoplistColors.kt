@@ -17,4 +17,6 @@ data class ShoplistColors(
     val ledOn: Color,
     val ledOff: Color,
     val danger: Color,
+    val surfaceInverse: Color = content,
+    val contentInverse: Color = background,
 )

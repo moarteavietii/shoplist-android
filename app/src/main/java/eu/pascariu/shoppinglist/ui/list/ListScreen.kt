@@ -254,32 +254,13 @@ fun ListScreen(
             }
 
             AnimatedVisibility(
-                visible = state.errorMessage != null,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-            ) {
-                Text(
-                    text = state.errorMessage.orEmpty(),
-                    style = typography.label,
-                    color = colors.danger,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { viewModel.onErrorDismissed() }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-
-            AnimatedVisibility(
                 visible = isOffline,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
-                Text(
-                    text = "Offline — changes will be queued",
-                    style = typography.label,
-                    color = colors.ledOn,
+                StatusChip(
+                    label = "Offline — changes will be queued",
                     modifier = Modifier
-                        .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }

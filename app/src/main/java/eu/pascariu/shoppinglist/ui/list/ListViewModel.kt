@@ -14,6 +14,7 @@ import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.RealtimeClient
 import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
+import eu.pascariu.shoppinglist.data.realtime.ToastSeverity
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoConfig
@@ -74,7 +75,7 @@ class ListViewModel @Inject constructor(
 
     private val _changeToast = MutableStateFlow<ChangeToast?>(null)
     val changeToast: StateFlow<ChangeToast?> = _changeToast.asStateFlow()
-    private val pendingToastTexts = ArrayDeque<String>()
+    private val pendingToastTexts = ArrayDeque<Pair<String, ToastSeverity>>()
     private var toastDismissJob: Job? = null
     private var nextChangeToastId = 0L
 
@@ -124,7 +125,7 @@ class ListViewModel @Inject constructor(
                     pendingToastTexts.clear()
                     return@collect
                 }
-                showChangeToasts(labelBatch.map { it.text })
+                showChangeToasts(labelBatch.map { it.text to it.severity })
             }
         }
         viewModelScope.launch {
@@ -139,15 +140,19 @@ class ListViewModel @Inject constructor(
         }
     }
 
-    private fun showChangeToasts(texts: List<String>) {
+    private fun showChangeToasts(texts: List<Pair<String, ToastSeverity>>) {
         if (texts.isEmpty()) return
         if (_changeToast.value != null) {
             pendingToastTexts.addAll(texts)
         } else {
-            displayToast(texts.first())
+            displayToast(texts.first().first, texts.first().second)
             pendingToastTexts.addAll(texts.drop(1))
         }
         trimPendingToasts()
+    }
+
+    fun showToast(text: String, severity: ToastSeverity) {
+        showChangeToasts(listOf(text to severity))
     }
 
     private fun trimPendingToasts() {
@@ -156,8 +161,8 @@ class ListViewModel @Inject constructor(
         }
     }
 
-    private fun displayToast(text: String) {
-        _changeToast.value = ChangeToast(id = nextChangeToastId++, text = text)
+    private fun displayToast(text: String, severity: ToastSeverity) {
+        _changeToast.value = ChangeToast(id = nextChangeToastId++, text = text, severity = severity)
         toastDismissJob?.cancel()
         toastDismissJob = viewModelScope.launch {
             delay(TOAST_AUTO_DISMISS_MS)
@@ -177,7 +182,7 @@ class ListViewModel @Inject constructor(
         _changeToast.value = null
         val next = pendingToastTexts.removeFirstOrNull()
         if (next != null) {
-            displayToast(next)
+            displayToast(next.first, next.second)
         }
     }
 
@@ -189,11 +194,10 @@ class ListViewModel @Inject constructor(
             try {
                 itemsRepository.refetch(listId = RealtimeClient.DEFAULT_LIST_ID)
                 shopsRepository.refetch()
-                localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                localState.update { it.copy(errorMessage = "Couldn't refresh the list") }
+                showToast("Couldn't refresh the list", ToastSeverity.Danger)
             }
         }
     }
@@ -251,11 +255,10 @@ class ListViewModel @Inject constructor(
             try {
                 val newKey = dropKeyForIndex(orderedKeys = orderedKeys, dropIndex = clampedDropIndex)
                 itemsRepository.reorder(itemId = item.id, viewId = viewId, newKey = newKey)
-                localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                localState.update { it.copy(errorMessage = "Couldn't move the item") }
+                showToast("Couldn't move the item", ToastSeverity.Danger)
             }
         }
     }
@@ -406,9 +409,11 @@ class ListViewModel @Inject constructor(
                 )
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 isCreateInFlight = false
-                localState.update { it.copy(errorMessage = "Couldn't save the item") }
+                showToast("Couldn't save the item", ToastSeverity.Danger)
                 return@launch
             }
             isCreateInFlight = false
@@ -417,7 +422,6 @@ class ListViewModel @Inject constructor(
                     searchQuery = "",
                     postSaveSignal = PostSaveSignal(id = nextPostSaveSignalId++),
                     addItemModal = null,
-                    errorMessage = null,
                 )
             }
         }
@@ -518,16 +522,16 @@ class ListViewModel @Inject constructor(
                         isTemporary = if (modal.isTemporary != modal.originalIsTemporary) modal.isTemporary else null,
                     ),
                 )
-                localState.update { it.copy(editItemModal = null, errorMessage = null) }
+                localState.update { it.copy(editItemModal = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 localState.update { state ->
                     state.copy(
                         editItemModal = null,
-                        errorMessage = "Couldn't save the item",
                     )
                 }
+                showToast("Couldn't save the item", ToastSeverity.Danger)
             } finally {
                 isUpdateInFlight = false
             }
@@ -556,17 +560,14 @@ class ListViewModel @Inject constructor(
             itemsRepository.applyDeleted(item.id)
             try {
                 itemsRepository.delete(item.id)
-                localState.update { it.copy(errorMessage = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (e is HttpException && e.code() == 404) {
-                    localState.update { it.copy(errorMessage = null) }
+                    // Item already gone server-side; nothing to report.
                 } else {
                     itemsRepository.applyRestored(item)
-                    localState.update {
-                        it.copy(errorMessage = "Couldn't delete the item")
-                    }
+                    showToast("Couldn't delete the item", ToastSeverity.Danger)
                 }
             }
         }
@@ -574,10 +575,6 @@ class ListViewModel @Inject constructor(
 
     fun consumePostSaveSignal() {
         localState.update { it.copy(postSaveSignal = null) }
-    }
-
-    fun onErrorDismissed() {
-        localState.update { it.copy(errorMessage = null) }
     }
 
     fun onViewSelected(shopId: Long) {
@@ -612,7 +609,18 @@ class ListViewModel @Inject constructor(
             QuickMenuControl.VIEW_SWITCHER -> onDrawerToggled()
             QuickMenuControl.SETTINGS -> onSettingsDrawerToggled()
             QuickMenuControl.SORT_MODE -> onSortModeToggled()
-            QuickMenuControl.CHECKED_ITEMS_TOGGLE -> onShowCheckedChanged(!localState.value.showChecked)
+            QuickMenuControl.CHECKED_ITEMS_TOGGLE -> {
+                val isManualSortEngaged = localState.value.sortModeEnabled &&
+                    localState.value.sortOrder == SortOrder.MANUAL
+                if (isManualSortEngaged) {
+                    showToast(
+                        "Checked items stay visible while manual sorting is engaged",
+                        ToastSeverity.Danger,
+                    )
+                } else {
+                    onShowCheckedChanged(!localState.value.showChecked)
+                }
+            }
             QuickMenuControl.SEARCH -> onSearchExpandedChanged(!localState.value.searchExpanded)
             QuickMenuControl.UNDO -> onUndoTapped()
         }
@@ -817,7 +825,6 @@ class ListViewModel @Inject constructor(
             deleteConfirmItem = local.deleteConfirmItem,
             shopModal = local.shopModal,
             postSaveSignal = local.postSaveSignal,
-            errorMessage = local.errorMessage,
         )
     }
 
@@ -892,7 +899,6 @@ class ListViewModel @Inject constructor(
         val editItemModal: EditItemUiState? = null,
         val deleteConfirmItem: Item? = null,
         val shopModal: ShopModalUiState? = null,
-        val errorMessage: String? = null,
         val isUndoInFlight: Boolean = false,
     )
 

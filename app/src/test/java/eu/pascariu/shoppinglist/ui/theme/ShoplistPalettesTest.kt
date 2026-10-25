@@ -40,6 +40,24 @@ class ShoplistPalettesTest {
     }
 
     @Test
+    fun `every theme derives inverse tokens`() {
+        ThemeId.entries.forEach { themeId ->
+            val palette = ShoplistThemePalettes[themeId]
+                ?: throw AssertionError("Missing palette for $themeId")
+            assertEquals(
+                "$themeId surfaceInverse should invert content",
+                palette.content,
+                palette.surfaceInverse,
+            )
+            assertEquals(
+                "$themeId contentInverse should invert background",
+                palette.background,
+                palette.contentInverse,
+            )
+        }
+    }
+
+    @Test
     fun `default palette matches web root tokens`() {
         assertPinned(
             ThemeId.DEFAULT,

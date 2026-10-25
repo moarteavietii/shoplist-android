@@ -17,6 +17,10 @@ class ChangeToastDerivationTest {
         )
 
         assertEquals(listOf("checked: Milk"), labels.map { it.text })
+        assertEquals(
+            listOf(ToastSeverity.Info),
+            labels.map { it.severity },
+        )
     }
 
     @Test
@@ -180,6 +184,10 @@ class ChangeToastDerivationTest {
                 "Bread rolls added to Auchan",
             ),
             labels.map { it.text },
+        )
+        assertEquals(
+            listOf(ToastSeverity.Info, ToastSeverity.Info, ToastSeverity.Info, ToastSeverity.Info),
+            labels.map { it.severity },
         )
     }
 
