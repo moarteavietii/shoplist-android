@@ -181,37 +181,30 @@ fun QuickMenu(
                 .background(colors.surface, shapes.medium)
                 .padding(6.dp),
         ) {
-            Box {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clickable(
-                            role = Role.Button,
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() },
-                        ) { onExpandedChanged(!isExpanded) },
-                ) {
-                    Canvas(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .graphicsLayer(rotationZ = chevronRotation)
-                            .semantics {
-                                contentDescription =
-                                    if (isExpanded) "Collapse quick menu" else "Expand quick menu"
-                            },
-                    ) {
-                        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                        val inset = 14.dp.toPx()
-                        val midY = size.height / 2
-                        val path = Path().apply {
-                            moveTo(inset, midY - 2.dp.toPx())
-                            lineTo(size.width / 2, midY + 2.dp.toPx())
-                            lineTo(size.width - inset, midY - 2.dp.toPx())
-                        }
-                        drawPath(path, color = colors.contentMuted, style = stroke)
-                    }
+            Canvas(
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .clickable(
+                        role = Role.Button,
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { onExpandedChanged(!isExpanded) }
+                    .size(40.dp)
+                    .graphicsLayer(rotationZ = chevronRotation)
+                    .semantics {
+                        contentDescription =
+                            if (isExpanded) "Collapse quick menu" else "Expand quick menu"
+                    },
+            ) {
+                val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                val inset = 14.dp.toPx()
+                val midY = size.height / 2
+                val path = Path().apply {
+                    moveTo(inset, midY - 2.dp.toPx())
+                    lineTo(size.width / 2, midY + 2.dp.toPx())
+                    lineTo(size.width - inset, midY - 2.dp.toPx())
                 }
+                drawPath(path, color = colors.contentMuted, style = stroke)
             }
             AnimatedVisibility(
                 visible = isExpanded,
