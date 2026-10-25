@@ -7,7 +7,9 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBus
 import eu.pascariu.shoppinglist.data.auth.TokenStore
+import eu.pascariu.shoppinglist.data.network.HealthApi
 import eu.pascariu.shoppinglist.di.IoDispatcher
+import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,18 +18,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 
 data class CredentialEntryUiState(
     val clientId: String = "",
     val clientSecret: String = "",
     val isSaving: Boolean = false,
     val error: String? = null,
+    val rejectionMessage: String? = null,
     val saved: Boolean = false,
 )
 
 @HiltViewModel
 class CredentialEntryViewModel @Inject constructor(
     private val tokenStore: TokenStore,
+    private val healthApi: HealthApi,
     authEventBus: AuthEventBus,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -39,18 +44,24 @@ class CredentialEntryViewModel @Inject constructor(
         viewModelScope.launch {
             authEventBus.events.collect { event ->
                 if (event is AuthEvent.CredentialsRejected) {
-                    _uiState.update { it.copy(saved = false) }
+                    _uiState.update { state ->
+                        if (state.isSaving) {
+                            state.copy(saved = false)
+                        } else {
+                            state.copy(saved = false, rejectionMessage = REJECTION_MESSAGE)
+                        }
+                    }
                 }
             }
         }
     }
 
     fun onClientIdChange(value: String) {
-        _uiState.update { it.copy(clientId = value, error = null) }
+        _uiState.update { it.copy(clientId = value, error = null, rejectionMessage = null) }
     }
 
     fun onClientSecretChange(value: String) {
-        _uiState.update { it.copy(clientSecret = value, error = null) }
+        _uiState.update { it.copy(clientSecret = value, error = null, rejectionMessage = null) }
     }
 
     fun onQrPayloadScanned(payload: String) {
@@ -74,21 +85,63 @@ class CredentialEntryViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Both client id and secret are required") }
             return
         }
-        saveCredentials(AccessCredentials(state.clientId.trim(), state.clientSecret.trim()))
+        verifyAndSave(AccessCredentials(state.clientId.trim(), state.clientSecret.trim()))
     }
 
     fun onSavedHandled() {
         _uiState.update { it.copy(saved = false) }
     }
 
-    private fun saveCredentials(credentials: AccessCredentials) {
+    private fun verifyAndSave(credentials: AccessCredentials) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
             withContext(ioDispatcher) {
                 tokenStore.save(credentials)
             }
-            _uiState.update { it.copy(isSaving = false, saved = true) }
+            when (probeCredentials()) {
+                ProbeOutcome.Verified -> _uiState.update {
+                    it.copy(isSaving = false, saved = true)
+                }
+                ProbeOutcome.Rejected -> {
+                    withContext(ioDispatcher) {
+                        tokenStore.clear()
+                    }
+                    _uiState.update {
+                        it.copy(isSaving = false, error = INVALID_CREDENTIALS_MESSAGE, rejectionMessage = null)
+                    }
+                }
+                ProbeOutcome.Unreachable -> {
+                    withContext(ioDispatcher) {
+                        tokenStore.clear()
+                    }
+                    _uiState.update {
+                        it.copy(isSaving = false, error = UNREACHABLE_MESSAGE, rejectionMessage = null)
+                    }
+                }
+            }
         }
+    }
+
+    private suspend fun probeCredentials(): ProbeOutcome =
+        withContext(ioDispatcher) {
+            try {
+                healthApi.getHealth()
+                ProbeOutcome.Verified
+            } catch (error: HttpException) {
+                if (error.code() == 401 || error.code() == 403) {
+                    ProbeOutcome.Rejected
+                } else {
+                    ProbeOutcome.Unreachable
+                }
+            } catch (error: IOException) {
+                ProbeOutcome.Unreachable
+            }
+        }
+
+    private enum class ProbeOutcome {
+        Verified,
+        Rejected,
+        Unreachable,
     }
 
     private fun parseQrPayload(payload: String): AccessCredentials? {
@@ -103,5 +156,11 @@ class CredentialEntryViewModel @Inject constructor(
         val clientSecret = params["secret"] ?: return null
         if (clientId.isBlank() || clientSecret.isBlank()) return null
         return AccessCredentials(clientId, clientSecret)
+    }
+
+    companion object {
+        const val INVALID_CREDENTIALS_MESSAGE = "Invalid credentials"
+        const val UNREACHABLE_MESSAGE = "Can't reach the server"
+        const val REJECTION_MESSAGE = "Your credentials were rejected or the session expired. Please sign in again."
     }
 }

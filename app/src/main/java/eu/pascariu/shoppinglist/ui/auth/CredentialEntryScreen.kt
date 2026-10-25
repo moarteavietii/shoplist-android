@@ -94,6 +94,15 @@ fun CredentialEntryScreen(
         )
         Spacer(Modifier.height(24.dp))
 
+        state.rejectionMessage?.let { message ->
+            Text(
+                text = message,
+                style = typography.label,
+                color = colors.danger,
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+
         OutlinedTextField(
             value = state.clientId,
             onValueChange = viewModel::onClientIdChange,
@@ -119,7 +128,11 @@ fun CredentialEntryScreen(
             Text(
                 text = error,
                 style = typography.label,
-                color = colors.danger,
+                color = if (error == CredentialEntryViewModel.UNREACHABLE_MESSAGE) {
+                    colors.contentMuted
+                } else {
+                    colors.danger
+                },
             )
             Spacer(Modifier.height(12.dp))
         }

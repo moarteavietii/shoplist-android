@@ -15,6 +15,7 @@ import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.AuthResponseInterceptor
 import eu.pascariu.shoppinglist.data.auth.AuthInterceptor
 import eu.pascariu.shoppinglist.data.auth.EncryptedTokenStore
+import eu.pascariu.shoppinglist.data.auth.MockCloudflareGate
 import eu.pascariu.shoppinglist.data.auth.TokenStore
 import eu.pascariu.shoppinglist.data.connectivity.BackendReachability
 import eu.pascariu.shoppinglist.data.connectivity.BackendReachabilityListener
@@ -70,6 +71,7 @@ object NetworkModule {
         tokenStore: TokenStore,
         deviceIdInterceptor: DeviceIdInterceptor,
         reachabilityListener: BackendReachabilityListener,
+        mockCloudflareGate: MockCloudflareGate,
     ): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
@@ -78,6 +80,7 @@ object NetworkModule {
             .addNetworkInterceptor(authInterceptor)
             .addInterceptor(AuthResponseInterceptor(authEventBus, tokenStore))
             .addInterceptor(deviceIdInterceptor)
+            .addInterceptor(mockCloudflareGate)
             .build()
 
     @Provides

@@ -45,6 +45,17 @@ require(devBaseUrl.none { it == '"' || it == '\\' || it == '<' || it == '>' || i
     "devBaseUrl must not contain quotes, backslashes, XML metacharacters, or whitespace"
 }
 
+val mockCloudflare: Boolean = if (localPropertiesFile.asFile.exists()) {
+    providers.fileContents(localPropertiesFile).asText
+        .map { text ->
+            val properties = Properties().apply { text.reader().use { load(it) } }
+            properties.getProperty("mockCloudflare")?.toBoolean() ?: false
+        }
+        .get()
+} else {
+    false
+}
+
 val releaseBaseUrl = "https://shoppinglist.pascariu.eu"
 require(releaseBaseUrl.startsWith("https://")) {
     "release BASE_URL must use HTTPS"
@@ -112,6 +123,7 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "BASE_URL", "\"$devBaseUrl\"")
+            buildConfigField("boolean", "MOCK_CLOUDFLARE", mockCloudflare.toString())
         }
         release {
             optimization {
