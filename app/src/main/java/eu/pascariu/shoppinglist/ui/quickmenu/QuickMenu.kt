@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +55,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -325,8 +327,20 @@ private fun QuickMenuControlButton(
             interactionSource = noIndication,
         )
     }
+    val ledStateDescription = when (ledState) {
+        SortModeLedState.FILLED -> "On"
+        SortModeLedState.HOLLOW -> "Off"
+        SortModeLedState.NONE, null -> null
+    }
     Box(
         modifier = buttonModifier
+            .then(
+                if (ledStateDescription != null) {
+                    Modifier.semantics { stateDescription = ledStateDescription }
+                } else {
+                    Modifier
+                },
+            )
             .minimumInteractiveComponentSize()
             .size(40.dp)
             .background(
