@@ -331,10 +331,9 @@ private fun QuickMenuControlButton(
     val colors = LocalShoplistColors.current
     val shapes = LocalShoplistShapes.current
     val noIndication = remember { MutableInteractionSource() }
-    val buttonModifier = if (disabled) {
-        Modifier
-    } else if (onLongPressed != null) {
+    val buttonModifier = if (onLongPressed != null) {
         Modifier.combinedClickable(
+            enabled = !disabled,
             role = Role.Button,
             onClick = onTapped,
             onLongClick = onLongPressed,
@@ -343,6 +342,7 @@ private fun QuickMenuControlButton(
         )
     } else {
         Modifier.clickable(
+            enabled = !disabled,
             role = Role.Button,
             onClick = onTapped,
             indication = null,
