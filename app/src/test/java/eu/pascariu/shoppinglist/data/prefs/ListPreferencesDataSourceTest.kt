@@ -55,14 +55,14 @@ class ListPreferencesDataSourceTest {
     }
 
     @Test
-    fun `widget stack expanded defaults to false`() = runTest(testDispatcher) {
+    fun `quick menu expanded defaults to false`() = runTest(testDispatcher) {
         settle()
 
         assertFalse(dataSource.quickMenuExpanded.value)
     }
 
     @Test
-    fun `widget stack expanded round-trips through storage`() = runTest(testDispatcher) {
+    fun `quick menu expanded round-trips through storage`() = runTest(testDispatcher) {
         settle()
 
         dataSource.setQuickMenuExpanded(true)
