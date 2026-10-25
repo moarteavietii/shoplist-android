@@ -180,7 +180,7 @@ fun QuickMenu(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .shadow(elevation = 4.dp, shape = shapes.medium)
-                .background(colors.surface, shapes.medium)
+                .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
                 .padding(6.dp),
         ) {
             Canvas(
@@ -322,9 +322,9 @@ private fun QuickMenuControlButton(
         )
     }
     val ledStateDescription = when (ledState) {
-        SortModeLedState.FILLED -> "On"
-        SortModeLedState.HOLLOW -> "Off"
-        SortModeLedState.NONE, null -> null
+        LedState.FILLED -> "On"
+        LedState.HOLLOW -> "Off"
+        LedState.NONE, null -> null
     }
     Box(
         modifier = buttonModifier
