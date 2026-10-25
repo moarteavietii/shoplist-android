@@ -33,7 +33,7 @@ class HealthViewModelTest {
 
     @Test
     fun `checkHealth reports repository result`() = runTest {
-        val viewModel = HealthViewModel(HealthRepository(FakeHealthApi { HealthResponse(status = "degraded") }))
+        val viewModel = HealthViewModel(HealthRepository(FakeHealthApi(healthBehavior = { HealthResponse(status = "degraded") })))
 
         viewModel.checkHealth()
         advanceUntilIdle()
@@ -46,7 +46,7 @@ class HealthViewModelTest {
 
     @Test
     fun `checkHealth replaces stale unreachable state after re-entry`() = runTest {
-        val fakeApi = FakeHealthApi { HealthResponse(status = "degraded") }
+        val fakeApi = FakeHealthApi(healthBehavior = { HealthResponse(status = "degraded") })
         val viewModel = HealthViewModel(HealthRepository(fakeApi))
 
         viewModel.checkHealth()
@@ -56,7 +56,7 @@ class HealthViewModelTest {
             viewModel.healthStatus.value,
         )
 
-        fakeApi.behavior = { HealthResponse(status = "ok") }
+        fakeApi.healthBehavior = { HealthResponse(status = "ok") }
         viewModel.checkHealth()
         advanceUntilIdle()
 

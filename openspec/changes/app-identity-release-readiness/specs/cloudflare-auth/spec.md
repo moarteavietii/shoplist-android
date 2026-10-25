@@ -5,7 +5,7 @@ Covers the auth-flow fixes discovered while testing the signed release build on 
 ## MODIFIED Requirements
 
 ### Requirement: Credential entry screen supports manual and QR input
-The app SHALL provide a credential entry screen that accepts the Cloudflare Access client id and secret via manual text input and via QR scan. The QR payload SHALL be a JSON object `{"clientId":"...","clientSecret":"..."}` (unknown keys tolerated), matching the format used by the helloworldcosmin app so QR codes are interchangeable.
+The app SHALL provide a credential entry screen that accepts the Cloudflare Access client id and secret via manual text input and via QR scan. The QR payload SHALL be a JSON object `{"clientId":"...","clientSecret":"..."}` (unknown keys tolerated), matching the format used by the helloworldcosmin app so QR codes are interchangeable. The credential probe SHALL verify credentials against a gate-protected JSON API route (`GET /api/v1/shops`), not `/health` — on the production deployment `/health` is served by the web frontend's SPA fallback and returns HTML even when the gate accepts the token, so it cannot distinguish accepted from rejected credentials.
 
 #### Scenario: Manual entry is accepted
 - **WHEN** the user enters a client id and secret on the credential entry screen and submits

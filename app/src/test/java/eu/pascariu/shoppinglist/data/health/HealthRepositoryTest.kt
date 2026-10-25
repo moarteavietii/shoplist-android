@@ -14,7 +14,7 @@ class HealthRepositoryTest {
 
     @Test
     fun `maps ok status to healthy`() = runTest {
-        val repository = HealthRepository(FakeHealthApi { HealthResponse(status = "ok") })
+        val repository = HealthRepository(FakeHealthApi(healthBehavior = { HealthResponse(status = "ok") }))
 
         val result = repository.refresh()
 
@@ -23,7 +23,7 @@ class HealthRepositoryTest {
 
     @Test
     fun `maps unexpected status to unreachable`() = runTest {
-        val repository = HealthRepository(FakeHealthApi { HealthResponse(status = "degraded") })
+        val repository = HealthRepository(FakeHealthApi(healthBehavior = { HealthResponse(status = "degraded") }))
 
         val result = repository.refresh()
 
@@ -32,7 +32,7 @@ class HealthRepositoryTest {
 
     @Test
     fun `maps HTTP error to unreachable`() = runTest {
-        val repository = HealthRepository(FakeHealthApi { throw httpException(500) })
+        val repository = HealthRepository(FakeHealthApi(healthBehavior = { throw httpException(500) }))
 
         val result = repository.refresh()
 
@@ -41,7 +41,7 @@ class HealthRepositoryTest {
 
     @Test
     fun `maps malformed response to unreachable`() = runTest {
-        val repository = HealthRepository(FakeHealthApi { throw SerializationException("bad json") })
+        val repository = HealthRepository(FakeHealthApi(healthBehavior = { throw SerializationException("bad json") }))
 
         val result = repository.refresh()
 
@@ -50,7 +50,7 @@ class HealthRepositoryTest {
 
     @Test
     fun `maps IO failure to unreachable`() = runTest {
-        val repository = HealthRepository(FakeHealthApi { throw IOException("connection refused") })
+        val repository = HealthRepository(FakeHealthApi(healthBehavior = { throw IOException("connection refused") }))
 
         val result = repository.refresh()
 

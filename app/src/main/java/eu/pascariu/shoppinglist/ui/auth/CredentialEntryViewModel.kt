@@ -164,7 +164,7 @@ class CredentialEntryViewModel @Inject constructor(
 
     private suspend fun probeCredentials(credentials: AccessCredentials): ProbeOutcome =
         try {
-            healthApi.probeHealth(credentials.clientId, credentials.clientSecret)
+            healthApi.probeShops(credentials.clientId, credentials.clientSecret)
             ProbeOutcome.Verified
         } catch (error: HttpException) {
             if (error.code() == 401 || error.code() == 403) {

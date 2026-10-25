@@ -5,7 +5,7 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.TokenStore
-import eu.pascariu.shoppinglist.data.network.HealthResponse
+import eu.pascariu.shoppinglist.data.network.ShopProbeEntry
 import eu.pascariu.shoppinglist.di.IoDispatcher
 import eu.pascariu.shoppinglist.testutil.FakeHealthApi
 import eu.pascariu.shoppinglist.testutil.httpException
@@ -199,7 +199,7 @@ class CredentialEntryViewModelTest {
     fun `valid probe saves credentials and emits saved`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { HealthResponse(status = "ok") }
+        fakeHealthApi.probeBehavior = { emptyList() }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -217,7 +217,7 @@ class CredentialEntryViewModelTest {
     fun `rejected probe shows invalid credentials error and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
+        fakeHealthApi.probeBehavior = { throw httpException(401) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -236,7 +236,7 @@ class CredentialEntryViewModelTest {
     fun `forbidden probe shows invalid credentials error and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(403) }
+        fakeHealthApi.probeBehavior = { throw httpException(403) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -254,7 +254,7 @@ class CredentialEntryViewModelTest {
     fun `unreachable probe shows connectivity error and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw IOException("connection refused") }
+        fakeHealthApi.probeBehavior = { throw IOException("connection refused") }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -273,7 +273,7 @@ class CredentialEntryViewModelTest {
     fun `server error probe shows server error message and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(500) }
+        fakeHealthApi.probeBehavior = { throw httpException(500) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -292,7 +292,7 @@ class CredentialEntryViewModelTest {
     fun `probe returning gate html instead of json shows invalid credentials and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = {
+        fakeHealthApi.probeBehavior = {
             throw SerializationException(
                 "Unexpected JSON token at offset 0: Expected start of the object '{', but had '<' instead at path: $"
             )
@@ -315,7 +315,7 @@ class CredentialEntryViewModelTest {
     fun `server error probe does not show the connectivity error`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(503) }
+        fakeHealthApi.probeBehavior = { throw httpException(503) }
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -330,13 +330,13 @@ class CredentialEntryViewModelTest {
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
 
-        val failureBehaviors: List<() -> HealthResponse> = listOf(
+        val failureBehaviors: List<() -> List<ShopProbeEntry>> = listOf(
             { throw httpException(401) },
             { throw httpException(500) },
             { throw IOException("connection refused") },
         )
         for (failureBehavior in failureBehaviors) {
-            fakeHealthApi.behavior = failureBehavior
+            fakeHealthApi.probeBehavior = failureBehavior
             viewModel.submit()
             testDispatcher.scheduler.advanceUntilIdle()
             assertEquals(null, fakeTokenStore.saved)
@@ -360,7 +360,7 @@ class CredentialEntryViewModelTest {
     fun `rejected probe does not set the rejection banner`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
+        fakeHealthApi.probeBehavior = { throw httpException(401) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -376,7 +376,7 @@ class CredentialEntryViewModelTest {
     fun `rejection event during an in-flight probe does not set the banner`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = {
+        fakeHealthApi.probeBehavior = {
             authEventBus.emit(AuthEvent.CredentialsRejected)
             throw httpException(401)
         }
@@ -393,7 +393,7 @@ class CredentialEntryViewModelTest {
     fun `rejection event after a rejected probe does not stack the banner`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
+        fakeHealthApi.probeBehavior = { throw httpException(401) }
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()

@@ -10,13 +10,16 @@ data class HealthResponse(
     val status: String,
 )
 
+@Serializable
+class ShopProbeEntry
+
 interface HealthApi {
     @GET("health")
     suspend fun getHealth(): HealthResponse
 
-    @GET("health")
-    suspend fun probeHealth(
+    @GET("api/v1/shops")
+    suspend fun probeShops(
         @Header(CloudflareAccessInterceptor.HEADER_CLIENT_ID) clientId: String,
         @Header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET) clientSecret: String,
-    ): HealthResponse
+    ): List<ShopProbeEntry>
 }
