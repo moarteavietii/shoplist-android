@@ -46,7 +46,8 @@ class AuthResponseInterceptor(
         // A missing/invalid gate session makes Cloudflare redirect to its login
         // page (302 -> HTML 200 after OkHttp follows it), so the final request
         // URL is the only reliable gate signal besides 401/403.
-        val landedOnGate = response.request.url.host.endsWith(GATE_HOST_SUFFIX)
+        val host = response.request.url.host
+        val landedOnGate = host == GATE_HOST || host.endsWith(".$GATE_HOST")
         if (!isExplicitCredentialProbe && (landedOnGate || response.code == 401 || response.code == 403)) {
             tokenStore.clear()
             authEventBus.emit(AuthEvent.CredentialsRejected)
@@ -55,6 +56,6 @@ class AuthResponseInterceptor(
     }
 
     private companion object {
-        const val GATE_HOST_SUFFIX = "cloudflareaccess.com"
+        const val GATE_HOST = "cloudflareaccess.com"
     }
 }
