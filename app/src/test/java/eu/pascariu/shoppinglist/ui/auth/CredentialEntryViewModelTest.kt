@@ -5,7 +5,7 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.TokenStore
-import eu.pascariu.shoppinglist.data.network.ShopProbeEntry
+import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.di.IoDispatcher
 import eu.pascariu.shoppinglist.testutil.FakeHealthApi
 import eu.pascariu.shoppinglist.testutil.httpException
@@ -395,7 +395,7 @@ class CredentialEntryViewModelTest {
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
 
-        val failureBehaviors: List<() -> List<ShopProbeEntry>> = listOf(
+        val failureBehaviors: List<() -> List<Shop>> = listOf(
             { throw httpException(401) },
             { throw httpException(500) },
             { throw IOException("connection refused") },

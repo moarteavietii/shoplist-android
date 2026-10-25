@@ -2,13 +2,13 @@ package eu.pascariu.shoppinglist.testutil
 
 import eu.pascariu.shoppinglist.data.network.HealthApi
 import eu.pascariu.shoppinglist.data.network.HealthResponse
-import eu.pascariu.shoppinglist.data.network.ShopProbeEntry
+import eu.pascariu.shoppinglist.data.model.Shop
 import retrofit2.HttpException
 import retrofit2.Response
 
 class FakeHealthApi(
     var healthBehavior: () -> HealthResponse = { HealthResponse(status = "ok") },
-    var probeBehavior: () -> List<ShopProbeEntry> = { emptyList() },
+    var probeBehavior: () -> List<Shop> = { emptyList() },
 ) : HealthApi {
     var probedClientId: String? = null
         private set
@@ -17,7 +17,7 @@ class FakeHealthApi(
 
     override suspend fun getHealth(): HealthResponse = healthBehavior()
 
-    override suspend fun probeShops(clientId: String, clientSecret: String): List<ShopProbeEntry> {
+    override suspend fun probeShops(clientId: String, clientSecret: String): List<Shop> {
         probedClientId = clientId
         probedClientSecret = clientSecret
         return probeBehavior()
