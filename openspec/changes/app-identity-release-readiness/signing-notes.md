@@ -11,7 +11,7 @@
   shoplist.release.keystore.alias=YOUR_KEY_ALIAS
   ```
 
-  `~` in the path is expanded to your home directory. The key password is assumed to be the same as the store password; if you set a distinct key password, tell the agent and a `shoplist.release.keystore.keypassword` key can be added.
+  `~` in the path is expanded to your home directory. The key password defaults to the store password; if your keystore uses a distinct key password, set `shoplist.release.keystore.keypassword=YOUR_KEY_PASSWORD` alongside the other keys.
 
 ## Behavior
 
