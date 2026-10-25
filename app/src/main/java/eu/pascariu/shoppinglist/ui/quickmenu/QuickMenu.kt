@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -195,6 +194,7 @@ fun QuickMenu(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() },
                     ) { onExpandedChanged(!isExpanded) }
+                    .minimumInteractiveComponentSize()
                     .size(40.dp)
                     .background(colors.chrome, shapes.medium)
                     .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.medium)
@@ -363,6 +363,7 @@ private fun QuickMenuControlButton(
                     Modifier
                 },
             )
+            .minimumInteractiveComponentSize()
             .size(40.dp)
             .background(
                 color = if (isActive) colors.surface else colors.chrome,
