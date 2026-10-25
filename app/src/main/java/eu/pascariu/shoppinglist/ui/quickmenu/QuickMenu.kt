@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -342,20 +343,13 @@ private fun QuickMenuControlButton(
             tint = if (isActive) colors.content else colors.contentFaint,
             modifier = Modifier.size(20.dp),
         )
-        when (ledState) {
-            SortModeLedState.FILLED -> CornerLedDot(
-                filled = true,
+        if (ledState == SortModeLedState.FILLED || ledState == SortModeLedState.HOLLOW) {
+            CornerLedDot(
+                filled = ledState == SortModeLedState.FILLED,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 2.dp, end = 2.dp),
             )
-            SortModeLedState.HOLLOW -> CornerLedDot(
-                filled = false,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 2.dp, end = 2.dp),
-            )
-            SortModeLedState.NONE, null -> Unit
         }
         if (badgeCount != null) {
             SwitcherBadge(
