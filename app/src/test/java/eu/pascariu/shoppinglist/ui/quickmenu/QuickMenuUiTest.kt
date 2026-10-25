@@ -34,6 +34,8 @@ class QuickMenuUiTest {
         isSortModeEnabled: Boolean = false,
         sortOrder: SortOrder = SortOrder.MANUAL,
         globalUncheckedCount: Int = 0,
+        canUndo: Boolean = false,
+        isUndoInFlight: Boolean = false,
     ) {
         lastTappedControl = null
         expandedChanges = 0
@@ -49,6 +51,8 @@ class QuickMenuUiTest {
                     isSortModeEnabled = isSortModeEnabled,
                     sortOrder = sortOrder,
                     globalUncheckedCount = globalUncheckedCount,
+                    canUndo = canUndo,
+                    isUndoInFlight = isUndoInFlight,
                     onControlTapped = { control -> lastTappedControl = control },
                     onSortOrderSelected = { order -> lastSelectedOrder = order },
                     onExpandedChanged = { value ->
@@ -131,6 +135,44 @@ class QuickMenuUiTest {
         composeRule.runOnIdle {
             assertEquals(1, expandedChanges)
             assertEquals(false, lastExpandedValue)
+        }
+    }
+
+    @Test
+    fun `undo button is absent when there is nothing to undo`() {
+        setContent(isExpanded = true, canUndo = false)
+
+        composeRule.onNodeWithContentDescription("Undo last action")
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `undo button is rendered when undo is available`() {
+        setContent(isExpanded = true, canUndo = true)
+
+        composeRule.onNodeWithContentDescription("Undo last action")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `tapping undo reports it`() {
+        setContent(isExpanded = true, canUndo = true)
+
+        composeRule.onNodeWithContentDescription("Undo last action").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(QuickMenuControl.UNDO, lastTappedControl)
+        }
+    }
+
+    @Test
+    fun `undo button is not clickable while undo is in flight`() {
+        setContent(isExpanded = true, canUndo = true, isUndoInFlight = true)
+
+        composeRule.onNodeWithContentDescription("Undo last action").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(null, lastTappedControl)
         }
     }
 }

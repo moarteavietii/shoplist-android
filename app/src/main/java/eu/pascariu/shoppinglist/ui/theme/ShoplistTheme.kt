@@ -31,9 +31,9 @@ val LocalShoplistShapes = staticCompositionLocalOf<ShoplistShapes> {
 private val ShoplistTypographyDefault = ShoplistTypography(
     display = TextStyle(
         fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Light,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
+        fontWeight = FontWeight.Bold,
+        fontSize = 56.sp,
+        lineHeight = 62.sp,
     ),
     title = TextStyle(
         fontFamily = FontFamily.Default,

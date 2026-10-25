@@ -233,7 +233,7 @@ class ListViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(listOf("Milk", "Bread"), state.items.map { it.name })
         assertEquals("Global", state.watermarkName)
-        assertFalse(state.showUndoBar)
+        assertFalse(state.canUndo)
     }
 
     @Test
@@ -317,7 +317,7 @@ class ListViewModelTest {
         )
 
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         assertEquals(1, undoHistoryStore.entries.value.size)
         assertTrue(viewModel.uiState.value.items.first { it.id == 10L }.isChecked)
@@ -332,7 +332,7 @@ class ListViewModelTest {
         awaitUntil { server.requestCount == 3 }
         awaitUntil { !viewModel.uiState.value.items.first { it.id == 10L }.isChecked }
 
-        assertFalse(viewModel.uiState.value.showUndoBar)
+        assertFalse(viewModel.uiState.value.canUndo)
         assertTrue(undoHistoryStore.entries.value.isEmpty())
         assertFalse(viewModel.uiState.value.items.first { it.id == 10L }.isChecked)
     }
@@ -346,7 +346,7 @@ class ListViewModelTest {
                 .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
         )
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         server.enqueue(
             MockResponse().setResponseCode(200)
@@ -368,7 +368,7 @@ class ListViewModelTest {
         assertEquals("PATCH", undoRequest!!.method)
         assertEquals("/api/v1/items/10", undoRequest.path)
         assertTrue(undoRequest.body.readUtf8().contains("\"isUndo\":true"))
-        awaitUntil { !viewModel.uiState.value.showUndoBar }
+        awaitUntil { !viewModel.uiState.value.canUndo }
     }
 
     @Test
@@ -380,7 +380,7 @@ class ListViewModelTest {
                 .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
         )
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         server.enqueue(
             MockResponse().setResponseCode(200)
@@ -404,7 +404,7 @@ class ListViewModelTest {
                 .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
         )
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         server.enqueue(
             MockResponse().setResponseCode(200)
@@ -415,7 +415,7 @@ class ListViewModelTest {
         awaitUntil { !viewModel.uiState.value.items.first { it.id == 10L }.isChecked }
 
         viewModel.onUndoTapped()
-        awaitUntil { !viewModel.uiState.value.showUndoBar }
+        awaitUntil { !viewModel.uiState.value.canUndo }
 
         assertEquals(4, server.requestCount)
     }
@@ -429,13 +429,13 @@ class ListViewModelTest {
                 .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
         )
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         itemsRepository.applyDeleted(10L)
         awaitUntil { itemsRepository.items.value.none { it.id == 10L } }
 
         viewModel.onUndoTapped()
-        awaitUntil { !viewModel.uiState.value.showUndoBar }
+        awaitUntil { !viewModel.uiState.value.canUndo }
 
         assertEquals(3, server.requestCount)
     }
@@ -449,14 +449,14 @@ class ListViewModelTest {
                 .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
         )
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
         viewModel.onUndoTapped()
         awaitUntil { server.requestCount == 4 }
         awaitUntil { viewModel.uiState.value.items.first { it.id == 10L }.isChecked }
 
-        assertTrue(viewModel.uiState.value.showUndoBar)
+        assertTrue(viewModel.uiState.value.canUndo)
         assertEquals(1, undoHistoryStore.entries.value.size)
     }
 
@@ -1247,13 +1247,13 @@ class ListViewModelTest {
                 .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
         )
         viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
-        awaitUntil { viewModel.uiState.value.showUndoBar }
+        awaitUntil { viewModel.uiState.value.canUndo }
 
         itemsRepository.applyDeleted(11L)
         awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
 
         assertEquals(listOf(10L), viewModel.uiState.value.items.map { it.id })
-        assertTrue(viewModel.uiState.value.showUndoBar)
+        assertTrue(viewModel.uiState.value.canUndo)
     }
 
     @Test

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SortByAlpha
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -74,6 +75,7 @@ enum class QuickMenuControl {
     SORT_MODE,
     CHECKED_ITEMS_TOGGLE,
     SEARCH,
+    UNDO,
 }
 
 enum class LedState { FILLED, HOLLOW, NONE }
@@ -146,6 +148,8 @@ fun QuickMenu(
     isSortModeEnabled: Boolean,
     sortOrder: SortOrder,
     globalUncheckedCount: Int,
+    canUndo: Boolean,
+    isUndoInFlight: Boolean = false,
     onControlTapped: (QuickMenuControl) -> Unit,
     onSortOrderSelected: (SortOrder) -> Unit,
     onExpandedChanged: (Boolean) -> Unit,
@@ -245,6 +249,22 @@ fun QuickMenu(
                                     onDismiss = { sortOrderSelectorOpen = false },
                                 )
                             }
+                        } else if (control == QuickMenuControl.UNDO) {
+                            AnimatedVisibility(
+                                visible = canUndo,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically(),
+                            ) {
+                                QuickMenuControlButton(
+                                    control = control,
+                                    isActive = false,
+                                    ledState = ledState,
+                                    badgeCount = null,
+                                    onTapped = { onControlTapped(control) },
+                                    onLongPressed = null,
+                                    disabled = isUndoInFlight,
+                                )
+                            }
                         } else {
                             QuickMenuControlButton(
                                 control = control,
@@ -301,11 +321,14 @@ private fun QuickMenuControlButton(
     badgeCount: Int?,
     onTapped: () -> Unit,
     onLongPressed: (() -> Unit)?,
+    disabled: Boolean = false,
 ) {
     val colors = LocalShoplistColors.current
     val shapes = LocalShoplistShapes.current
     val noIndication = remember { MutableInteractionSource() }
-    val buttonModifier = if (onLongPressed != null) {
+    val buttonModifier = if (disabled) {
+        Modifier
+    } else if (onLongPressed != null) {
         Modifier.combinedClickable(
             role = Role.Button,
             onClick = onTapped,
@@ -347,7 +370,11 @@ private fun QuickMenuControlButton(
         Icon(
             imageVector = control.icon(),
             contentDescription = control.contentDescription(),
-            tint = if (isActive) colors.content else colors.contentFaint,
+            tint = when {
+                disabled -> colors.contentFaint.copy(alpha = 0.4f)
+                isActive -> colors.content
+                else -> colors.contentFaint
+            },
             modifier = Modifier.size(20.dp),
         )
         if (ledState == LedState.FILLED || ledState == LedState.HOLLOW) {
@@ -373,6 +400,7 @@ private fun QuickMenuControl.icon(): ImageVector = when (this) {
     QuickMenuControl.SORT_MODE -> Icons.Outlined.SwapVert
     QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Outlined.Check
     QuickMenuControl.SEARCH -> Icons.Outlined.Search
+    QuickMenuControl.UNDO -> Icons.Outlined.Undo
 }
 
 private fun QuickMenuControl.contentDescription(): String = when (this) {
@@ -381,6 +409,7 @@ private fun QuickMenuControl.contentDescription(): String = when (this) {
         QuickMenuControl.SORT_MODE -> "Sort mode"
         QuickMenuControl.CHECKED_ITEMS_TOGGLE -> "Checked items toggle"
         QuickMenuControl.SEARCH -> "Search"
+        QuickMenuControl.UNDO -> "Undo last action"
     }
 
 private const val SWIPE_COLLAPSE_THRESHOLD_PX = 24f

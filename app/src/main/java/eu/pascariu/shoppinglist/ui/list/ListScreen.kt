@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +64,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.ui.common.ModalButton
+import eu.pascariu.shoppinglist.ui.common.ModalButtonStyle
+import eu.pascariu.shoppinglist.ui.common.modalPanel
 import eu.pascariu.shoppinglist.ui.drawer.ViewDrawer
 import eu.pascariu.shoppinglist.ui.drawer.leftEdgeSwipeToOpen
 import eu.pascariu.shoppinglist.ui.settings.SettingsDrawer
@@ -176,7 +180,7 @@ fun ListScreen(
                     color = colors.content,
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .graphicsLayer(alpha = 0.07f),
+                        .graphicsLayer(alpha = 0.04f),
                 )
 
                 val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
@@ -238,44 +242,14 @@ fun ListScreen(
                     isSortModeEnabled = state.sortModeEnabled,
                     sortOrder = state.sortOrder,
                     globalUncheckedCount = state.drawerShops.firstOrNull { it.isGlobal }?.uncheckedCount ?: 0,
+                    canUndo = state.canUndo,
+                    isUndoInFlight = state.isUndoInFlight,
                     onControlTapped = viewModel::onQuickMenuControlTapped,
                     onSortOrderSelected = viewModel::onSortOrderChanged,
                     onExpandedChanged = viewModel::onQuickMenuExpandedChanged,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 8.dp),
-                )
-            }
-
-            AnimatedVisibility(
-                visible = state.showAddAffordance,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-            ) {
-                Text(
-                    text = "Add \"${state.searchQuery.trim()}\"",
-                    style = typography.label,
-                    color = colors.ledOn,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { viewModel.onAddAffordanceTapped() }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-
-            AnimatedVisibility(
-                visible = state.showUndoBar,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-            ) {
-                Text(
-                    text = "Undo",
-                    style = typography.label,
-                    color = colors.ledOn,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { viewModel.onUndoTapped() }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             }
 
@@ -315,13 +289,29 @@ fun ListScreen(
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
-                ExpandableSearchField(
-                    query = state.searchQuery,
-                    onQueryChanged = viewModel::onSearchQueryChanged,
-                    onDismiss = { viewModel.onSearchExpandedChanged(false) },
-                    onImeAction = viewModel::onAddAffordanceTapped,
-                    focusRequester = searchFocusRequester,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ExpandableSearchField(
+                        query = state.searchQuery,
+                        onQueryChanged = viewModel::onSearchQueryChanged,
+                        onDismiss = { viewModel.onSearchExpandedChanged(false) },
+                        onImeAction = viewModel::onAddAffordanceTapped,
+                        focusRequester = searchFocusRequester,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 16.dp),
+                    )
+                    AnimatedVisibility(visible = state.showAddAffordance) {
+                        ModalButton(
+                            label = "Add",
+                            style = ModalButtonStyle.Primary,
+                            onClick = viewModel::onAddAffordanceTapped,
+                            modifier = Modifier.padding(start = 8.dp, end = 16.dp),
+                        )
+                    }
+                }
             }
         }
 
@@ -391,7 +381,10 @@ fun ListScreen(
                     onToggleAll = viewModel::onAddItemToggleAllTapped,
                     onSave = viewModel::onAddItemSave,
                     onDiscard = viewModel::onAddItemDiscard,
-                    modifier = Modifier.background(colors.surface, shapes.large),
+                    modifier = Modifier
+                        .padding(bottom = 48.dp)
+                        .padding(horizontal = 16.dp)
+                        .modalPanel(shapes.large),
                 )
             }
         }
@@ -413,7 +406,10 @@ fun ListScreen(
                     onSave = viewModel::onEditItemSave,
                     onDiscard = viewModel::onEditItemDiscard,
                     onDelete = viewModel::onEditItemDeleteTapped,
-                    modifier = Modifier.background(colors.surface, shapes.large),
+                    modifier = Modifier
+                        .padding(bottom = 48.dp)
+                        .padding(horizontal = 16.dp)
+                        .modalPanel(shapes.large),
                 )
             }
         }
@@ -455,6 +451,7 @@ private fun ExpandableSearchField(
     onDismiss: () -> Unit,
     onImeAction: () -> Unit,
     focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
@@ -492,12 +489,15 @@ private fun ExpandableSearchField(
                     tint = colors.contentMuted,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
-                        .clickable(role = Role.Button) { onQueryChanged("") },
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                        ) { onQueryChanged("") },
                 )
             }
         },
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .focusRequester(focusRequester)
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
@@ -510,7 +510,7 @@ private fun ExpandableSearchField(
                     }
                 }
             }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(vertical = 8.dp),
     )
 }
 

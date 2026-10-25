@@ -1,17 +1,13 @@
 package eu.pascariu.shoppinglist.ui.list
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,28 +15,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathMeasure
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.ui.common.LedSquareCheckbox
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 
@@ -67,7 +55,7 @@ fun ItemRow(
     AnimatedVisibility(
         visible = !(hideChecked && item.isChecked),
         enter = fadeIn() + expandVertically(),
-        exit = fadeOut() + shrinkVertically(),
+        exit = slideOutHorizontally(targetOffsetX = { it / 2 }) + fadeOut(),
         modifier = modifier,
     ) {
         Row(
@@ -103,15 +91,15 @@ fun ItemRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CircleCheckbox(
+                LedSquareCheckbox(
                     checked = item.isChecked,
                     onCheckedChange = { onCheckToggled(item) },
+                    testTag = ItemRowTestTags.checkbox,
                 )
                 Text(
                     text = item.name,
                     style = typography.body,
-                    color = if (item.isChecked) colors.contentMuted else colors.content,
-                    modifier = Modifier.graphicsLayer(alpha = if (item.isChecked) 0.6f else 1f),
+                    color = colors.content,
                 )
                 if (item.quantity > 1) {
                     Text(
@@ -150,58 +138,3 @@ private fun DragHandle(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun CircleCheckbox(
-    checked: Boolean,
-    onCheckedChange: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalShoplistColors.current
-    val checkProgress by animateFloatAsState(
-        targetValue = if (checked) 1f else 0f,
-        animationSpec = tween(200),
-        label = "checkmarkProgress",
-    )
-    val circleColor by animateColorAsState(
-        targetValue = if (checked) colors.ledOn else colors.ledOff,
-        animationSpec = tween(200),
-        label = "circleColor",
-    )
-    val checkColor = colors.background
-
-    val checkPath = remember { Path() }
-    val checkMeasure = remember { PathMeasure() }
-    val partialPath = remember { Path() }
-
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .testTag(ItemRowTestTags.checkbox)
-            .toggleable(
-                value = checked,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Checkbox,
-                onValueChange = { onCheckedChange() },
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.size(20.dp)) {
-            drawCircle(color = circleColor)
-            if (checkProgress > 0f) {
-                checkPath.reset()
-                checkPath.moveTo(size.width * 0.25f, size.height * 0.52f)
-                checkPath.lineTo(size.width * 0.42f, size.height * 0.70f)
-                checkPath.lineTo(size.width * 0.78f, size.height * 0.32f)
-                checkMeasure.setPath(checkPath, false)
-                partialPath.reset()
-                checkMeasure.getSegment(0f, checkMeasure.length * checkProgress, partialPath, true)
-                drawPath(
-                    path = partialPath,
-                    color = checkColor,
-                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
-                )
-            }
-        }
-    }
-}

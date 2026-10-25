@@ -28,6 +28,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import eu.pascariu.shoppinglist.ui.common.ModalButton
+import eu.pascariu.shoppinglist.ui.common.ModalButtonStyle
+import eu.pascariu.shoppinglist.ui.common.modalPanel
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
@@ -60,9 +63,9 @@ fun ShopModal(
         Column(
             modifier = modifier
                 .widthIn(min = 280.dp, max = 360.dp)
+                .modalPanel(shapes.large)
                 .verticalScroll(rememberScrollState())
                 .pointerInput(Unit) { detectTapGestures { } }
-                .background(colors.surface, shapes.large)
                 .padding(24.dp),
         ) {
             UnderlinedNameInput(
@@ -87,22 +90,22 @@ fun ShopModal(
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 if (modal.mode == ShopModalMode.EDIT) {
-                    ModalAction(
+                    ModalButton(
                         label = "Delete",
-                        color = colors.danger,
+                        style = ModalButtonStyle.Danger,
                         enabled = !modal.saving,
                         onClick = onDeleteTapped,
                     )
                 }
-                ModalAction(
+                ModalButton(
                     label = modal.secondaryLabel,
-                    color = colors.contentMuted,
+                    style = ModalButtonStyle.Quiet,
                     enabled = !modal.saving,
                     onClick = onDiscard,
                 )
-                ModalAction(
+                ModalButton(
                     label = "Save",
-                    color = colors.ledOn,
+                    style = ModalButtonStyle.Primary,
                     enabled = modal.canSave,
                     onClick = onSave,
                 )
@@ -138,14 +141,17 @@ private fun UnderlinedNameInput(
             cursorBrush = SolidColor(colors.ledOn),
             decorationBox = { inner ->
                 Column {
-                    if (name.isEmpty()) {
-                        Text(
-                            text = "Shop name",
-                            style = typography.title,
-                            color = colors.contentMuted,
-                        )
+                    Box {
+                        inner()
+                        if (name.isEmpty()) {
+                            Text(
+                                text = "Shop name",
+                                style = typography.title,
+                                color = colors.contentFaint,
+                                modifier = Modifier.align(Alignment.CenterStart),
+                            )
+                        }
                     }
-                    inner()
                     Box(
                         modifier = Modifier
                             .padding(top = 4.dp)
@@ -158,24 +164,6 @@ private fun UnderlinedNameInput(
             modifier = Modifier.fillMaxWidth(),
         )
     }
-}
-
-@Composable
-private fun ModalAction(
-    label: String,
-    color: androidx.compose.ui.graphics.Color,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val typography = LocalShoplistTypography.current
-    Text(
-        text = label,
-        style = typography.label,
-        color = if (enabled) color else color.copy(alpha = 0.4f),
-        modifier = Modifier
-            .clickable(enabled = enabled, role = Role.Button) { onClick() }
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-    )
 }
 
 @Composable
@@ -227,8 +215,8 @@ private fun DeleteShopConfirmDialog(
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    ModalAction(label = "Cancel", color = colors.contentMuted, enabled = true, onClick = onCancel)
-                    ModalAction(label = "Delete", color = colors.danger, enabled = true, onClick = onConfirm)
+                    ModalButton(label = "Cancel", style = ModalButtonStyle.Quiet, onClick = onCancel)
+                    ModalButton(label = "Delete", style = ModalButtonStyle.Danger, onClick = onConfirm)
                 }
             }
         }

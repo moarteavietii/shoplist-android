@@ -24,7 +24,8 @@ data class ListUiState(
     val hideChecked: Boolean = false,
     val filteredItems: List<Item> = emptyList(),
     val showAddAffordance: Boolean = false,
-    val showUndoBar: Boolean = false,
+    val canUndo: Boolean = false,
+    val isUndoInFlight: Boolean = false,
     val addItemModal: AddItemUiState? = null,
     val editItemModal: EditItemUiState? = null,
     val deleteConfirmItem: Item? = null,
@@ -59,6 +60,7 @@ data class EditItemUiState(
     val quantity: Int = originalQuantity,
     val originalIsTemporary: Boolean = false,
     val isTemporary: Boolean = originalIsTemporary,
+    val checkCount: Int = 0,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
     val isUnchanged: Boolean get() =
