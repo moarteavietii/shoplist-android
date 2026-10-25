@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">shoplist-android</string>
+    <string name="offline_chip_label">Offline — changes will be queued</string>
 </resources>

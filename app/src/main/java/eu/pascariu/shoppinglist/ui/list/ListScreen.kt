@@ -59,11 +59,13 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.R
 import eu.pascariu.shoppinglist.ui.common.ModalButton
 import eu.pascariu.shoppinglist.ui.common.ModalButtonStyle
 import eu.pascariu.shoppinglist.ui.common.modalPanel
@@ -259,7 +261,7 @@ fun ListScreen(
                 exit = fadeOut() + shrinkVertically(),
             ) {
                 StatusChip(
-                    label = "Offline — changes will be queued",
+                    label = stringResource(R.string.offline_chip_label),
                     modifier = Modifier
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
