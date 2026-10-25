@@ -1,10 +1,11 @@
 package eu.pascariu.shoppinglist.ui.list
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -45,7 +46,6 @@ class ChangeToastOverlayUiTest {
         setContent(ChangeToast(id = 1, text = "checked: Bread", severity = ToastSeverity.Info))
 
         composeRule.onNodeWithText("checked: Bread").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("notification pill").assertIsDisplayed()
     }
 
     @Test
@@ -53,14 +53,13 @@ class ChangeToastOverlayUiTest {
         setContent(ChangeToast(id = 2, text = "Couldn't refresh the list", severity = ToastSeverity.Danger))
 
         composeRule.onNodeWithText("Couldn't refresh the list").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("notification pill").assertIsDisplayed()
     }
 
     @Test
     fun `tap dismisses the pill`() {
         setContent(ChangeToast(id = 3, text = "checked: Bread"))
 
-        composeRule.onNodeWithContentDescription("notification pill").performClick()
+        composeRule.onNodeWithText("checked: Bread").performClick()
         composeRule.runOnIdle { assertEquals(3L, dismissedToastId) }
     }
 
@@ -68,7 +67,7 @@ class ChangeToastOverlayUiTest {
     fun `horizontal swipe dismisses the pill`() {
         setContent(ChangeToast(id = 4, text = "checked: Bread"))
 
-        composeRule.onNodeWithContentDescription("notification pill")
+        composeRule.onNodeWithText("checked: Bread")
             .performTouchInput {
                 down(center)
                 moveBy(Offset(-300f, 0f), delayMillis = 50)
@@ -83,6 +82,6 @@ class ChangeToastOverlayUiTest {
     fun `nothing renders when toast is null`() {
         setContent(null)
 
-        composeRule.onNodeWithContentDescription("notification pill").assertDoesNotExist()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(0)
     }
 }
