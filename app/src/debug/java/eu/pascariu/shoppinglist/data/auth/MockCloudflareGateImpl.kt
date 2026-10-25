@@ -33,8 +33,9 @@ class MockCloudflareGateImpl(
                 .request(request)
                 .protocol(okhttp3.Protocol.HTTP_1_1)
                 .code(401)
-                .message("Unauthorized")
-                .body("unauthorized".toResponseBody("text/plain".toMediaType()))
+                .message("Mock Cloudflare Unauthorized")
+                .header(MOCK_REJECTION_HEADER, "true")
+                .body("mock-cloudflare: unauthorized".toResponseBody("text/plain".toMediaType()))
                 .build()
         }
     }
@@ -42,5 +43,6 @@ class MockCloudflareGateImpl(
     companion object {
         const val FAKE_CLIENT_ID = "dev-client"
         const val FAKE_CLIENT_SECRET = "dev-secret"
+        const val MOCK_REJECTION_HEADER = "X-Mock-Cloudflare-Rejection"
     }
 }

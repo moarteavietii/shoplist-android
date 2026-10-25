@@ -67,6 +67,11 @@ class MockCloudflareGateImplTest {
             .execute()
 
         assertEquals(401, response.code)
+        assertEquals(
+            "true",
+            response.header(MockCloudflareGateImpl.MOCK_REJECTION_HEADER),
+        )
+        assertEquals("mock-cloudflare: unauthorized", response.body?.string())
         response.close()
         assertEquals(0, server.requestCount)
     }
