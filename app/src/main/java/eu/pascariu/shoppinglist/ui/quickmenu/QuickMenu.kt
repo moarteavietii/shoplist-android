@@ -74,15 +74,15 @@ enum class QuickMenuControl {
     SEARCH,
 }
 
-enum class SortModeLedState { FILLED, HOLLOW, NONE }
+enum class LedState { FILLED, HOLLOW, NONE }
 
-fun deriveSortModeLedState(sortModeEnabled: Boolean, order: SortOrder): SortModeLedState =
+fun deriveSortModeLedState(sortModeEnabled: Boolean, order: SortOrder): LedState =
     when (order) {
         SortOrder.MANUAL ->
-            if (sortModeEnabled) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+            if (sortModeEnabled) LedState.FILLED else LedState.HOLLOW
         SortOrder.ALPHABETICAL,
         SortOrder.FREQUENCY,
-        -> SortModeLedState.NONE
+        -> LedState.NONE
     }
 
 fun deriveControlLedState(
@@ -91,14 +91,14 @@ fun deriveControlLedState(
     isShowingCheckedItems: Boolean,
     isSortModeEnabled: Boolean,
     sortOrder: SortOrder,
-): SortModeLedState? =
+): LedState? =
     when (control) {
         QuickMenuControl.SORT_MODE ->
             deriveSortModeLedState(sortModeEnabled = isSortModeEnabled, order = sortOrder)
         QuickMenuControl.SEARCH ->
-            if (isSearchExpanded) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+            if (isSearchExpanded) LedState.FILLED else LedState.HOLLOW
         QuickMenuControl.CHECKED_ITEMS_TOGGLE ->
-            if (isShowingCheckedItems) SortModeLedState.FILLED else SortModeLedState.HOLLOW
+            if (isShowingCheckedItems) LedState.FILLED else LedState.HOLLOW
         else -> null
     }
 
@@ -295,7 +295,7 @@ private fun SwitcherBadge(count: Int, modifier: Modifier = Modifier) {
 private fun QuickMenuControlButton(
     control: QuickMenuControl,
     isActive: Boolean,
-    ledState: SortModeLedState?,
+    ledState: LedState?,
     badgeCount: Int?,
     onTapped: () -> Unit,
     onLongPressed: (() -> Unit)?,
@@ -336,9 +336,9 @@ private fun QuickMenuControlButton(
             tint = if (isActive) colors.content else colors.contentFaint,
             modifier = Modifier.size(20.dp),
         )
-        if (ledState == SortModeLedState.FILLED || ledState == SortModeLedState.HOLLOW) {
+        if (ledState == LedState.FILLED || ledState == LedState.HOLLOW) {
             CornerLedDot(
-                filled = ledState == SortModeLedState.FILLED,
+                filled = ledState == LedState.FILLED,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 2.dp, end = 2.dp),
