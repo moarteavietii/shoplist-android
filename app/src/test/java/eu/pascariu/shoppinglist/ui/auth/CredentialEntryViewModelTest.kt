@@ -73,6 +73,47 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `submit with control characters shows validation error and does not save`() {
+        val viewModel = createViewModel()
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret\u000d\u000a-1")
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(CredentialErrorKind.Validation, viewModel.uiState.value.errorKind)
+        assertEquals(null, fakeTokenStore.saved)
+        assertFalse(viewModel.uiState.value.saved)
+    }
+
+    @Test
+    fun `submit with non-ascii characters shows validation error and does not save`() {
+        val viewModel = createViewModel()
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-ț")
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(CredentialErrorKind.Validation, viewModel.uiState.value.errorKind)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `qr payload with non-ascii characters is rejected at submit and does not save`() {
+        val viewModel = createViewModel()
+        viewModel.onQrPayloadScanned(
+            """{"clientId":"id-1","clientSecret":"secret­-1"}"""
+        )
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(CredentialErrorKind.Validation, viewModel.uiState.value.errorKind)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
     fun `saved flag resets after handling so a reused screen does not close immediately`() {
         val viewModel = createViewModel()
         viewModel.onClientIdChange("id-1")
