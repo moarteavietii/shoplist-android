@@ -286,6 +286,40 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `rejection event during an in-flight probe does not set the banner`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = {
+            authEventBus.emit(AuthEvent.CredentialsRejected)
+            throw httpException(401)
+        }
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, state.error)
+        assertNull(state.rejectionMessage)
+    }
+
+    @Test
+    fun `rejection event after a rejected probe does not stack the banner`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = { throw httpException(401) }
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, viewModel.uiState.value.error)
+
+        authEventBus.emit(AuthEvent.CredentialsRejected)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.rejectionMessage)
+        assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `editing a field clears the rejection banner`() = runViewModelTest { viewModel ->
         authEventBus.emit(AuthEvent.CredentialsRejected)
         testDispatcher.scheduler.advanceUntilIdle()
