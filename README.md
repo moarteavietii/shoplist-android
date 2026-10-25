@@ -40,6 +40,30 @@ openspec/
 ./gradlew lint
 ```
 
+## Building a Release
+
+The release build is signed with your own keystore. One-time setup: put the three keystore values in gitignored `local.properties` (see `openspec/changes/app-identity-release-readiness/signing-notes.md` for details and backup guidance):
+
+```properties
+shoplist.release.keystore.path=/absolute/path/to/shoplist-release.jks
+shoplist.release.keystore.password=YOUR_KEYSTORE_PASSWORD
+shoplist.release.keystore.alias=YOUR_KEY_ALIAS
+```
+
+Relative paths are resolved against the repo root; `~` works too.
+
+Then build and install the signed release:
+
+```bash
+# Build the signed release APK
+./gradlew assembleRelease
+
+# Install it on a connected device
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+If any of the three properties is missing, the build fails fast with a message naming the missing keys — it never silently produces an unsigned artifact. Never commit the keystore or these values (both are gitignored).
+
 ## Running on Your Device
 
 Prerequisites (one-time): the dev backend must be reachable on workstation port 3005, and `devBaseUrl=http://127.0.0.1:3005` set in gitignored `local.properties`.

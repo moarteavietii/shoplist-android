@@ -79,6 +79,47 @@ require(releaseBaseUrl.startsWith("https://")) {
     "release BASE_URL must use HTTPS"
 }
 
+val keystoreProperties: Properties? = run {
+    val props = Properties()
+    localProperties?.let { props.putAll(it) }
+    val userGradleProps = File(System.getProperty("user.home"), ".gradle/gradle.properties")
+    if (userGradleProps.exists()) {
+        userGradleProps.reader().use { props.load(it) }
+    }
+    if (props.isEmpty) null else props
+}
+
+val keystorePath: String? = keystoreProperties?.getProperty("shoplist.release.keystore.path")
+val keystorePassword: String? = keystoreProperties?.getProperty("shoplist.release.keystore.password")
+val keystoreAlias: String? = keystoreProperties?.getProperty("shoplist.release.keystore.alias")
+
+val keystoreFile: File? = keystorePath?.let {
+    val expanded = File(it.replaceFirst("^~", System.getProperty("user.home")))
+    if (expanded.isAbsolute) expanded else rootDir.resolve(expanded)
+}
+
+val hasReleaseSigningConfig = keystoreFile != null && keystorePassword != null && keystoreAlias != null
+
+fun requireReleaseSigningConfig() {
+    if (hasReleaseSigningConfig) return
+    val missing = buildList {
+        if (keystorePath == null) add("shoplist.release.keystore.path")
+        if (keystorePassword == null) add("shoplist.release.keystore.password")
+        if (keystoreAlias == null) add("shoplist.release.keystore.alias")
+    }
+    throw GradleException(
+        "Release signing configuration is missing. Set the following in " +
+            "local.properties (or ~/.gradle/gradle.properties): ${missing.joinToString()}. " +
+            "Never commit these values or the keystore file."
+    )
+}
+
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.project.path == ":app" && it.name.contains("Release") }) {
+        requireReleaseSigningConfig()
+    }
+}
+
 val devHost = devBaseUrl
     .removePrefix("http://")
     .removePrefix("https://")
@@ -128,6 +169,22 @@ android {
         version = release(37)
     }
 
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            val keystore = keystoreFile!!
+            require(keystore.isFile) {
+                "Release signing: keystore file not found at '$keystore' " +
+                    "(shoplist.release.keystore.path)"
+            }
+            create("release") {
+                storeFile = keystore
+                storePassword = keystorePassword
+                keyAlias = keystoreAlias
+                keyPassword = keystorePassword
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "eu.pascariu.shoppinglist"
         minSdk = 35
@@ -150,6 +207,9 @@ android {
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
             buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     buildFeatures {

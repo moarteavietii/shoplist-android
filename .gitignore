@@ -16,4 +16,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+*.jks
+*.keystore
 devicerun.sh

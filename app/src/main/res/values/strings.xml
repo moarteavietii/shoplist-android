@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">shoplist-android</string>
+    <string name="app_name">shopy</string>
     <string name="offline_chip_label">Offline — changes will be queued</string>
     <string name="toast_refresh_failure">Couldn\'t refresh the list</string>
     <string name="toast_move_failure">Couldn\'t move the item</string>
