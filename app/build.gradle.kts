@@ -199,6 +199,7 @@ android {
         debug {
             buildConfigField("String", "BASE_URL", "\"$devBaseUrl\"")
             buildConfigField("boolean", "MOCK_CLOUDFLARE", mockCloudflare.toString())
+            buildConfigField("boolean", "REQUIRES_CREDENTIALS", mockCloudflare.toString())
         }
         release {
             optimization {
@@ -207,6 +208,7 @@ android {
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
             buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
+            buildConfigField("boolean", "REQUIRES_CREDENTIALS", "true")
             if (hasReleaseSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
             }
