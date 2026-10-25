@@ -158,12 +158,12 @@ fun ListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 12.dp),
+            .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
         ) {
             Box(
                 modifier = Modifier
