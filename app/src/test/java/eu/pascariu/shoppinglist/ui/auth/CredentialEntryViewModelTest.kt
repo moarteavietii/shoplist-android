@@ -63,6 +63,21 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `submit while saving is a no-op and does not launch a second verify`() {
+        val viewModel = createViewModel()
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+
+        viewModel.submit()
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
+        assertTrue(viewModel.uiState.value.saved)
+        assertFalse(viewModel.uiState.value.isSaving)
+    }
+
+    @Test
     fun `submit with blank fields shows error and does not save`() {
         val viewModel = createViewModel()
 
