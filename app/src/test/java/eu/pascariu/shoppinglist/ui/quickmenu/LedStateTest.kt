@@ -39,6 +39,26 @@ class LedStateTest {
     }
 
     @Test
+    fun `manual sort engaged only when sort mode enabled and order manual`() {
+        assertEquals(
+            true,
+            isManualSortEngaged(isSortModeEnabled = true, sortOrder = SortOrder.MANUAL),
+        )
+        assertEquals(
+            false,
+            isManualSortEngaged(isSortModeEnabled = false, sortOrder = SortOrder.MANUAL),
+        )
+        assertEquals(
+            false,
+            isManualSortEngaged(isSortModeEnabled = true, sortOrder = SortOrder.ALPHABETICAL),
+        )
+        assertEquals(
+            false,
+            isManualSortEngaged(isSortModeEnabled = true, sortOrder = SortOrder.FREQUENCY),
+        )
+    }
+
+    @Test
     fun `search control led follows search expanded state`() {
         assertEquals(
             LedState.FILLED,

@@ -77,6 +77,9 @@ enum class QuickMenuControl {
 
 enum class LedState { FILLED, HOLLOW, NONE }
 
+fun isManualSortEngaged(isSortModeEnabled: Boolean, sortOrder: SortOrder): Boolean =
+    isSortModeEnabled && sortOrder == SortOrder.MANUAL
+
 fun deriveSortModeLedState(sortModeEnabled: Boolean, order: SortOrder): LedState =
     when (order) {
         SortOrder.MANUAL ->
@@ -99,7 +102,10 @@ fun deriveControlLedState(
         QuickMenuControl.SEARCH ->
             if (isSearchExpanded) LedState.FILLED else LedState.HOLLOW
         QuickMenuControl.CHECKED_ITEMS_TOGGLE -> {
-            val isManualSortEngaged = isSortModeEnabled && sortOrder == SortOrder.MANUAL
+            val isManualSortEngaged = isManualSortEngaged(
+                isSortModeEnabled = isSortModeEnabled,
+                sortOrder = sortOrder,
+            )
             val isEffectivelyShowing = isShowingCheckedItems || isManualSortEngaged
             if (isEffectivelyShowing) LedState.FILLED else LedState.HOLLOW
         }
@@ -278,8 +284,10 @@ fun QuickMenu(
                                     QuickMenuControl.VIEW_SWITCHER -> isDrawerOpen
                                     QuickMenuControl.SEARCH -> isSearchExpanded
                                     QuickMenuControl.CHECKED_ITEMS_TOGGLE -> {
-                                        val isManualSortEngaged = isSortModeEnabled && sortOrder == SortOrder.MANUAL
-                                        isShowingCheckedItems || isManualSortEngaged
+                                        isShowingCheckedItems || isManualSortEngaged(
+                                            isSortModeEnabled = isSortModeEnabled,
+                                            sortOrder = sortOrder,
+                                        )
                                     }
                                     else -> false
                                 },
