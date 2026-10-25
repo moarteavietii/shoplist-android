@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
+import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 
 data class DrawerShop(
@@ -89,7 +89,7 @@ private fun DrawerShopRow(
 ) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
-    val cardShape = RoundedCornerShape(8.dp)
+    val cardShape = LocalShoplistShapes.current.medium
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -149,6 +149,7 @@ private fun DrawerShopRow(
 @Composable
 private fun UncheckedCountBadge(count: Int, isActive: Boolean) {
     val colors = LocalShoplistColors.current
+    val badgeShape = LocalShoplistShapes.current.medium
     val badgeStyle = LocalShoplistTypography.current.ledDot.copy(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Bold,
@@ -161,7 +162,7 @@ private fun UncheckedCountBadge(count: Int, isActive: Boolean) {
         style = badgeStyle,
         color = if (isActive) colors.accentDeep else colors.background,
         modifier = Modifier
-            .background(if (isActive) colors.background else colors.accentDeep, RoundedCornerShape(7.dp))
+            .background(if (isActive) colors.background else colors.accentDeep, badgeShape)
             .padding(horizontal = 4.dp)
             .semantics { contentDescription = "$count unchecked items" },
     )
@@ -171,13 +172,14 @@ private fun UncheckedCountBadge(count: Int, isActive: Boolean) {
 private fun AddShopButton(onClick: () -> Unit) {
     val colors = LocalShoplistColors.current
     val typography = LocalShoplistTypography.current
+    val buttonShape = LocalShoplistShapes.current.medium
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
             .height(48.dp)
-            .border(1.dp, colors.border, RoundedCornerShape(8.dp))
+            .border(1.dp, colors.border, buttonShape)
             .clickable(role = Role.Button) { onClick() },
         contentAlignment = Alignment.Center,
     ) {
