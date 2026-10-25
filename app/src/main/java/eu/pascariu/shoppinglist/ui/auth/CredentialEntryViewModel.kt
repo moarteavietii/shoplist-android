@@ -140,19 +140,17 @@ class CredentialEntryViewModel @Inject constructor(
     }
 
     private suspend fun probeCredentials(credentials: AccessCredentials): ProbeOutcome =
-        withContext(ioDispatcher) {
-            try {
-                healthApi.probeHealth(credentials.clientId, credentials.clientSecret)
-                ProbeOutcome.Verified
-            } catch (error: HttpException) {
-                if (error.code() == 401 || error.code() == 403) {
-                    ProbeOutcome.Rejected
-                } else {
-                    ProbeOutcome.Unreachable
-                }
-            } catch (error: IOException) {
+        try {
+            healthApi.probeHealth(credentials.clientId, credentials.clientSecret)
+            ProbeOutcome.Verified
+        } catch (error: HttpException) {
+            if (error.code() == 401 || error.code() == 403) {
+                ProbeOutcome.Rejected
+            } else {
                 ProbeOutcome.Unreachable
             }
+        } catch (error: IOException) {
+            ProbeOutcome.Unreachable
         }
 
     private enum class ProbeOutcome {
