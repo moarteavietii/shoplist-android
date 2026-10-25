@@ -19,18 +19,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material.icons.outlined.SortByAlpha
 import androidx.compose.material.icons.outlined.Store
-import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -44,6 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -173,14 +175,25 @@ fun QuickMenu(
                         interactionSource = remember { MutableInteractionSource() },
                     ) { onExpandedChanged(!isExpanded) },
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (isExpanded) "Collapse quick menu" else "Expand quick menu",
-                        tint = colors.contentMuted,
+                    Canvas(
                         modifier = Modifier
                             .size(40.dp)
-                            .graphicsLayer(rotationZ = chevronRotation),
-                    )
+                            .graphicsLayer(rotationZ = chevronRotation)
+                            .semantics {
+                                contentDescription =
+                                    if (isExpanded) "Collapse quick menu" else "Expand quick menu"
+                            },
+                    ) {
+                        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                        val inset = 14.dp.toPx()
+                        val midY = size.height / 2
+                        val path = Path().apply {
+                            moveTo(inset, midY - 2.dp.toPx())
+                            lineTo(size.width / 2, midY + 2.dp.toPx())
+                            lineTo(size.width - inset, midY - 2.dp.toPx())
+                        }
+                        drawPath(path, color = colors.contentMuted, style = stroke)
+                    }
                 }
             }
             AnimatedVisibility(
@@ -341,8 +354,8 @@ private fun QuickMenuControlButton(
 private fun QuickMenuControl.icon(): ImageVector = when (this) {
     QuickMenuControl.VIEW_SWITCHER -> Icons.Outlined.Store
     QuickMenuControl.SETTINGS -> Icons.Outlined.Settings
-    QuickMenuControl.SORT_MODE -> Icons.Outlined.Sort
-    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Outlined.Visibility
+    QuickMenuControl.SORT_MODE -> Icons.Outlined.SwapVert
+    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> Icons.Outlined.Check
     QuickMenuControl.SEARCH -> Icons.Outlined.Search
 }
 
@@ -421,7 +434,7 @@ private fun SortOrderSelector(
 }
 
 private fun SortOrder.icon(): ImageVector = when (this) {
-    SortOrder.MANUAL -> Icons.Outlined.Sort
+    SortOrder.MANUAL -> Icons.Outlined.SwapVert
     SortOrder.ALPHABETICAL -> Icons.Outlined.SortByAlpha
     SortOrder.FREQUENCY -> Icons.Outlined.LocalFireDepartment
 }
