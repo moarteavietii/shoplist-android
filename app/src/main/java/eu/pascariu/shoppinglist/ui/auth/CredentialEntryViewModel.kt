@@ -83,6 +83,7 @@ class CredentialEntryViewModel @Inject constructor(
                     clientSecret = credentials.clientSecret,
                     error = null,
                     errorKind = null,
+                    rejectionMessage = null,
                 )
             }
         }

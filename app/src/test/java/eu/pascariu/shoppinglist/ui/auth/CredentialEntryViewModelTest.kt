@@ -160,6 +160,19 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `scanned qr payload clears stale rejection banner`() {
+        val viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        authEventBus.emit(AuthEvent.CredentialsRejected)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(CredentialEntryViewModel.REJECTION_MESSAGE, viewModel.uiState.value.rejectionMessage)
+
+        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+
+        assertNull(viewModel.uiState.value.rejectionMessage)
+    }
+
+    @Test
     fun `unrecognized qr payload shows error and does not save`() {
         val viewModel = createViewModel()
 
