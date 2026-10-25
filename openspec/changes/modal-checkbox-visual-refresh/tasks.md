@@ -97,3 +97,12 @@
 - [x] 13.1 Replace the full-width "Add \"query\"" text line with a compact accent-filled ModalButton (Primary), matching the web ExpandableSearch add button
 - [x] 13.2 Move the Add button into the search row (right-aligned, "Add" label only) so it squeezes the search field when it appears
 - [x] 13.3 Remove the ripple/gray background from the search clear (×) button
+
+## 14. QuickMenu polish
+
+- [x] 14.1 Restyle the chevron button to match the other control buttons (chrome background, border, 8dp radius); it never renders a selected state
+- [x] 14.2 Increase the control button corner radius from 4dp to 8dp
+- [x] 14.3 Tighten the control spacing from 6dp to 4dp
+- [x] 14.4 Shrink the container padding from 6dp to 4dp and bump its radius to 12dp so it stays concentric with the rounder buttons
+- [x] 14.5 Remove the 48dp minimumInteractiveComponentSize touch-target expansion from the control buttons so the chevron-to-first-item gap matches the inter-item gap (4dp) and the container width is identical open and closed
+- [x] 14.6 Add 4dp vertical spacing between the chevron button and the controls column so they no longer touch

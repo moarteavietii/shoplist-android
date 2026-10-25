@@ -181,36 +181,41 @@ fun QuickMenu(
 
     Box(modifier = modifier.then(collapseOnSwipeUp)) {
         Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .shadow(elevation = 4.dp, shape = shapes.medium)
-                .background(colors.surface.copy(alpha = 0.95f), shapes.medium)
-                .padding(6.dp),
+                .shadow(elevation = 4.dp, shape = QuickMenuContainerShape)
+                .background(colors.surface.copy(alpha = 0.95f), QuickMenuContainerShape)
+                .padding(4.dp),
         ) {
-            Canvas(
+            Box(
                 modifier = Modifier
-                    .minimumInteractiveComponentSize()
                     .clickable(
                         role = Role.Button,
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() },
                     ) { onExpandedChanged(!isExpanded) }
                     .size(40.dp)
+                    .background(colors.chrome, shapes.medium)
+                    .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.medium)
                     .graphicsLayer(rotationZ = chevronRotation)
                     .semantics {
                         contentDescription =
                             if (isExpanded) "Collapse quick menu" else "Expand quick menu"
                     },
+                contentAlignment = Alignment.Center,
             ) {
-                val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                val inset = 14.dp.toPx()
-                val midY = size.height / 2
-                val path = Path().apply {
-                    moveTo(inset, midY - 2.dp.toPx())
-                    lineTo(size.width / 2, midY + 2.dp.toPx())
-                    lineTo(size.width - inset, midY - 2.dp.toPx())
+                Canvas(modifier = Modifier.size(40.dp)) {
+                    val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                    val inset = 14.dp.toPx()
+                    val midY = size.height / 2
+                    val path = Path().apply {
+                        moveTo(inset, midY - 2.dp.toPx())
+                        lineTo(size.width / 2, midY + 2.dp.toPx())
+                        lineTo(size.width - inset, midY - 2.dp.toPx())
+                    }
+                    drawPath(path, color = colors.contentMuted, style = stroke)
                 }
-                drawPath(path, color = colors.contentMuted, style = stroke)
             }
             AnimatedVisibility(
                 visible = isExpanded,
@@ -218,7 +223,7 @@ fun QuickMenu(
                 exit = fadeOut() + shrinkVertically(),
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalAlignment = Alignment.End,
                 ) {
                     QuickMenuControl.entries.forEach { control ->
@@ -358,13 +363,12 @@ private fun QuickMenuControlButton(
                     Modifier
                 },
             )
-            .minimumInteractiveComponentSize()
             .size(40.dp)
             .background(
                 color = if (isActive) colors.surface else colors.chrome,
-                shape = shapes.small,
+                shape = shapes.medium,
             )
-            .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.small),
+            .border(1.dp, colors.border.copy(alpha = 0.5f), shapes.medium),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -413,6 +417,8 @@ private fun QuickMenuControl.contentDescription(): String = when (this) {
     }
 
 private const val SWIPE_COLLAPSE_THRESHOLD_PX = 24f
+
+private val QuickMenuContainerShape = RoundedCornerShape(12.dp)
 
 @Composable
 private fun SortOrderSelector(
