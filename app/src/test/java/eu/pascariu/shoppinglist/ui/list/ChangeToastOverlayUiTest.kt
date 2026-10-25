@@ -1,8 +1,10 @@
 package eu.pascariu.shoppinglist.ui.list
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -80,6 +82,6 @@ class ChangeToastOverlayUiTest {
     fun `nothing renders when toast is null`() {
         setContent(null)
 
-        composeRule.onNodeWithText("checked: Bread").assertDoesNotExist()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(0)
     }
 }
