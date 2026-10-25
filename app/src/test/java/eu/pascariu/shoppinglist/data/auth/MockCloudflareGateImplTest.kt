@@ -120,6 +120,35 @@ class MockCloudflareGateImplTest {
     }
 
     @Test
+    fun `explicit probe headers are validated against the fake pair`() {
+        server.enqueue(MockResponse().setResponseCode(200))
+
+        val request = Request.Builder().url(server.url("/health"))
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_ID, MockCloudflareGateImpl.FAKE_CLIENT_ID)
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET, MockCloudflareGateImpl.FAKE_CLIENT_SECRET)
+            .build()
+        val response = buildClient(mockEnabled = true).newCall(request).execute()
+
+        assertEquals(200, response.code)
+        response.close()
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `explicit probe headers that do not match the fake pair yield synthesized 401`() {
+        val request = Request.Builder().url(server.url("/health"))
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_ID, "probe-id")
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET, "probe-secret")
+            .build()
+
+        val response = buildClient(mockEnabled = true).newCall(request).execute()
+
+        assertEquals(401, response.code)
+        response.close()
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
     fun `synthesized 401 carries the authorized request so outer interceptors see it`() {
         fakeTokenStore.saved = AccessCredentials(clientId = "wrong-id", clientSecret = "wrong-secret")
 

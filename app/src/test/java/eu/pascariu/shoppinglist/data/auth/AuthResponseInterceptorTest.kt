@@ -115,6 +115,23 @@ class AuthResponseInterceptorTest {
 
         assertNull(authEventBus.events.replayCache.firstOrNull())
     }
+
+    @Test
+    fun `explicit credential probe with 401 keeps stored credentials and emits nothing`() = runTest {
+        mockWebServer.enqueue(MockResponse().setResponseCode(401))
+
+        val request = Request.Builder().url(mockWebServer.url("/health"))
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_ID, "probe-id")
+            .header(CloudflareAccessInterceptor.HEADER_CLIENT_SECRET, "probe-secret")
+            .build()
+        authEventBus.events.test {
+            buildClient().newCall(request).execute().close()
+
+            assertEquals(0, authEventBus.events.replayCache.size)
+            expectNoEvents()
+        }
+        assertEquals(AccessCredentials(clientId = "id", clientSecret = "secret"), tokenStore.load())
+    }
 }
 
 private class FakeCredentialsTokenStore(var saved: AccessCredentials? = null) : TokenStore {

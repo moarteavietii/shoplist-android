@@ -109,47 +109,39 @@ class CredentialEntryViewModel @Inject constructor(
     private fun verifyAndSave(credentials: AccessCredentials) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, errorKind = null) }
-            withContext(ioDispatcher) {
-                tokenStore.save(credentials)
-            }
-            when (probeCredentials()) {
-                ProbeOutcome.Verified -> _uiState.update {
-                    it.copy(isSaving = false, saved = true)
-                }
-                ProbeOutcome.Rejected -> {
+            when (probeCredentials(credentials)) {
+                ProbeOutcome.Verified -> {
                     withContext(ioDispatcher) {
-                        tokenStore.clear()
+                        tokenStore.save(credentials)
                     }
                     _uiState.update {
-                        it.copy(
-                            isSaving = false,
-                            error = INVALID_CREDENTIALS_MESSAGE,
-                            errorKind = CredentialErrorKind.InvalidCredentials,
-                            rejectionMessage = null,
-                        )
+                        it.copy(isSaving = false, saved = true)
                     }
                 }
-                ProbeOutcome.Unreachable -> {
-                    withContext(ioDispatcher) {
-                        tokenStore.clear()
-                    }
-                    _uiState.update {
-                        it.copy(
-                            isSaving = false,
-                            error = UNREACHABLE_MESSAGE,
-                            errorKind = CredentialErrorKind.Unreachable,
-                            rejectionMessage = null,
-                        )
-                    }
+                ProbeOutcome.Rejected -> _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        error = INVALID_CREDENTIALS_MESSAGE,
+                        errorKind = CredentialErrorKind.InvalidCredentials,
+                        rejectionMessage = null,
+                    )
+                }
+                ProbeOutcome.Unreachable -> _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        error = UNREACHABLE_MESSAGE,
+                        errorKind = CredentialErrorKind.Unreachable,
+                        rejectionMessage = null,
+                    )
                 }
             }
         }
     }
 
-    private suspend fun probeCredentials(): ProbeOutcome =
+    private suspend fun probeCredentials(credentials: AccessCredentials): ProbeOutcome =
         withContext(ioDispatcher) {
             try {
-                healthApi.getHealth()
+                healthApi.probeHealth(credentials.clientId, credentials.clientSecret)
                 ProbeOutcome.Verified
             } catch (error: HttpException) {
                 if (error.code() == 401 || error.code() == 403) {

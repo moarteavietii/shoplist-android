@@ -275,6 +275,47 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `probe uses candidate credentials without touching the store first`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = { HealthResponse(status = "ok") }
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AccessCredentials("id-1", "secret-1"), fakeHealthApi.lastProbeCredentials)
+        assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `rejected probe keeps previously stored credentials`() = runViewModelTest { viewModel ->
+        fakeTokenStore.saved = AccessCredentials("old-id", "old-secret")
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = { throw httpException(401) }
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AccessCredentials("old-id", "old-secret"), fakeTokenStore.saved)
+        assertEquals(CredentialErrorKind.InvalidCredentials, viewModel.uiState.value.errorKind)
+    }
+
+    @Test
+    fun `unreachable probe keeps previously stored credentials`() = runViewModelTest { viewModel ->
+        fakeTokenStore.saved = AccessCredentials("old-id", "old-secret")
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = { throw IOException("connection refused") }
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AccessCredentials("old-id", "old-secret"), fakeTokenStore.saved)
+        assertEquals(CredentialErrorKind.Unreachable, viewModel.uiState.value.errorKind)
+    }
+
+    @Test
     fun `credentials rejected event produces the rejection banner`() = runViewModelTest { viewModel ->
         viewModel.uiState.test {
             assertFalse(awaitItem().rejectionMessage != null)
@@ -372,7 +413,15 @@ class CredentialEntryViewModelTest {
     private class FakeHealthApi(var behavior: () -> HealthResponse = {
         HealthResponse(status = "ok")
     }) : HealthApi {
+        var lastProbeCredentials: AccessCredentials? = null
+            private set
+
         override suspend fun getHealth(): HealthResponse = behavior()
+
+        override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse {
+            lastProbeCredentials = AccessCredentials(clientId, clientSecret)
+            return behavior()
+        }
     }
 
     private class FakeTokenStore(var saved: AccessCredentials? = null) : TokenStore {

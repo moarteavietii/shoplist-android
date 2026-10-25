@@ -20,6 +20,9 @@ class CloudflareAccessInterceptor @Inject constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
+        if (request.header(HEADER_CLIENT_ID) != null && request.header(HEADER_CLIENT_SECRET) != null) {
+            return chain.proceed(request)
+        }
         val credentials = tokenStore.load()
         val isApiRequest = request.url.host == apiOrigin.host &&
             request.url.port == apiOrigin.port &&
