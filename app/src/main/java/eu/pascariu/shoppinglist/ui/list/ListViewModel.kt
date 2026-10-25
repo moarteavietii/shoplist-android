@@ -409,8 +409,6 @@ class ListViewModel @Inject constructor(
                 )
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: CancellationException) {
-                throw e
             } catch (_: Exception) {
                 isCreateInFlight = false
                 showToast("Couldn't save the item", ToastSeverity.Danger)
