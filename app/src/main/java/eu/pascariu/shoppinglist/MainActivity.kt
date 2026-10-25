@@ -34,7 +34,9 @@ import eu.pascariu.shoppinglist.ui.list.ListScreen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.ShoplistTheme
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,6 +52,7 @@ class MainActivity : ComponentActivity() {
 
     private var credentialsRejected by mutableStateOf(false)
     private var credentialsMissing by mutableStateOf(false)
+    private var credentialsChecked by mutableStateOf(!BuildConfig.REQUIRES_CREDENTIALS)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,7 +60,11 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState != null) {
             credentialsRejected = savedInstanceState.getBoolean(KEY_CREDENTIALS_REJECTED)
         }
-        credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && tokenStore.load() == null
+        lifecycleScope.launch {
+            val hasCredentials = withContext(Dispatchers.IO) { tokenStore.load() != null }
+            credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && !hasCredentials
+            credentialsChecked = true
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 authEventBus.events.collect {
@@ -89,10 +96,11 @@ class MainActivity : ComponentActivity() {
                             onCredentialsSaved = {
                                 credentialsRejected = false
                                 credentialsMissing = false
+                                credentialsChecked = true
                             },
                             shownAfterRejection = credentialsRejected,
                         )
-                    } else {
+                    } else if (credentialsChecked) {
                         ListScreen()
                     }
                 }
