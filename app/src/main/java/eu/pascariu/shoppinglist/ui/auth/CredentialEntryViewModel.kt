@@ -53,10 +53,10 @@ class CredentialEntryViewModel @Inject constructor(
             authEventBus.events.collect { event ->
                 if (event is AuthEvent.CredentialsRejected) {
                     _uiState.update { state ->
-                        if (state.isSaving) {
-                            state.copy(saved = false)
-                        } else {
-                            state.copy(saved = false, rejectionMessage = REJECTION_MESSAGE)
+                        when {
+                            state.isSaving -> state.copy(saved = false)
+                            state.error == INVALID_CREDENTIALS_MESSAGE -> state
+                            else -> state.copy(saved = false, rejectionMessage = REJECTION_MESSAGE)
                         }
                     }
                 }
