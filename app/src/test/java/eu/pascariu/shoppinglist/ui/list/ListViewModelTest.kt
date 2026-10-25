@@ -396,6 +396,62 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `rapid double-tap on undo launches only one undo`() = runTest(testDispatcher) {
+        loadFixtures()
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.canUndo }
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = false)),
+        )
+        viewModel.onUndoTapped()
+        runCurrent()
+        assertTrue(viewModel.uiState.value.isUndoInFlight)
+
+        viewModel.onUndoTapped()
+        runCurrent()
+
+        awaitUntil { !viewModel.uiState.value.isUndoInFlight }
+        awaitUntil { !viewModel.uiState.value.canUndo }
+
+        val checkRequest = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(checkRequest)
+        assertEquals("PATCH", checkRequest!!.method)
+        assertTrue(checkRequest.body.readUtf8().contains("\"isChecked\":true"))
+        val undoRequest = server.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(undoRequest)
+        assertEquals("PATCH", undoRequest!!.method)
+        assertEquals("/api/v1/items/10", undoRequest.path)
+        assertTrue(undoRequest.body.readUtf8().contains("\"isUndo\":true"))
+        assertNull("second tap must not launch a second undo PATCH", server.takeRequest(1, TimeUnit.SECONDS))
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = true)),
+        )
+        viewModel.onCheckToggled(viewModel.uiState.value.items.first { it.id == 10L })
+        awaitUntil { viewModel.uiState.value.canUndo }
+
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(itemJson(id = 10, name = "Milk", isChecked = false)),
+        )
+        viewModel.onUndoTapped()
+        runCurrent()
+        assertTrue(viewModel.uiState.value.isUndoInFlight)
+        awaitUntil { !viewModel.uiState.value.isUndoInFlight }
+    }
+
+    @Test
     fun `undo skips stale entry whose to no longer matches`() = runTest(testDispatcher) {
         loadFixtures()
         server.enqueue(

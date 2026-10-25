@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
 @HiltViewModel
 class ListViewModel @Inject constructor(
@@ -79,6 +80,7 @@ class ListViewModel @Inject constructor(
 
     private val inFlightChecks = MutableStateFlow(0)
     private val undoMutex = Mutex()
+    private val undoInFlightGuard = AtomicBoolean(false)
     private var isCreateInFlight = false
     private var isUpdateInFlight = false
     private var nextPostSaveSignalId = 0L
@@ -282,49 +284,57 @@ class ListViewModel @Inject constructor(
     }
 
     fun onUndoTapped() {
+        if (!undoInFlightGuard.compareAndSet(false, true)) return
+        localState.update { it.copy(isUndoInFlight = true) }
         viewModelScope.launch {
-            localState.update { it.copy(isUndoInFlight = true) }
             try {
                 undoMutex.withLock {
-                    val settled = waitForInFlightChecks()
-                    if (!settled) return@withLock
-                    undoHistoryStore.prune()
-                    val entries = undoHistoryStore.entries.value
-                    val itemCache = itemsRepository.items.value.associateBy { it.id }
-                    for (entry in entries) {
-                        val expired = System.currentTimeMillis() - entry.at >= UndoConfig.TTL.toMillis()
-                        val item = itemCache[entry.itemId]
-                        when {
-                            expired || item == null || item.isChecked != entry.to -> {
-                                undoHistoryStore.removeTop()
-                                continue
-                            }
-                            else -> {
-                                val removed = undoHistoryStore.removeTop()
-                                if (removed == null) return@withLock
-                                try {
-                                    inFlightChecks.update { it + 1 }
-                                    try {
-                                        itemsRepository.setChecked(
-                                            itemId = entry.itemId,
-                                            isChecked = entry.from,
-                                            isUndo = true,
-                                        )
-                                    } finally {
-                                        inFlightChecks.update { it - 1 }
-                                    }
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (_: Exception) {
-                                    undoHistoryStore.restoreTop(entry)
+                    try {
+                        val settled = waitForInFlightChecks()
+                        if (!settled) return@withLock
+                        undoHistoryStore.prune()
+                        val entries = undoHistoryStore.entries.value
+                        val itemCache = itemsRepository.items.value.associateBy { it.id }
+                        for (entry in entries) {
+                            val expired = System.currentTimeMillis() - entry.at >= UndoConfig.TTL.toMillis()
+                            val item = itemCache[entry.itemId]
+                            when {
+                                expired || item == null || item.isChecked != entry.to -> {
+                                    undoHistoryStore.removeTop()
+                                    continue
                                 }
-                                return@withLock
+                                else -> {
+                                    val removed = undoHistoryStore.removeTop()
+                                    if (removed == null) return@withLock
+                                    try {
+                                        inFlightChecks.update { it + 1 }
+                                        try {
+                                            itemsRepository.setChecked(
+                                                itemId = entry.itemId,
+                                                isChecked = entry.from,
+                                                isUndo = true,
+                                            )
+                                        } finally {
+                                            inFlightChecks.update { it - 1 }
+                                        }
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (_: Exception) {
+                                        undoHistoryStore.restoreTop(entry)
+                                    }
+                                    return@withLock
+                                }
                             }
                         }
+                    } finally {
+                        undoInFlightGuard.set(false)
+                        localState.update { it.copy(isUndoInFlight = false) }
                     }
                 }
-            } finally {
+            } catch (e: CancellationException) {
+                undoInFlightGuard.set(false)
                 localState.update { it.copy(isUndoInFlight = false) }
+                throw e
             }
         }
     }
