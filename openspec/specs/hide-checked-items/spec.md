@@ -7,7 +7,9 @@ Let users hide checked items from the list via a widget-stack toggle, with smoot
 ## Requirements
 
 ### Requirement: The Checked-Items Toggle controls checked-item visibility
-The widget stack's Checked-Items Toggle SHALL control whether checked items appear in the list. It SHALL be enabled (showing) by default, render an LED dot with dimmed/active styling, and expose its pressed state to accessibility services. The state SHALL persist across sessions.
+The list screen's Checked-Items Toggle SHALL control whether checked items appear in the list. It SHALL be enabled (showing) by default, render an LED dot with dimmed/active styling, and expose its pressed state to accessibility services. The state SHALL persist across sessions.
+
+While manual sorting is engaged, checked items SHALL remain visible regardless of the toggle, and the toggle SHALL reflect this effective visibility in its LED and pressed state (see the `quick-menu` capability). Tapping the toggle while manual sorting is engaged SHALL surface a rejection message instead of changing the stored preference.
 
 #### Scenario: Toggle hides checked items
 - **WHEN** the user disables the toggle
@@ -20,6 +22,10 @@ The widget stack's Checked-Items Toggle SHALL control whether checked items appe
 #### Scenario: Pressed state is accessible
 - **WHEN** an accessibility service reads the toggle
 - **THEN** it exposes its pressed (showing/hiding) state
+
+#### Scenario: Effective visibility during manual sort
+- **WHEN** manual sorting is engaged while the toggle is disabled
+- **THEN** checked items are visible in the list and the toggle's LED and pressed state reflect them as shown
 
 ### Requirement: Hiding animates and check-off commits instantly
 When checked items are hidden, newly checked items SHALL animate out (height to zero + fade); re-enabling the toggle SHALL animate them back in (grow + fade) in their original order. Check/uncheck SHALL commit instantly regardless of the toggle, and the undo bar SHALL remain available to restore an item that animated out.
