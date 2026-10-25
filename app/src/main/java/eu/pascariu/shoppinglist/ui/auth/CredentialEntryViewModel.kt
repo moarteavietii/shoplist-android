@@ -109,6 +109,8 @@ class CredentialEntryViewModel @Inject constructor(
     private fun verifyAndSave(credentials: AccessCredentials) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, errorKind = null) }
+            // Saved before probing because the auth interceptor only injects
+            // CF headers from the store (and strips explicit ones); cleared on failure.
             withContext(ioDispatcher) {
                 tokenStore.save(credentials)
             }
