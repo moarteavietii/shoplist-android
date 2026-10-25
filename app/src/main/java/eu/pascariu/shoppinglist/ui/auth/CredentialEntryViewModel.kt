@@ -22,6 +22,7 @@ import retrofit2.HttpException
 
 enum class CredentialErrorKind {
     InvalidCredentials,
+    ServerError,
     Unreachable,
     Validation,
     QrFormat,
@@ -138,6 +139,14 @@ class CredentialEntryViewModel @Inject constructor(
                         rejectionMessage = null,
                     )
                 }
+                ProbeOutcome.ServerError -> _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        error = SERVER_ERROR_MESSAGE,
+                        errorKind = CredentialErrorKind.ServerError,
+                        rejectionMessage = null,
+                    )
+                }
             }
         }
     }
@@ -150,7 +159,7 @@ class CredentialEntryViewModel @Inject constructor(
             if (error.code() == 401 || error.code() == 403) {
                 ProbeOutcome.Rejected
             } else {
-                ProbeOutcome.Unreachable
+                ProbeOutcome.ServerError
             }
         } catch (error: IOException) {
             ProbeOutcome.Unreachable
@@ -159,6 +168,7 @@ class CredentialEntryViewModel @Inject constructor(
     private enum class ProbeOutcome {
         Verified,
         Rejected,
+        ServerError,
         Unreachable,
     }
 
@@ -178,6 +188,7 @@ class CredentialEntryViewModel @Inject constructor(
 
     companion object {
         const val INVALID_CREDENTIALS_MESSAGE = "Invalid credentials"
+        const val SERVER_ERROR_MESSAGE = "Server error. Please try again later."
         const val UNREACHABLE_MESSAGE = "Can't reach the server"
         const val REJECTION_MESSAGE = "Your credentials were rejected or the session expired. Please sign in again."
     }

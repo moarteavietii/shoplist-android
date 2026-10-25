@@ -135,7 +135,7 @@ fun CredentialEntryScreen(
             Text(
                 text = error,
                 style = typography.label,
-                color = if (state.errorKind == CredentialErrorKind.Unreachable) {
+                color = if (state.errorKind == CredentialErrorKind.Unreachable || state.errorKind == CredentialErrorKind.ServerError) {
                     colors.contentMuted
                 } else {
                     colors.danger

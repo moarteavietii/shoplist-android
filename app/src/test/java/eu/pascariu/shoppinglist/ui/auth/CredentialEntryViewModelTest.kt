@@ -256,7 +256,7 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
-    fun `unexpected http error shows connectivity error and stores nothing`() = runViewModelTest { viewModel ->
+    fun `server error probe shows server error message and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
         fakeHealthApi.behavior = { throw httpException(500) }
@@ -265,12 +265,46 @@ class CredentialEntryViewModelTest {
             viewModel.submit()
             skipItems(1)
             assertTrue(awaitItem().isSaving)
-            val unreachableState = awaitItem()
-            assertEquals(CredentialEntryViewModel.UNREACHABLE_MESSAGE, unreachableState.error)
-            assertEquals(CredentialErrorKind.Unreachable, unreachableState.errorKind)
-            assertFalse(unreachableState.isSaving)
+            val serverErrorState = awaitItem()
+            assertEquals(CredentialEntryViewModel.SERVER_ERROR_MESSAGE, serverErrorState.error)
+            assertEquals(CredentialErrorKind.ServerError, serverErrorState.errorKind)
+            assertFalse(serverErrorState.isSaving)
+            assertFalse(serverErrorState.saved)
         }
         assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `server error probe does not show the connectivity error`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.behavior = { throw httpException(503) }
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(CredentialEntryViewModel.SERVER_ERROR_MESSAGE, state.error)
+        assertTrue(CredentialEntryViewModel.UNREACHABLE_MESSAGE != state.error)
+    }
+
+    @Test
+    fun `failed probe never persists credentials`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+
+        val failureBehaviors: List<() -> HealthResponse> = listOf(
+            { throw httpException(401) },
+            { throw httpException(500) },
+            { throw IOException("connection refused") },
+        )
+        for (failureBehavior in failureBehaviors) {
+            fakeHealthApi.behavior = failureBehavior
+            viewModel.submit()
+            testDispatcher.scheduler.advanceUntilIdle()
+            assertEquals(null, fakeTokenStore.saved)
+            assertFalse(viewModel.uiState.value.saved)
+        }
     }
 
     @Test
