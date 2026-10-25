@@ -167,11 +167,13 @@ fun QuickMenu(
             Box {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable(
-                        role = Role.Button,
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                    ) { onExpandedChanged(!isExpanded) },
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(
+                            role = Role.Button,
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                        ) { onExpandedChanged(!isExpanded) },
                 ) {
                     Canvas(
                         modifier = Modifier
@@ -311,6 +313,7 @@ private fun QuickMenuControlButton(
     }
     Box(
         modifier = buttonModifier
+            .minimumInteractiveComponentSize()
             .size(40.dp)
             .background(
                 color = if (isActive) colors.surface else colors.chrome,
