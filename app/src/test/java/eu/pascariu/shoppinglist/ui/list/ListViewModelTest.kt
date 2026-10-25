@@ -16,10 +16,12 @@ import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
 import eu.pascariu.shoppinglist.data.prefs.SortOrder
 import eu.pascariu.shoppinglist.data.realtime.ChangeToastLabel
 import eu.pascariu.shoppinglist.data.realtime.RealtimeSyncManagerContract
+import eu.pascariu.shoppinglist.data.realtime.ToastSeverity
 import eu.pascariu.shoppinglist.data.repo.ItemsRepository
 import eu.pascariu.shoppinglist.data.repo.ShopsRepository
 import eu.pascariu.shoppinglist.data.undo.UndoHistoryStore
 import eu.pascariu.shoppinglist.domain.search.GLOBAL_FALLBACK_ID
+import eu.pascariu.shoppinglist.ui.quickmenu.QuickMenuControl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -142,6 +144,7 @@ class ListViewModelTest {
             listPreferences = listPreferences,
             themeRepository = themeRepository,
             realtimeSyncManager = fakeSyncManager,
+            stringProvider = FakeListStringProvider(),
             expiryTicker = expiryTick,
         )
     }
@@ -226,6 +229,23 @@ class ListViewModelTest {
         }
     }
 
+    // Toasts auto-dismiss on virtual time; advanceUntilIdle() would burn through the
+    // auto-dismiss delay before the toast could be observed. runCurrent() only executes
+    // already-scheduled tasks, so the toast stays visible while MockWebServer responses land.
+    private fun TestScope.awaitToast(timeoutMs: Long = 5_000, condition: (ChangeToast?) -> Boolean = { it != null }) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!condition(viewModel.changeToast.value)) {
+            if (System.currentTimeMillis() >= deadline) {
+                throw AssertionError(
+                    "toast condition not met within ${timeoutMs}ms " +
+                        "(requests=${server.requestCount}, shops=${shopsRepository.shops.value.size}, items=${itemsRepository.items.value.size})",
+                )
+            }
+            runCurrent()
+            Thread.sleep(10)
+        }
+    }
+
     @Test
     fun `refresh loads items and shops and builds ui state`() = runTest(testDispatcher) {
         loadFixtures()
@@ -244,7 +264,7 @@ class ListViewModelTest {
         advanceUntilIdle()
 
         assertEquals(0, server.requestCount)
-        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -254,16 +274,23 @@ class ListViewModelTest {
 
         server.enqueue(MockResponse().setResponseCode(500))
         connectivityFlow.value = BackendConnectivity.REACHABLE
-        awaitUntil { viewModel.uiState.value.errorMessage != null }
-        assertEquals("Couldn't refresh the list", viewModel.uiState.value.errorMessage)
+        awaitToast()
+        assertEquals("Couldn't refresh the list", viewModel.changeToast.value?.text)
+        assertEquals(ToastSeverity.Danger, viewModel.changeToast.value?.severity)
 
         enqueueItemList(itemJson(10, "Milk", orderKey = "a0"))
         enqueueShopList(shopJson(1, "Global"))
         connectivityFlow.value = BackendConnectivity.UNREACHABLE
-        advanceUntilIdle()
+        runCurrent()
         connectivityFlow.value = BackendConnectivity.REACHABLE
-        awaitUntil { viewModel.uiState.value.errorMessage == null }
+        val deadline = System.currentTimeMillis() + 5_000
+        while (server.requestCount < 3 && System.currentTimeMillis() < deadline) {
+            runCurrent()
+            Thread.sleep(10)
+        }
+        runCurrent()
         assertEquals(3, server.requestCount)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -280,7 +307,7 @@ class ListViewModelTest {
         advanceUntilIdle()
 
         assertEquals(2, server.requestCount)
-        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -692,9 +719,8 @@ class ListViewModelTest {
 
         viewModel.onAddItemSave()
         awaitUntil { server.requestCount == 3 }
-        advanceUntilIdle()
 
-        assertNotNull(viewModel.uiState.value.errorMessage)
+        awaitToast()
         assertNotNull(viewModel.uiState.value.addItemModal)
     }
 
@@ -714,13 +740,14 @@ class ListViewModelTest {
 
         viewModel.onAddItemSave()
         awaitUntil { server.requestCount == 3 }
-        advanceUntilIdle()
-        assertNotNull(viewModel.uiState.value.errorMessage)
+        awaitToast()
 
         viewModel.onAddItemSave()
         awaitUntil { viewModel.uiState.value.addItemModal == null }
 
-        assertNull(viewModel.uiState.value.errorMessage)
+        viewModel.onToastSwipedDismissed(viewModel.changeToast.value?.id ?: -1L)
+        runCurrent()
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -734,13 +761,12 @@ class ListViewModelTest {
 
         viewModel.onAddItemSave()
         awaitUntil { server.requestCount == 3 }
-        advanceUntilIdle()
-        assertNotNull(viewModel.uiState.value.errorMessage)
+        awaitToast()
 
-        viewModel.onErrorDismissed()
-        advanceUntilIdle()
+        viewModel.onToastSwipedDismissed(viewModel.changeToast.value?.id ?: -1L)
+        runCurrent()
 
-        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -749,9 +775,10 @@ class ListViewModelTest {
         server.enqueue(MockResponse().setResponseCode(500))
 
         viewModel.refresh()
-        awaitUntil { viewModel.uiState.value.errorMessage != null }
+        awaitToast()
 
-        assertNotNull(viewModel.uiState.value.errorMessage)
+        assertEquals("Couldn't refresh the list", viewModel.changeToast.value?.text)
+        assertEquals(ToastSeverity.Danger, viewModel.changeToast.value?.severity)
     }
 
     @Test
@@ -1033,10 +1060,9 @@ class ListViewModelTest {
 
         viewModel.onEditItemSave()
         awaitUntil { server.requestCount == 3 }
-        advanceUntilIdle()
 
+        awaitToast()
         assertEquals("Bread", viewModel.uiState.value.items.first { it.id == 11L }.name)
-        assertNotNull(viewModel.uiState.value.errorMessage)
         assertNull(viewModel.uiState.value.editItemModal)
     }
 
@@ -1155,11 +1181,10 @@ class ListViewModelTest {
 
         viewModel.onDeleteConfirmed()
         awaitUntil { server.requestCount == 3 }
-        advanceUntilIdle()
 
+        awaitToast()
         assertEquals(listOf("Milk", "Bread"), viewModel.uiState.value.items.map { it.name })
         assertEquals(listOf(10L, 11L), itemsRepository.items.value.map { it.id })
-        assertNotNull(viewModel.uiState.value.errorMessage)
         assertNull(viewModel.uiState.value.deleteConfirmItem)
     }
 
@@ -1193,7 +1218,7 @@ class ListViewModelTest {
         advanceUntilIdle()
 
         awaitUntil { viewModel.uiState.value.items.none { it.id == 11L } }
-        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.changeToast.value)
         assertNull(viewModel.uiState.value.deleteConfirmItem)
     }
 
@@ -1575,6 +1600,7 @@ class ListViewModelTest {
             listPreferences = listPreferences,
             themeRepository = themeRepository,
             realtimeSyncManager = fakeSyncManager,
+            stringProvider = FakeListStringProvider(),
             expiryTicker = expiryTick,
         )
         viewModel = instance
@@ -1829,6 +1855,51 @@ class ListViewModelTest {
     }
 
     @Test
+    fun `toggle tap during manual sort posts rejection toast and keeps preference`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.showChecked)
+
+        viewModel.onQuickMenuControlTapped(QuickMenuControl.CHECKED_ITEMS_TOGGLE)
+        awaitToast()
+
+        assertEquals(
+            "Checked items stay visible while manual sorting is engaged",
+            viewModel.changeToast.value?.text,
+        )
+        assertEquals(ToastSeverity.Danger, viewModel.changeToast.value?.severity)
+        assertFalse(viewModel.uiState.value.showChecked)
+        assertFalse(listPreferences.showChecked.value)
+    }
+
+    @Test
+    fun `toggle tap without manual sort toggles preference normally`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onSortOrderChanged(SortOrder.ALPHABETICAL)
+        advanceUntilIdle()
+
+        viewModel.onQuickMenuControlTapped(QuickMenuControl.CHECKED_ITEMS_TOGGLE)
+        runCurrent()
+
+        assertFalse(viewModel.uiState.value.showChecked)
+        assertNull(viewModel.changeToast.value)
+    }
+
+    @Test
+    fun `toggle returns to preference after manual sort disengages`() = runTest(testDispatcher) {
+        loadFixtures()
+        viewModel.onShowCheckedChanged(false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.hideChecked)
+
+        viewModel.onSortModeToggled()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.hideChecked)
+    }
+
+    @Test
     fun `hiding excludes checked items but search override keeps matches visible`() = runTest(testDispatcher) {
         enqueueItemList(
             itemJson(10, "Milk", isChecked = false, visibleIn = "[1]"),
@@ -2062,7 +2133,7 @@ class ListViewModelTest {
         assertTrue(body.contains("\"orderMap\""))
         assertTrue(body.contains("\"1\":\"a2\""))
         awaitUntil { viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"] == "a2" }
-        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -2090,7 +2161,7 @@ class ListViewModelTest {
         val recorded = server.takeRequest(5, TimeUnit.SECONDS)!!
         val body = recorded.body.readUtf8()
         assertTrue(body.contains("\"1\":\"a2\""))
-        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.changeToast.value)
     }
 
     @Test
@@ -2099,9 +2170,10 @@ class ListViewModelTest {
         server.enqueue(MockResponse().setResponseCode(500).setHeader("Content-Type", "application/json").setBody("{\"error\":\"boom\"}"))
 
         viewModel.onItemDropped(viewModel.uiState.value.items.first { it.id == 10L }, dropIndex = 1)
-        awaitUntil { viewModel.uiState.value.errorMessage != null }
+        awaitToast()
 
-        assertEquals("Couldn't move the item", viewModel.uiState.value.errorMessage)
+        assertEquals("Couldn't move the item", viewModel.changeToast.value?.text)
+        assertEquals(ToastSeverity.Danger, viewModel.changeToast.value?.severity)
         assertEquals("a0", viewModel.uiState.value.items.first { it.id == 10L }.orderMap["1"])
     }
 
@@ -2343,4 +2415,13 @@ private class FakeRealtimeSyncManager : RealtimeSyncManagerContract {
     suspend fun emit(batch: List<String>) {
         labels.emit(batch.map { ChangeToastLabel(it) })
     }
+}
+
+private class FakeListStringProvider : ListStringProvider {
+    override val refreshFailure: String = "Couldn't refresh the list"
+    override val moveFailure: String = "Couldn't move the item"
+    override val saveFailure: String = "Couldn't save the item"
+    override val deleteFailure: String = "Couldn't delete the item"
+    override val manualSortCheckedItemsNotice: String =
+        "Checked items stay visible while manual sorting is engaged"
 }

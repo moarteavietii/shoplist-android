@@ -77,6 +77,9 @@ enum class QuickMenuControl {
 
 enum class LedState { FILLED, HOLLOW, NONE }
 
+fun isManualSortEngaged(isSortModeEnabled: Boolean, sortOrder: SortOrder): Boolean =
+    isSortModeEnabled && sortOrder == SortOrder.MANUAL
+
 fun deriveSortModeLedState(sortModeEnabled: Boolean, order: SortOrder): LedState =
     when (order) {
         SortOrder.MANUAL ->
@@ -98,8 +101,14 @@ fun deriveControlLedState(
             deriveSortModeLedState(sortModeEnabled = isSortModeEnabled, order = sortOrder)
         QuickMenuControl.SEARCH ->
             if (isSearchExpanded) LedState.FILLED else LedState.HOLLOW
-        QuickMenuControl.CHECKED_ITEMS_TOGGLE ->
-            if (isShowingCheckedItems) LedState.FILLED else LedState.HOLLOW
+        QuickMenuControl.CHECKED_ITEMS_TOGGLE -> {
+            val isManualSortEngaged = isManualSortEngaged(
+                isSortModeEnabled = isSortModeEnabled,
+                sortOrder = sortOrder,
+            )
+            val isEffectivelyShowing = isShowingCheckedItems || isManualSortEngaged
+            if (isEffectivelyShowing) LedState.FILLED else LedState.HOLLOW
+        }
         else -> null
     }
 
@@ -274,7 +283,12 @@ fun QuickMenu(
                                 isActive = when (control) {
                                     QuickMenuControl.VIEW_SWITCHER -> isDrawerOpen
                                     QuickMenuControl.SEARCH -> isSearchExpanded
-                                    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> isShowingCheckedItems
+                                    QuickMenuControl.CHECKED_ITEMS_TOGGLE -> {
+                                        isShowingCheckedItems || isManualSortEngaged(
+                                            isSortModeEnabled = isSortModeEnabled,
+                                            sortOrder = sortOrder,
+                                        )
+                                    }
                                     else -> false
                                 },
                                 ledState = ledState,

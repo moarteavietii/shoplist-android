@@ -7,10 +7,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,18 +27,23 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.pascariu.shoppinglist.data.realtime.ToastSeverity
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
-import eu.pascariu.shoppinglist.ui.theme.LocalShoplistShapes
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistTypography
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private val TOAST_SWIPE_DISMISS_THRESHOLD = 72.dp
+private val TOAST_PILL_SHAPE = RoundedCornerShape(50)
+private val TOAST_LED_SIZE = 8.dp
+private val TOAST_SHADOW_ELEVATION = 6.dp
 
 @Composable
 fun ChangeToastOverlay(
@@ -69,7 +79,6 @@ private fun ToastContent(
     onDismissed: (Long) -> Unit,
 ) {
     val colors = LocalShoplistColors.current
-    val shapes = LocalShoplistShapes.current
     val typography = LocalShoplistTypography.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -87,14 +96,19 @@ private fun ToastContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .graphicsLayer {
                     translationX = dragOffsetX.value
                     alpha = 1f - (abs(dragOffsetX.value) / (dismissThresholdPx * 2f))
                         .coerceIn(0f, 0.6f)
                 }
-                .background(colors.surface, shapes.medium)
+                .shadow(elevation = TOAST_SHADOW_ELEVATION, shape = TOAST_PILL_SHAPE)
+                .background(colors.surfaceInverse, TOAST_PILL_SHAPE)
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = "Dismiss notification",
+                ) { currentOnDismissed(toast.id) }
                 .pointerInput(toast.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -120,14 +134,33 @@ private fun ToastContent(
                     }
                 }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            ToastLed(
+                severity = toast.severity,
+                modifier = Modifier.padding(end = 8.dp),
+            )
             Text(
                 text = toast.text,
                 style = typography.body,
-                color = colors.content,
-                maxLines = 2,
+                color = colors.contentInverse,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
     }
+}
+
+@Composable
+private fun ToastLed(severity: ToastSeverity, modifier: Modifier = Modifier) {
+    val colors = LocalShoplistColors.current
+    val ledColor = when (severity) {
+        ToastSeverity.Info -> colors.ledOn
+        ToastSeverity.Danger -> colors.danger
+    }
+    Box(
+        modifier = modifier
+            .size(TOAST_LED_SIZE)
+            .background(ledColor, CircleShape),
+    )
 }

@@ -59,11 +59,13 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.pascariu.shoppinglist.data.model.Item
+import eu.pascariu.shoppinglist.R
 import eu.pascariu.shoppinglist.ui.common.ModalButton
 import eu.pascariu.shoppinglist.ui.common.ModalButtonStyle
 import eu.pascariu.shoppinglist.ui.common.modalPanel
@@ -254,32 +256,13 @@ fun ListScreen(
             }
 
             AnimatedVisibility(
-                visible = state.errorMessage != null,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-            ) {
-                Text(
-                    text = state.errorMessage.orEmpty(),
-                    style = typography.label,
-                    color = colors.danger,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { viewModel.onErrorDismissed() }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-
-            AnimatedVisibility(
                 visible = isOffline,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
-                Text(
-                    text = "Offline — changes will be queued",
-                    style = typography.label,
-                    color = colors.ledOn,
+                StatusChip(
+                    label = stringResource(R.string.offline_chip_label),
                     modifier = Modifier
-                        .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }

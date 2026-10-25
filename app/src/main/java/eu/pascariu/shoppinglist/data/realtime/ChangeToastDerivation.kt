@@ -6,7 +6,13 @@ import eu.pascariu.shoppinglist.data.model.Shop
 
 data class ChangeToastLabel(
     val text: String,
+    val severity: ToastSeverity = ToastSeverity.Info,
 )
+
+enum class ToastSeverity {
+    Info,
+    Danger,
+}
 
 fun deriveChangeToasts(
     event: ItemEvent,

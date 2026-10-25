@@ -31,7 +31,6 @@ data class ListUiState(
     val deleteConfirmItem: Item? = null,
     val shopModal: ShopModalUiState? = null,
     val postSaveSignal: PostSaveSignal? = null,
-    val errorMessage: String? = null,
 )
 
 data class PostSaveSignal(val id: Long)
