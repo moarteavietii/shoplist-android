@@ -25,13 +25,13 @@
 ## 5. Watermark
 
 - [x] 5.1 Change `ShoplistTypographyDefault.display` to 56sp Bold and the watermark alpha in `ListScreen.kt` from 0.07 to 0.04
-- [ ] 5.2 Verify watermark rendering with the longest shop name (no layout breakage; passes through touches)
+- [x] 5.2 Verify watermark rendering with the longest shop name (no layout breakage; passes through touches)
 
 ## 6. Verification
 
 - [x] 6.1 Run `./gradlew test` and fix any regressions
 - [x] 6.2 Run `./gradlew lint` and resolve new findings
-- [ ] 6.3 Device smoke test across all nine themes: checkbox legibility (border visibility when unchecked), modal shadow, button contrast, watermark scale
+- [x] 6.3 Device smoke test across all nine themes: checkbox legibility (border visibility when unchecked), modal shadow, button contrast, watermark scale
 
 ## 7. Round-2 review fixes
 
