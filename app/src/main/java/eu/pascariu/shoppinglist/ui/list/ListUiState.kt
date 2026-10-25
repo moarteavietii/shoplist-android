@@ -60,7 +60,7 @@ data class EditItemUiState(
     val quantity: Int = originalQuantity,
     val originalIsTemporary: Boolean = false,
     val isTemporary: Boolean = originalIsTemporary,
-    val checkCount: Int = 0,
+    val checkCount: Int? = null,
 ) {
     val allViewsSelected: Boolean get() = availableViews.all { it.id in selectedViewIds }
     val isUnchanged: Boolean get() =
