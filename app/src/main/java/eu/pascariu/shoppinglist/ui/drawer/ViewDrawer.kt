@@ -25,8 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
@@ -118,10 +116,7 @@ private fun DrawerShopRow(
             } else if (shop.uncheckedCount == 0) {
                 Text(
                     text = "0",
-                    style = typography.label.copy(
-                        fontFamily = FontFamily.Default,
-                        fontSize = 10.sp,
-                    ),
+                    style = typography.micro,
                     color = colors.contentFaint,
                 )
             }
@@ -150,12 +145,7 @@ private fun DrawerShopRow(
 private fun UncheckedCountBadge(count: Int, isActive: Boolean) {
     val colors = LocalShoplistColors.current
     val badgeShape = LocalShoplistShapes.current.medium
-    val badgeStyle = LocalShoplistTypography.current.ledDot.copy(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Bold,
-        fontSize = 10.sp,
-        lineHeight = 14.sp,
-    )
+    val badgeStyle = LocalShoplistTypography.current.micro.copy(lineHeight = 14.sp)
 
     Text(
         text = count.toString(),

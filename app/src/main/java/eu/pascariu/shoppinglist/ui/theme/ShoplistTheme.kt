@@ -59,6 +59,30 @@ private val ShoplistTypographyDefault = ShoplistTypography(
         fontSize = 12.sp,
         lineHeight = 16.sp,
     ),
+    micro = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 10.sp,
+        lineHeight = 10.sp,
+    ),
+    chip = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+    ),
+    stepperKey = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 15.sp,
+        lineHeight = 20.sp,
+    ),
+    stepperValue = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Bold,
+        fontSize = 17.sp,
+        lineHeight = 22.sp,
+    ),
 )
 
 @Composable

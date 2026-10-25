@@ -39,12 +39,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.ui.common.LedSquareCheckbox
 import eu.pascariu.shoppinglist.ui.common.ModalButton
@@ -341,10 +337,7 @@ private fun TemporaryChip(
         )
         Text(
             text = "Temporary",
-            style = typography.label.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
+            style = typography.chip,
             color = if (isTemporary) colors.accentDeep else colors.contentMuted,
         )
     }
@@ -372,10 +365,7 @@ private fun ChecksCountPill(count: Int) {
         )
         Text(
             text = count.toString(),
-            style = typography.label.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
+            style = typography.chip,
             color = colors.contentMuted,
         )
     }
@@ -406,7 +396,7 @@ private fun QuantityStepperWell(
         )
         Text(
             text = quantity.toString(),
-            style = typography.body.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp),
+            style = typography.stepperValue,
             color = colors.content,
             textAlign = TextAlign.Center,
             modifier = Modifier
@@ -430,6 +420,7 @@ private fun StepperKey(
     onClick: () -> Unit,
 ) {
     val colors = LocalShoplistColors.current
+    val typography = LocalShoplistTypography.current
 
     Box(
         modifier = Modifier
@@ -447,11 +438,7 @@ private fun StepperKey(
     ) {
         Text(
             text = symbol,
-            style = TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-            ),
+            style = typography.stepperKey,
             color = if (enabled) colors.accentDeep else colors.ledOff,
         )
     }

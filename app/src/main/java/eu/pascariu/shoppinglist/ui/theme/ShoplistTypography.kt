@@ -10,4 +10,8 @@ data class ShoplistTypography(
     val body: TextStyle,
     val label: TextStyle,
     val ledDot: TextStyle,
+    val micro: TextStyle,
+    val chip: TextStyle,
+    val stepperKey: TextStyle,
+    val stepperValue: TextStyle,
 )
