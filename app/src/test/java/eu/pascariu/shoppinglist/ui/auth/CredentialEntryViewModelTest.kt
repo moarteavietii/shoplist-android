@@ -252,6 +252,8 @@ class CredentialEntryViewModelTest {
             assertNull(savedState.error)
         }
         assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
+        assertEquals("id-1", fakeHealthApi.probedClientId)
+        assertEquals("secret-1", fakeHealthApi.probedClientSecret)
     }
 
     @Test
