@@ -360,6 +360,7 @@ private fun ChecksCountPill(count: Int) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = Modifier
             .background(colors.chrome, RoundedCornerShape(50))
+            .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 7.dp)
             .semantics { contentDescription = "Times checked: $count" },
     ) {
@@ -392,6 +393,7 @@ private fun QuantityStepperWell(
     Row(
         modifier = modifier
             .background(colors.chrome, RoundedCornerShape(50))
+            .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(50))
             .padding(3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -433,6 +435,7 @@ private fun StepperKey(
         modifier = Modifier
             .size(26.dp)
             .background(colors.surface, CircleShape)
+            .border(1.dp, colors.border.copy(alpha = 0.5f), CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
