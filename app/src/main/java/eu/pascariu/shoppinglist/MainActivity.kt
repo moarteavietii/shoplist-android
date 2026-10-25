@@ -34,7 +34,9 @@ import eu.pascariu.shoppinglist.ui.list.ListScreen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.ShoplistTheme
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,14 +52,24 @@ class MainActivity : ComponentActivity() {
 
     private var credentialsRejected by mutableStateOf(false)
     private var credentialsMissing by mutableStateOf(false)
+    private var credentialsCheckDone by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState != null) {
             credentialsRejected = savedInstanceState.getBoolean(KEY_CREDENTIALS_REJECTED)
+            credentialsMissing = savedInstanceState.getBoolean(KEY_CREDENTIALS_MISSING)
+            credentialsCheckDone = true
+        } else {
+            lifecycleScope.launch {
+                val hasCredentials = withContext(Dispatchers.IO) {
+                    tokenStore.load() != null
+                }
+                credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && !hasCredentials
+                credentialsCheckDone = true
+            }
         }
-        credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && tokenStore.load() == null
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 authEventBus.events.collect {
@@ -92,7 +104,7 @@ class MainActivity : ComponentActivity() {
                             },
                             shownAfterRejection = credentialsRejected,
                         )
-                    } else {
+                    } else if (credentialsCheckDone) {
                         ListScreen()
                     }
                 }
@@ -103,9 +115,11 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_CREDENTIALS_REJECTED, credentialsRejected)
+        outState.putBoolean(KEY_CREDENTIALS_MISSING, credentialsMissing)
     }
 
     private companion object {
         const val KEY_CREDENTIALS_REJECTED = "credentialsRejected"
+        const val KEY_CREDENTIALS_MISSING = "credentialsMissing"
     }
 }
