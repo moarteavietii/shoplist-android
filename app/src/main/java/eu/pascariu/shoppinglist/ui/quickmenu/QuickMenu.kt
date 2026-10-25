@@ -102,7 +102,7 @@ fun deriveControlLedState(
     }
 
 @Composable
-fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
+private fun CornerLedDot(filled: Boolean, modifier: Modifier = Modifier) {
     val colors = LocalShoplistColors.current
     Box(modifier = modifier.size(10.dp), contentAlignment = Alignment.Center) {
         if (filled) {
