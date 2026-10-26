@@ -1,9 +1,13 @@
 package eu.pascariu.shoppinglist.ui.list
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -42,6 +46,7 @@ fun ItemRow(
     onCheckToggled: (Item) -> Unit,
     modifier: Modifier = Modifier,
     hideChecked: Boolean = false,
+    staggerDelayMillis: Long = 0,
     dragEnabled: Boolean = false,
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
@@ -51,11 +56,18 @@ fun ItemRow(
     val typography = LocalShoplistTypography.current
     val dragShadowPx = with(LocalDensity.current) { 16.dp.toPx() }
     val dragShape = RoundedCornerShape(12.dp)
+    val exitDriftPx = with(LocalDensity.current) { 24.dp.roundToPx() }
 
     AnimatedVisibility(
         visible = !(hideChecked && item.isChecked),
-        enter = fadeIn() + expandVertically(),
-        exit = slideOutHorizontally(targetOffsetX = { it / 2 }) + fadeOut(),
+        enter = fadeIn(tween(260, delayMillis = staggerDelayMillis.toInt(), easing = LinearOutSlowInEasing)) +
+            expandVertically(tween(260, delayMillis = staggerDelayMillis.toInt(), easing = LinearOutSlowInEasing)),
+        exit = fadeOut(tween(200, easing = FastOutLinearInEasing)) +
+            shrinkVertically(tween(200, easing = FastOutLinearInEasing)) +
+            slideOutHorizontally(
+                tween(200, easing = FastOutLinearInEasing),
+                targetOffsetX = { exitDriftPx },
+            ),
         modifier = modifier,
     ) {
         Row(

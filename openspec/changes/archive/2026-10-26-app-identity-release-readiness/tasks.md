@@ -15,7 +15,7 @@
 - [x] 3.1 Add keystore property reading to `app/build.gradle.kts` (`shoplist.release.keystore.path` / `.password` / `.alias` from `local.properties` with `~/.gradle/gradle.properties` fallback), failing with a clear error when missing
 - [x] 3.2 Wire the signing config to the `release` build type; debug builds unaffected
 - [x] 3.3 Document the keystore/password storage and backup guidance (password manager; keystore outside the repo) in the change notes for the user (`signing-notes.md`)
-- [ ] 3.4 Verify with `assembleRelease`: build succeeds with properties present, fails with a clear message when absent, and the artifact installs on the device
+- [x] 3.4 Verify with `assembleRelease`: build succeeds with properties present, fails with a clear message when absent, and the artifact installs on the device
 
 ## 4. Final verification
 
