@@ -1,3 +1,9 @@
+## Purpose
+
+Defines how the app adopts the backend's API: all traffic targets the versioned `/api/v1` prefix, the backend's machine-readable contract documents (OpenAPI for REST, AsyncAPI for SSE) drive any endpoint work, and breaking backend changes are adopted explicitly as a new major prefix.
+
+## Requirements
+
 ### Requirement: The app calls the versioned API surface
 The app SHALL send all REST requests and open all SSE connections against the versioned prefix `/api/v1`. No request SHALL target the unversioned `/api/...` prefix.
 
