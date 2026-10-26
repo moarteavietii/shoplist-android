@@ -100,6 +100,10 @@ adb exec-out screencap -p > .coda/tmp/screen.png
 
 # Watch logcat for crashes (leave running while testing)
 adb logcat -s AndroidRuntime:E
+
+# Generate the QR code for login
+qrencode -o qr-token.png '{"clientId":"","clientSecret":""}'
+
 ```
 
 Troubleshooting:
