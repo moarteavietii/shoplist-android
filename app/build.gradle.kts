@@ -217,7 +217,7 @@ android {
 
     defaultConfig {
         applicationId = "eu.pascariu.shoppinglist"
-        minSdk = 35
+        minSdk = 31
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
