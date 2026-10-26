@@ -207,6 +207,12 @@ fun ListScreen(
                             state = reorderableState,
                             key = item.id,
                             enabled = dragEnabled,
+                            // ReorderableItem applies its own default animateItem() (with fades) internally;
+                            // without this, appearance fades re-trigger at the list's bottom edge and flicker.
+                            animateItemModifier = Modifier.animateItem(
+                                fadeInSpec = null,
+                                fadeOutSpec = null,
+                            ),
                         ) { isDragging ->
                             val rowIsDragging = isDragging && draggingItemId == item.id
                             ItemRow(
@@ -230,7 +236,10 @@ fun ListScreen(
                                         dragOrder = emptyList()
                                     },
                                 ),
-                                modifier = Modifier.animateItem(),
+                                modifier = Modifier.animateItem(
+                                    fadeInSpec = null,
+                                    fadeOutSpec = null,
+                                ),
                             )
                         }
                     }
