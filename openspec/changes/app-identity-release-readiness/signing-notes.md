@@ -2,7 +2,7 @@
 
 ## Where things live
 
-- **Keystore file:** `shoplist-release.jks` (currently in the repo root; it is gitignored via `*.jks`, so it will never be committed). Recommended: move it somewhere outside the repo, e.g. `~/keystores/shoplist-release.jks`, and point `shoplist.release.keystore.path` at that location — the repo copy then can't be lost by a careless `rm -rf` of the project.
+- **Keystore file:** `shoplist-release.jks` — **must live outside the repository**, e.g. `~/keystores/shoplist-release.jks`. The build refuses to sign with a keystore located inside the repo (a repo copy could be committed by a forced `git add` or a `.gitignore` regression). Point `shoplist.release.keystore.path` at the outside-repo location; the file also can't be lost by a careless `rm -rf` of the project.
 - **Passwords:** expected in gitignored `local.properties` (repo root) or `~/.gradle/gradle.properties` (machine-independent). Required keys:
 
   ```properties

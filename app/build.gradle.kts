@@ -125,6 +125,16 @@ fun requireReleaseSigningConfig() {
                 "(shoplist.release.keystore.path)"
         )
     }
+    val keystoreRepoPath = keystore!!.absolutePath + File.separator
+    val repoRootPath = rootDir.absolutePath + File.separator
+    if (keystoreRepoPath.startsWith(repoRootPath)) {
+        throw GradleException(
+            "Release signing: the keystore must live outside the repository " +
+                "(got '${keystoreRepoPath.removeSuffix(File.separator)}'). A keystore inside " +
+                "the repo can be committed by a forced add or a .gitignore regression. " +
+                "Move it (e.g. to ~/keystores/) and update shoplist.release.keystore.path."
+        )
+    }
 }
 
 gradle.taskGraph.whenReady {
