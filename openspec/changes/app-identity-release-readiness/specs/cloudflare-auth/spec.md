@@ -41,3 +41,8 @@ The app SHALL respond to credential rejection by navigating to the credential en
 #### Scenario: Rejected credential probe does not crash
 - **WHEN** the credential probe receives HTML (or any non-JSON body) instead of the expected JSON
 - **THEN** the probe outcome is treated as rejected credentials, an error message is shown, and nothing is stored
+
+#### Scenario: Probe parse-failure classification is deliberately coarse
+- **WHEN** the probe response cannot be parsed as the expected JSON schema (gate HTML, an error envelope, or a drifted response shape)
+- **THEN** all such parse failures are classified as rejected credentials, even though a 200 response with a drifted shape would misreport valid credentials as invalid
+- **AND** this coarse mapping is an accepted trade-off: distinguishing gate HTML from a drifted JSON shape would require refactoring the probe to inspect raw response bodies, and response-shape drift is guarded by the OpenAPI contract-verification workflow instead
