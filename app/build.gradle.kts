@@ -99,7 +99,13 @@ val keystoreKeyPassword: String? =
     keystoreProperties?.nonBlankProperty("shoplist.release.keystore.keypassword")
 
 val keystoreFile: File? = keystorePath?.let {
-    val expanded = File(it.replaceFirst("^~", System.getProperty("user.home")))
+    val expanded = if (it == "~") {
+        File(System.getProperty("user.home"))
+    } else if (it.startsWith("~/")) {
+        File(System.getProperty("user.home"), it.removePrefix("~/"))
+    } else {
+        File(it)
+    }
     if (expanded.isAbsolute) expanded else rootDir.resolve(expanded)
 }
 
