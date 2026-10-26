@@ -202,7 +202,14 @@ fun ListScreen(
                         ),
                 ) {
                     val visibleItems = if (draggingItemId != null) dragOrder else state.filteredItems
+                    val checkedCount = visibleItems.count { it.isChecked }
                     items(visibleItems, key = { it.id }) { item ->
+                        val checkedIndex = visibleItems.takeWhile { it.id != item.id }.count { it.isChecked }
+                        val staggerDelayMillis = if (checkedCount > 1) {
+                            minOf(40L, 250L / checkedCount) * checkedIndex
+                        } else {
+                            0L
+                        }
                         ReorderableItem(
                             state = reorderableState,
                             key = item.id,
@@ -219,6 +226,7 @@ fun ListScreen(
                                 item = item,
                                 onCheckToggled = viewModel::onCheckToggled,
                                 hideChecked = state.hideChecked,
+                                staggerDelayMillis = staggerDelayMillis,
                                 dragEnabled = dragEnabled,
                                 isDragging = rowIsDragging,
                                 onLongPress = { viewModel.onItemLongPressed(item) },
