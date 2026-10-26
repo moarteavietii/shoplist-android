@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the application shell for the native Android client: the Compose-based UI foundation carrying the custom design language, the dependency-injection and networking stack, per-build-type server configuration, and the health-check contract that proves end-to-end connectivity to the backend.
+Defines the application shell for the native Android client: the Compose-based UI foundation carrying the custom design language, the dependency-injection and networking stack, and per-build-type server configuration.
 
 ## Requirements
 
@@ -28,15 +28,11 @@ The app SHALL use Hilt for dependency injection, with an application class annot
 - **THEN** the manifest declares a Hilt-annotated application class and dependency graph construction succeeds
 
 ### Requirement: Networking stack uses Retrofit, OkHttp, and kotlinx.serialization
-The app SHALL perform REST calls through Retrofit over OkHttp with kotlinx.serialization for JSON conversion, and SHALL expose a health-check API for `GET /health`.
+The app SHALL perform REST calls through Retrofit over OkHttp with kotlinx.serialization for JSON conversion.
 
-#### Scenario: Health check succeeds against a healthy backend
-- **WHEN** the app calls the health-check endpoint and the backend is reachable
-- **THEN** the call returns the backend's `{ status: "ok" }` response
-
-#### Scenario: Health check reports an unreachable backend
-- **WHEN** the app calls the health-check endpoint and the backend is unreachable
-- **THEN** the call fails with an error the UI can surface, without crashing the app
+#### Scenario: REST calls go through the typed client
+- **WHEN** the app performs any REST call
+- **THEN** the request is executed by Retrofit over OkHttp and the response is converted with kotlinx.serialization
 
 ### Requirement: Base URL is selected per build type
 The app SHALL use `https://shoppinglist.pascariu.eu` as the base URL in release builds. In debug builds the base URL SHALL come from the `devBaseUrl` property in the gitignored `local.properties`, falling back to `http://192.168.0.141:3005` (the workstation's LAN address) when unset, and debug builds SHALL permit cleartext HTTP for the configured dev host and the workstation fallback only.
@@ -63,10 +59,3 @@ The app SHALL NOT render a persistent application title or header bar at the top
 #### Scenario: No title is rendered
 - **WHEN** the app renders
 - **THEN** no static application title or header bar is visible at the top of the screen
-
-### Requirement: Health status is visible in the UI
-The app SHALL display the backend health status returned by the health-check call.
-
-#### Scenario: Health status is visible
-- **WHEN** the app is launched and the backend is healthy
-- **THEN** the UI displays the health status returned by the backend

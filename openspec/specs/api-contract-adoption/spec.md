@@ -1,5 +1,5 @@
 ### Requirement: The app calls the versioned API surface
-The app SHALL send all REST requests and open all SSE connections against the versioned prefix `/api/v1` (health probe at `/health` excepted). No request SHALL target the unversioned `/api/...` prefix.
+The app SHALL send all REST requests and open all SSE connections against the versioned prefix `/api/v1`. No request SHALL target the unversioned `/api/...` prefix.
 
 #### Scenario: REST requests carry the versioned prefix
 - **WHEN** the app sends any REST request (items or shops endpoints)
@@ -8,10 +8,6 @@ The app SHALL send all REST requests and open all SSE connections against the ve
 #### Scenario: SSE connections carry the versioned prefix
 - **WHEN** the app opens either SSE subscription
 - **THEN** the connection URL path starts with `/api/v1/`
-
-#### Scenario: Health probe stays unversioned
-- **WHEN** the app checks backend reachability
-- **THEN** the request targets `/health` without the `/api/v1` prefix
 
 ### Requirement: The backend contract is the source of truth for API work
 When implementing or changing anything that touches server endpoints or SSE (paths, request/response bodies, event names, event payloads), the app's implementation SHALL be derived from the backend's machine-readable contract documents — the live OpenAPI document (`GET /openapi.json` on the backend) for REST and the AsyncAPI document in the web repo for SSE — rather than re-derived from observation or memory.
