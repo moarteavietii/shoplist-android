@@ -7,7 +7,7 @@ The manifest already wires `@mipmap/ic_launcher`, `@mipmap/ic_launcher_round`, a
 **Goals:**
 
 - Faithful import of the web icon into the adaptive-icon pipeline with safe-zone compliance (option A, user-confirmed).
-- Product label `şopy` everywhere the launcher label surfaces.
+- Product label `shopy` everywhere the launcher label surfaces.
 - Reproducible, gitignored release signing wired into Gradle.
 
 **Non-Goals:**
@@ -43,7 +43,7 @@ The keystore passwords live in gitignored `local.properties`; the keystore file 
 - [Duotone art as monochrome layer may look poor when wallpaper-tinted] → Verify on device during smoke test; if unacceptable, a follow-up adds a dedicated single-color silhouette glyph (small, isolated change).
 - [Raster foreground at 66% scale may soften edges at small densities] → Generate webp from the 512px source with high-quality downsampling; visually verify at launcher size on device.
 - [Keystore loss] → Password-manager backup of keystore + passwords (D4); worst case is uninstall/reinstall, not permanent lockout.
-- [`şopy` diacritic rendering] → Full Unicode labels are standard on Android; verify on device screenshot anyway since it's the most visible string in the product.
+- [`shopy` label rendering] → Plain ASCII label; verify on device screenshot anyway since it's the most visible string in the product.
 
 ## Migration Plan
 

@@ -7,7 +7,7 @@
 
 ## 2. App label
 
-- [x] 2.1 Change `app_name` in `res/values/strings.xml` from `shoplist-android` to `shopy` (user decision: plain ASCII, `şopy` rejected for searchability)
+- [x] 2.1 Change `app_name` in `res/values/strings.xml` from `shoplist-android` to `shopy` (user decision: plain ASCII; the earlier diacritic variant was rejected for searchability, and 2026-10-26 confirmed plain `shopy` as final)
 - [x] 2.2 Verify on device: label renders under the launcher icon and in system Settings
 
 ## 3. Release signing
@@ -19,5 +19,5 @@
 
 ## 4. Final verification
 
-- [ ] 4.1 Run `./gradlew test` and `./gradlew lint` — no regressions
-- [ ] 4.2 Device smoke test: fresh install shows new icon + `şopy` label; release build installs and launches
+- [x] 4.1 Run `./gradlew test` and `./gradlew lint` — no regressions
+- [x] 4.2 Device smoke test: fresh install shows new icon + `shopy` label; release build installs and launches
