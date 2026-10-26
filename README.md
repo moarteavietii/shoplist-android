@@ -42,7 +42,7 @@ openspec/
 
 ## Building a Release
 
-The release build is signed with your own keystore. One-time setup: put the three keystore values in gitignored `local.properties` (see `openspec/changes/app-identity-release-readiness/signing-notes.md` for details and backup guidance):
+The release build is signed with your own keystore. One-time setup: put the three keystore values in gitignored `local.properties` (see `openspec/changes/archive/2026-10-26-app-identity-release-readiness/signing-notes.md` for details and backup guidance):
 
 ```properties
 shoplist.release.keystore.path=/absolute/path/to/shoplist-release.jks
