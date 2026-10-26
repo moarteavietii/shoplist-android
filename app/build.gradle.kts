@@ -79,6 +79,81 @@ require(releaseBaseUrl.startsWith("https://")) {
     "release BASE_URL must use HTTPS"
 }
 
+val keystoreProperties: Properties? = run {
+    val props = Properties()
+    localProperties?.let { props.putAll(it) }
+    val userGradleProps = File(System.getProperty("user.home"), ".gradle/gradle.properties")
+    if (userGradleProps.exists()) {
+        userGradleProps.reader().use { props.load(it) }
+    }
+    if (props.isEmpty) null else props
+}
+
+fun Properties.nonBlankProperty(key: String): String? =
+    getProperty(key)?.takeIf { it.isNotBlank() }
+
+val keystorePath: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.path")
+val keystorePassword: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.password")
+val keystoreAlias: String? = keystoreProperties?.nonBlankProperty("shoplist.release.keystore.alias")
+val keystoreKeyPassword: String? =
+    keystoreProperties?.nonBlankProperty("shoplist.release.keystore.keypassword")
+
+val keystoreFile: File? = keystorePath?.let {
+    val expanded = if (it == "~") {
+        File(System.getProperty("user.home"))
+    } else if (it.startsWith("~/")) {
+        File(System.getProperty("user.home"), it.removePrefix("~/"))
+    } else {
+        File(it)
+    }
+    if (expanded.isAbsolute) expanded else rootDir.resolve(expanded)
+}
+
+val hasReleaseSigningConfig = keystoreFile != null && keystorePassword != null && keystoreAlias != null
+
+fun requireReleaseSigningConfig() {
+    val missing = buildList {
+        if (keystorePath == null) add("shoplist.release.keystore.path")
+        if (keystorePassword == null) add("shoplist.release.keystore.password")
+        if (keystoreAlias == null) add("shoplist.release.keystore.alias")
+    }
+    if (missing.isNotEmpty()) {
+        throw GradleException(
+            "Release signing configuration is missing. Set the following in " +
+                "local.properties (or ~/.gradle/gradle.properties): ${missing.joinToString()}. " +
+                "Never commit these values or the keystore file."
+        )
+    }
+    val keystore = keystoreFile
+    if (keystore != null && !keystore.isFile) {
+        throw GradleException(
+            "Release signing: keystore file not found at '$keystore' " +
+                "(shoplist.release.keystore.path)"
+        )
+    }
+    val keystoreRepoPath = keystore!!.absolutePath + File.separator
+    val repoRootPath = rootDir.absolutePath + File.separator
+    if (keystoreRepoPath.startsWith(repoRootPath)) {
+        throw GradleException(
+            "Release signing: the keystore must live outside the repository " +
+                "(got '${keystoreRepoPath.removeSuffix(File.separator)}'). A keystore inside " +
+                "the repo can be committed by a forced add or a .gitignore regression. " +
+                "Move it (e.g. to ~/keystores/) and update shoplist.release.keystore.path."
+        )
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val buildsReleaseArtifact = allTasks.any { task ->
+        task.project.path == ":app" &&
+            (task.name.startsWith("assemble") || task.name.startsWith("bundle")) &&
+            task.name.endsWith("Release")
+    }
+    if (buildsReleaseArtifact) {
+        requireReleaseSigningConfig()
+    }
+}
+
 val devHost = devBaseUrl
     .removePrefix("http://")
     .removePrefix("https://")
@@ -128,6 +203,18 @@ android {
         version = release(37)
     }
 
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            val keystore = keystoreFile!!
+            create("release") {
+                storeFile = keystore
+                storePassword = keystorePassword
+                keyAlias = keystoreAlias
+                keyPassword = keystoreKeyPassword ?: keystorePassword
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "eu.pascariu.shoppinglist"
         minSdk = 35
@@ -142,6 +229,7 @@ android {
         debug {
             buildConfigField("String", "BASE_URL", "\"$devBaseUrl\"")
             buildConfigField("boolean", "MOCK_CLOUDFLARE", mockCloudflare.toString())
+            buildConfigField("boolean", "REQUIRES_CREDENTIALS", mockCloudflare.toString())
         }
         release {
             optimization {
@@ -150,6 +238,10 @@ android {
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
             buildConfigField("String", "BASE_URL", "\"$releaseBaseUrl\"")
+            buildConfigField("boolean", "REQUIRES_CREDENTIALS", "true")
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     buildFeatures {

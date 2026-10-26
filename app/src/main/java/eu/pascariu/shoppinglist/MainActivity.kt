@@ -24,15 +24,19 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.Modifier
 import dagger.hilt.android.AndroidEntryPoint
+import eu.pascariu.shoppinglist.BuildConfig
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBus
+import eu.pascariu.shoppinglist.data.auth.TokenStore
 import eu.pascariu.shoppinglist.data.prefs.ThemeRepository
 import eu.pascariu.shoppinglist.ui.auth.CredentialEntryScreen
 import eu.pascariu.shoppinglist.ui.list.ListScreen
 import eu.pascariu.shoppinglist.ui.theme.LocalShoplistColors
 import eu.pascariu.shoppinglist.ui.theme.ShoplistTheme
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -43,13 +47,28 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themeRepository: ThemeRepository
 
+    @Inject
+    lateinit var tokenStore: TokenStore
+
     private var credentialsRejected by mutableStateOf(false)
+    private var credentialsMissing by mutableStateOf(false)
+    private var credentialsCheckDone by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState != null) {
             credentialsRejected = savedInstanceState.getBoolean(KEY_CREDENTIALS_REJECTED)
+            credentialsMissing = savedInstanceState.getBoolean(KEY_CREDENTIALS_MISSING)
+            credentialsCheckDone = true
+        } else {
+            lifecycleScope.launch {
+                val hasCredentials = withContext(Dispatchers.IO) {
+                    tokenStore.load() != null
+                }
+                credentialsMissing = BuildConfig.REQUIRES_CREDENTIALS && !hasCredentials
+                credentialsCheckDone = true
+            }
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -77,12 +96,15 @@ class MainActivity : ComponentActivity() {
                             .windowInsetsTopHeight(WindowInsets.statusBars)
                             .background(colors.chrome),
                     )
-                    if (credentialsRejected) {
+                    if (credentialsRejected || credentialsMissing) {
                         CredentialEntryScreen(
-                            onCredentialsSaved = { credentialsRejected = false },
-                            shownAfterRejection = true,
+                            onCredentialsSaved = {
+                                credentialsRejected = false
+                                credentialsMissing = false
+                            },
+                            shownAfterRejection = credentialsRejected,
                         )
-                    } else {
+                    } else if (credentialsCheckDone) {
                         ListScreen()
                     }
                 }
@@ -93,9 +115,11 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_CREDENTIALS_REJECTED, credentialsRejected)
+        outState.putBoolean(KEY_CREDENTIALS_MISSING, credentialsMissing)
     }
 
     private companion object {
         const val KEY_CREDENTIALS_REJECTED = "credentialsRejected"
+        const val KEY_CREDENTIALS_MISSING = "credentialsMissing"
     }
 }

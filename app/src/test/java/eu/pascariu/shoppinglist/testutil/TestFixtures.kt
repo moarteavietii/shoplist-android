@@ -1,16 +1,23 @@
 package eu.pascariu.shoppinglist.testutil
 
 import eu.pascariu.shoppinglist.data.network.HealthApi
-import eu.pascariu.shoppinglist.data.network.HealthResponse
+import eu.pascariu.shoppinglist.data.model.Shop
 import retrofit2.HttpException
 import retrofit2.Response
 
-class FakeHealthApi(var behavior: () -> HealthResponse = {
-    HealthResponse(status = "ok")
-}) : HealthApi {
-    override suspend fun getHealth(): HealthResponse = behavior()
+class FakeHealthApi(
+    var probeBehavior: () -> List<Shop> = { emptyList() },
+) : HealthApi {
+    var probedClientId: String? = null
+        private set
+    var probedClientSecret: String? = null
+        private set
 
-    override suspend fun probeHealth(clientId: String, clientSecret: String): HealthResponse = behavior()
+    override suspend fun probeShops(clientId: String, clientSecret: String): List<Shop> {
+        probedClientId = clientId
+        probedClientSecret = clientSecret
+        return probeBehavior()
+    }
 }
 
 fun httpException(code: Int): HttpException =

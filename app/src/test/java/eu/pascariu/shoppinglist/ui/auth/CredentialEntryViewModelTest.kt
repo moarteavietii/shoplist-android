@@ -5,7 +5,7 @@ import eu.pascariu.shoppinglist.data.auth.AccessCredentials
 import eu.pascariu.shoppinglist.data.auth.AuthEvent
 import eu.pascariu.shoppinglist.data.auth.AuthEventBusImpl
 import eu.pascariu.shoppinglist.data.auth.TokenStore
-import eu.pascariu.shoppinglist.data.network.HealthResponse
+import eu.pascariu.shoppinglist.data.model.Shop
 import eu.pascariu.shoppinglist.di.IoDispatcher
 import eu.pascariu.shoppinglist.testutil.FakeHealthApi
 import eu.pascariu.shoppinglist.testutil.httpException
@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.SerializationException
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -68,6 +69,47 @@ class CredentialEntryViewModelTest {
         viewModel.submit()
 
         assertEquals("Both client id and secret are required", viewModel.uiState.value.error)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `submit with control characters shows validation error and does not save`() {
+        val viewModel = createViewModel()
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret\u000d\u000a-1")
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(CredentialErrorKind.Validation, viewModel.uiState.value.errorKind)
+        assertEquals(null, fakeTokenStore.saved)
+        assertFalse(viewModel.uiState.value.saved)
+    }
+
+    @Test
+    fun `submit with non-ascii characters shows validation error and does not save`() {
+        val viewModel = createViewModel()
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-ț")
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(CredentialErrorKind.Validation, viewModel.uiState.value.errorKind)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `qr payload with non-ascii characters is rejected at submit and does not save`() {
+        val viewModel = createViewModel()
+        viewModel.onQrPayloadScanned(
+            """{"clientId":"id-1","clientSecret":"secret­-1"}"""
+        )
+
+        viewModel.submit()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(CredentialErrorKind.Validation, viewModel.uiState.value.errorKind)
         assertEquals(null, fakeTokenStore.saved)
     }
 
@@ -137,7 +179,7 @@ class CredentialEntryViewModelTest {
     fun `scanned qr payload populates fields without saving`() {
         val viewModel = createViewModel()
 
-        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id","clientSecret":"scanned-secret"}""")
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("scanned-id", viewModel.uiState.value.clientId)
@@ -149,13 +191,48 @@ class CredentialEntryViewModelTest {
     @Test
     fun `scanned qr credentials are only saved after user submits`() {
         val viewModel = createViewModel()
-        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id","clientSecret":"scanned-secret"}""")
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(AccessCredentials("scanned-id", "scanned-secret"), fakeTokenStore.saved)
         assertTrue(viewModel.uiState.value.saved)
+    }
+
+    @Test
+    fun `scanned qr payload with unknown keys is accepted`() {
+        val viewModel = createViewModel()
+
+        viewModel.onQrPayloadScanned(
+            """{"clientId":"scanned-id","clientSecret":"scanned-secret","note":"extra"}"""
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("scanned-id", viewModel.uiState.value.clientId)
+        assertEquals("scanned-secret", viewModel.uiState.value.clientSecret)
+    }
+
+    @Test
+    fun `scanned qr payload with blank credentials is rejected`() {
+        val viewModel = createViewModel()
+
+        viewModel.onQrPayloadScanned("""{"clientId":"   ","clientSecret":"scanned-secret"}""")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Unrecognized QR code format", viewModel.uiState.value.error)
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
+    fun `scanned qr payload missing client secret is rejected`() {
+        val viewModel = createViewModel()
+
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id"}""")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Unrecognized QR code format", viewModel.uiState.value.error)
+        assertEquals(null, fakeTokenStore.saved)
     }
 
     @Test
@@ -166,7 +243,7 @@ class CredentialEntryViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(CredentialEntryViewModel.REJECTION_MESSAGE, viewModel.uiState.value.rejectionMessage)
 
-        viewModel.onQrPayloadScanned("https://example.com/auth?id=scanned-id&secret=scanned-secret")
+        viewModel.onQrPayloadScanned("""{"clientId":"scanned-id","clientSecret":"scanned-secret"}""")
 
         assertNull(viewModel.uiState.value.rejectionMessage)
     }
@@ -185,7 +262,7 @@ class CredentialEntryViewModelTest {
     fun `valid probe saves credentials and emits saved`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { HealthResponse(status = "ok") }
+        fakeHealthApi.probeBehavior = { emptyList() }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -197,13 +274,15 @@ class CredentialEntryViewModelTest {
             assertNull(savedState.error)
         }
         assertEquals(AccessCredentials("id-1", "secret-1"), fakeTokenStore.saved)
+        assertEquals("id-1", fakeHealthApi.probedClientId)
+        assertEquals("secret-1", fakeHealthApi.probedClientSecret)
     }
 
     @Test
     fun `rejected probe shows invalid credentials error and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
+        fakeHealthApi.probeBehavior = { throw httpException(401) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -222,7 +301,7 @@ class CredentialEntryViewModelTest {
     fun `forbidden probe shows invalid credentials error and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(403) }
+        fakeHealthApi.probeBehavior = { throw httpException(403) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -240,7 +319,7 @@ class CredentialEntryViewModelTest {
     fun `unreachable probe shows connectivity error and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw IOException("connection refused") }
+        fakeHealthApi.probeBehavior = { throw IOException("connection refused") }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -259,7 +338,7 @@ class CredentialEntryViewModelTest {
     fun `server error probe shows server error message and stores nothing`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(500) }
+        fakeHealthApi.probeBehavior = { throw httpException(500) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -275,10 +354,33 @@ class CredentialEntryViewModelTest {
     }
 
     @Test
+    fun `probe returning gate html instead of json shows invalid credentials and stores nothing`() = runViewModelTest { viewModel ->
+        viewModel.onClientIdChange("id-1")
+        viewModel.onClientSecretChange("secret-1")
+        fakeHealthApi.probeBehavior = {
+            throw SerializationException(
+                "Unexpected JSON token at offset 0: Expected start of the object '{', but had '<' instead at path: $"
+            )
+        }
+
+        viewModel.uiState.test {
+            viewModel.submit()
+            skipItems(1)
+            assertTrue(awaitItem().isSaving)
+            val rejectedState = awaitItem()
+            assertEquals(CredentialEntryViewModel.INVALID_CREDENTIALS_MESSAGE, rejectedState.error)
+            assertEquals(CredentialErrorKind.InvalidCredentials, rejectedState.errorKind)
+            assertFalse(rejectedState.isSaving)
+            assertFalse(rejectedState.saved)
+        }
+        assertEquals(null, fakeTokenStore.saved)
+    }
+
+    @Test
     fun `server error probe does not show the connectivity error`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(503) }
+        fakeHealthApi.probeBehavior = { throw httpException(503) }
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -293,13 +395,13 @@ class CredentialEntryViewModelTest {
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
 
-        val failureBehaviors: List<() -> HealthResponse> = listOf(
+        val failureBehaviors: List<() -> List<Shop>> = listOf(
             { throw httpException(401) },
             { throw httpException(500) },
             { throw IOException("connection refused") },
         )
         for (failureBehavior in failureBehaviors) {
-            fakeHealthApi.behavior = failureBehavior
+            fakeHealthApi.probeBehavior = failureBehavior
             viewModel.submit()
             testDispatcher.scheduler.advanceUntilIdle()
             assertEquals(null, fakeTokenStore.saved)
@@ -323,7 +425,7 @@ class CredentialEntryViewModelTest {
     fun `rejected probe does not set the rejection banner`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
+        fakeHealthApi.probeBehavior = { throw httpException(401) }
 
         viewModel.uiState.test {
             viewModel.submit()
@@ -339,7 +441,7 @@ class CredentialEntryViewModelTest {
     fun `rejection event during an in-flight probe does not set the banner`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = {
+        fakeHealthApi.probeBehavior = {
             authEventBus.emit(AuthEvent.CredentialsRejected)
             throw httpException(401)
         }
@@ -356,7 +458,7 @@ class CredentialEntryViewModelTest {
     fun `rejection event after a rejected probe does not stack the banner`() = runViewModelTest { viewModel ->
         viewModel.onClientIdChange("id-1")
         viewModel.onClientSecretChange("secret-1")
-        fakeHealthApi.behavior = { throw httpException(401) }
+        fakeHealthApi.probeBehavior = { throw httpException(401) }
 
         viewModel.submit()
         testDispatcher.scheduler.advanceUntilIdle()
